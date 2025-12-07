@@ -48,6 +48,40 @@ Sistema de gestión integral para una joyería que opera en múltiples puntos de
 
 ---
 
+## Índice de Documentación
+
+Esta sección proporciona acceso rápido a toda la documentación técnica del proyecto.
+
+### Documentación Principal
+
+- **[Épicas del MVP](Documentos/epicas.md)**: Descripción detallada de las épicas principales del MVP, incluyendo User Stories, orden de implementación y dependencias entre épicas.
+
+- **[Arquitectura del Sistema](Documentos/arquitectura.md)**: Documentación completa de la arquitectura técnica, incluyendo stack tecnológico, configuración de desarrollo y producción, flujos de datos principales y consideraciones de seguridad.
+
+- **[Modelo de Datos](Documentos/modelo-de-datos.md)**: Especificación completa del modelo de datos, incluyendo diagramas ER, descripción de entidades, relaciones, índices y optimizaciones para free-tier.
+
+- **[Modelo C4](Documentos/modelo-c4.md)**: Arquitectura del sistema utilizando el modelo C4, proporcionando diferentes niveles de abstracción desde el contexto general hasta los componentes internos del backend y frontend.
+
+### Procedimientos
+
+Documentación de procedimientos y metodologías de trabajo del proyecto:
+
+- **[Procedimiento de User Stories](Documentos/Procedimientos/Procedimiento-UserStories.md)**: Metodología y formato para la creación y gestión de User Stories.
+
+- **[Procedimiento de Tickets de Trabajo](Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md)**: Proceso para la creación, asignación y seguimiento de tickets de trabajo.
+
+### Propuestas
+
+Documentos de propuestas técnicas y análisis:
+
+- **[Aclaraciones Técnicas](Documentos/Propuestas/aclaraciones-tecnicas.md)**: Aclaraciones y decisiones técnicas importantes del proyecto.
+
+- **[Análisis de Metronic Frontend](Documentos/Propuestas/analisis-metronic-frontend.md)**: Análisis y evaluación del framework Metronic para el frontend.
+
+- **[Arquitecturas Propuestas](Documentos/Propuestas/arquitecturas-propuestas.md)**: Diferentes propuestas arquitectónicas evaluadas para el proyecto.
+
+---
+
 ## Casos de Uso - MVP (Fase 1)
 
 ### Gestión de Productos

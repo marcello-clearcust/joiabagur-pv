@@ -90,7 +90,7 @@ flowchart TB
         
         LocalStorage["Storage Local<br/>- Carpeta ./uploads/<br/>- Fotos de productos y ventas"]
         
-        Frontend -->|HTTP (sin HTTPS)| Backend
+        Frontend -->|"HTTP (sin HTTPS)"| Backend
         Backend -->|PostgreSQL| Postgres
         Backend -->|Local File System| LocalStorage
     end

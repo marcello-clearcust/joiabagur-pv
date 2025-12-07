@@ -14,6 +14,7 @@ Antes de generar tickets, es recomendable revisar:
 - **Épicas:** `Documentos/epicas.md` - Épicas del MVP y orden de implementación.
 - **User Stories:** `Documentos/Historias/` - Historias de usuario detalladas.
 - **Procedimiento User Stories:** `Documentos/Procedimientos/Procedimiento-UserStories.md` - Formato de User Stories.
+- **Análisis Metronic Frontend:** `Documentos/Propuestas/analisis-metronic-frontend.md` - Análisis del template Metronic React, componentes disponibles, mapeo por épicas y guía de integración (ver secciones 3, 6 y 7 para componentes UI y plan de adaptación).
 
 ---
 
@@ -101,7 +102,10 @@ Consultar `Documentos/modelo-c4.md` para entender la estructura de capas del pro
 - **Infraestructura**: Repositorios concretos (Entity Framework Core), DbContext, Migraciones, File Storage Service (local/S3/Blob).
 - **Aplicación (Services)**: Servicios de aplicación (Product Service, Sale Service, etc.), validaciones de negocio.
 - **API (Controllers)**: Endpoints REST (ASP.NET Core), DTOs, validación de entrada, manejo de errores, middleware (JWT, CORS).
-- **Frontend (SPA)**: Módulos funcionales (Product Module, Sale Module, etc.), componentes UI, servicios API Client, ML Model Handler (TensorFlow.js/ONNX.js).
+- **Frontend (SPA)**: Módulos funcionales (Product Module, Sale Module, etc.), componentes UI basados en Metronic React (ver `Documentos/Propuestas/analisis-metronic-frontend.md` sección 3 para componentes disponibles), servicios API Client, ML Model Handler (TensorFlow.js/ONNX.js).  
+  - **Componentes Metronic disponibles:** Consultar sección 3 del análisis de Metronic para identificar componentes UI específicos (data-grid, file-upload, form, card, etc.) que pueden reutilizarse en lugar de crear componentes desde cero.
+  - **Layout:** El proyecto utiliza Layout 8 de Metronic (ver análisis sección 2). Los tickets de frontend deben considerar la estructura del layout existente.
+  - **Mapeo por épicas:** Consultar sección 6 del análisis de Metronic para ver qué componentes Metronic se recomiendan para cada épica.
 - **Tests**: Unitarios (backend), integración (API), E2E (frontend), tests de reconocimiento de imágenes.
 
 **Tickets de Infraestructura y DevOps:**
@@ -134,8 +138,8 @@ Además de las capas funcionales, considerar tickets para:
 - Ticket de aplicación: Product Service con lógica de importación Excel y validaciones.
 - Ticket de aplicación: Excel Import Service (procesamiento de archivos Excel).
 - Ticket de API: Endpoint POST /api/products/import con validación de entrada.
-- Ticket de frontend: Componente de carga de archivo con preview y validación.
-- Ticket de frontend: Visualización de errores y confirmación de importación.
+- Ticket de frontend: Página de importación usando componente `file-upload.tsx` de Metronic (ver análisis Metronic sección 6.1) con preview y validación.
+- Ticket de frontend: Visualización de errores usando componente `alert.tsx` o `toast` de Metronic y confirmación con `dialog.tsx`.
 - Ticket de tests: Tests unitarios del servicio de importación.
 - Ticket de tests: Tests de integración del endpoint de importación.
 
@@ -149,10 +153,13 @@ Para cada área identificada:
    - Qué restricciones hay.  
    - Qué decisiones de diseño se esperan.  
    - Referencias a documentación técnica (modelo C4, modelo de datos, arquitectura).
+   - **Para tickets de frontend:** Especificar qué componentes Metronic se utilizarán (consultar `Documentos/Propuestas/analisis-metronic-frontend.md` sección 3 y 6 para identificar componentes apropiados).
 3. Definir **criterios de aceptación en inglés** y **pruebas de validación**.  
 4. Estimar una **prioridad relativa** (Alta/Media/Baja) dentro de la User Story.  
-5. Asignar una primera **estimación de esfuerzo** (SP / horas). Ver sección 4.6 para guía de estimación.
-6. Añadir **tags** y **enlaces** a la User Story y documentación relacionada.
+5. Asignar una primera **estimación de esfuerzo** (SP / horas). Ver sección 4.6 para guía de estimación.  
+   - **Nota para frontend:** El uso de componentes Metronic existentes puede reducir la estimación comparado con crear componentes desde cero (ver análisis Metronic sección 11 para ventajas).
+6. Añadir **tags** y **enlaces** a la User Story y documentación relacionada.  
+   - **Para tickets de frontend:** Incluir tag `metronic` y referencias a secciones específicas del análisis de Metronic cuando sea relevante.
 
 ### Paso 3.5 – Vincular tickets con User Story origen
 
@@ -218,6 +225,7 @@ Dado que el desarrollo del código se realizará directamente a partir de los ti
   - Modelo C4 (`Documentos/modelo-c4.md`) para entender la arquitectura.
   - Modelo de datos (`Documentos/modelo-de-datos.md`) para entender las entidades.
   - Arquitectura (`Documentos/arquitectura.md`) para entender el stack tecnológico.
+  - **Para tickets de frontend:** Análisis Metronic (`Documentos/Propuestas/analisis-metronic-frontend.md`) para identificar componentes UI reutilizables y estructura de páginas.
 
 ### Tickets independientes
 
@@ -234,6 +242,29 @@ Dado que el desarrollo del código se realizará directamente a partir de los ti
   - Casos límite (edge cases).
 - Considerar tests unitarios, de integración y E2E según corresponda.
 
+### Consideraciones específicas para tickets de Frontend con Metronic
+
+Al crear tickets de frontend, consultar `Documentos/Propuestas/analisis-metronic-frontend.md` para:
+
+- **Identificar componentes reutilizables:** Antes de crear un componente desde cero, verificar si Metronic ya proporciona uno (sección 3 del análisis). Ejemplos:
+  - `data-grid.tsx` para tablas avanzadas (productos, inventario, ventas)
+  - `file-upload.tsx` para subida de fotos y archivos Excel
+  - `form.tsx` para formularios con validación (react-hook-form)
+  - `card.tsx` para mostrar productos y sugerencias
+  - `dialog.tsx` para modales y confirmaciones
+  
+- **Mapeo por épicas:** Consultar sección 6 del análisis para ver qué componentes Metronic se recomiendan específicamente para cada épica del proyecto.
+
+- **Estructura de páginas:** Seguir la estructura propuesta en la sección 7.3 del análisis (`pages/products/`, `pages/inventory/`, etc.).
+
+- **Layout y routing:** Los tickets deben considerar que el proyecto usa Layout 8 de Metronic (ver análisis sección 2). Los componentes deben integrarse correctamente con el sidebar y header del layout.
+
+- **Servicios HTTP:** Los tickets de frontend deben considerar la estructura de servicios propuesta en la sección 7.4 del análisis (crear servicios por módulo: `products.service.ts`, `inventory.service.ts`, etc.).
+
+- **Tipos TypeScript:** Los tickets deben definir o referenciar tipos TypeScript para DTOs del backend (ver análisis sección 7.5 para estructura de tipos).
+
+- **Dependencias adicionales:** Si el ticket requiere funcionalidades específicas (ML, Excel, etc.), consultar sección 9 del análisis para identificar dependencias necesarias.
+
 ---
 
 ## 4.6. Guía de estimación para este proyecto
@@ -242,7 +273,7 @@ Dado que el desarrollo del código se realizará directamente a partir de los ti
 
 - **Complejidad del stack:** 
   - Backend: ASP.NET Core con Entity Framework Core (familiar para equipos .NET).
-  - Frontend: React/Vue/Angular con TypeScript (considerar curva de aprendizaje).
+  - Frontend: React 19 con TypeScript y Metronic React template (ver `Documentos/Propuestas/analisis-metronic-frontend.md`). Los componentes Metronic disponibles reducen el esfuerzo de desarrollo UI comparado con crear componentes desde cero.
   - ML: TensorFlow.js/ONNX.js (nuevo para el equipo, puede requerir investigación).
   
 - **Integraciones externas:**
@@ -307,3 +338,5 @@ Tickets/
 - [ ] Los tickets respetan el orden de implementación de épicas definido en `Documentos/epicas.md`.  
 - [ ] Los tickets están guardados en la estructura de carpetas correcta (`Tickets/EP[X]/HU-EP[X]-[NNN]/`).  
 - [ ] Los archivos de tickets siguen la convención de nombres `T-EP[X]-[NNN]-[MMM].md`.
+- [ ] **Para tickets de frontend:** Se ha verificado si existen componentes Metronic reutilizables antes de planificar crear componentes desde cero (consultar `Documentos/Propuestas/analisis-metronic-frontend.md` sección 3 y 6).
+- [ ] **Para tickets de frontend:** Se han identificado los componentes Metronic específicos a utilizar y se han documentado en la descripción del ticket.

@@ -15,6 +15,8 @@ Antes de generar tickets, es recomendable revisar:
 - **User Stories:** `Documentos/Historias/` - Historias de usuario detalladas.
 - **Procedimiento User Stories:** `Documentos/Procedimientos/Procedimiento-UserStories.md` - Formato de User Stories.
 - **Análisis Metronic Frontend:** `Documentos/Propuestas/analisis-metronic-frontend.md` - Análisis del template Metronic React, componentes disponibles, mapeo por épicas y guía de integración (ver secciones 3, 6 y 7 para componentes UI y plan de adaptación).
+- **Testing Backend:** `Documentos/testing-backend.md` - Stack de testing (xUnit, Moq, FluentAssertions), guías detalladas por tema en `Documentos/Testing/Backend/`.
+- **Testing Frontend:** `Documentos/testing-frontend.md` - Stack de testing (Vitest, React Testing Library, MSW, Playwright), guías detalladas por tema en `Documentos/Testing/Frontend/`.
 
 ---
 
@@ -106,7 +108,10 @@ Consultar `Documentos/modelo-c4.md` para entender la estructura de capas del pro
   - **Componentes Metronic disponibles:** Consultar sección 3 del análisis de Metronic para identificar componentes UI específicos (data-grid, file-upload, form, card, etc.) que pueden reutilizarse en lugar de crear componentes desde cero.
   - **Layout:** El proyecto utiliza Layout 8 de Metronic (ver análisis sección 2). Los tickets de frontend deben considerar la estructura del layout existente.
   - **Mapeo por épicas:** Consultar sección 6 del análisis de Metronic para ver qué componentes Metronic se recomiendan para cada épica.
-- **Tests**: Unitarios (backend), integración (API), E2E (frontend), tests de reconocimiento de imágenes.
+- **Tests**: 
+  - **Backend:** Unitarios (servicios, validadores), integración (API, repositorios con Testcontainers). Ver `Documentos/testing-backend.md`.
+  - **Frontend:** Unitarios (hooks, utilities), componentes (React Testing Library), E2E (Playwright). Ver `Documentos/testing-frontend.md`.
+  - **ML:** Tests de reconocimiento de imágenes (precisión, rendimiento).
 
 **Tickets de Infraestructura y DevOps:**
 
@@ -265,6 +270,94 @@ Al crear tickets de frontend, consultar `Documentos/Propuestas/analisis-metronic
 
 - **Dependencias adicionales:** Si el ticket requiere funcionalidades específicas (ML, Excel, etc.), consultar sección 9 del análisis para identificar dependencias necesarias.
 
+### Consideraciones específicas para tickets de Testing Backend
+
+Al crear tickets de testing backend, consultar `Documentos/testing-backend.md` (índice principal) y `Documentos/Testing/Backend/` (guías detalladas) para:
+
+- **Identificar tipo de test necesario:**
+  - **Tests unitarios:** Servicios, validadores, lógica de negocio aislada (mockear dependencias con Moq).
+  - **Tests de integración:** Repositorios con BD real (Testcontainers + PostgreSQL), endpoints API (WebApplicationFactory).
+  - **Tests de autenticación:** Escenarios JWT, roles, tokens expirados/inválidos.
+
+- **Stack y convenciones del proyecto:**
+  - **Framework:** xUnit 2.9.x
+  - **Mocking:** Moq 4.20.x
+  - **Assertions:** FluentAssertions 7.x
+  - **Datos de prueba:** Bogus 35.x
+  - **Contenedores:** Testcontainers 4.x (PostgreSQL)
+  - **Nomenclatura:** `Método_Escenario_ResultadoEsperado` (ej: `CreateSale_WithInsufficientStock_ShouldThrowException`)
+  - **Estructura:** AAA (Arrange, Act, Assert)
+
+- **Guías detalladas por tema:**
+
+  | Tema | Documento | Cuándo consultar |
+  |------|-----------|------------------|
+  | Configuración inicial | `Testing/Backend/01-configuracion.md` | Setup de proyectos de test, paquetes NuGet |
+  | Tests unitarios + Bogus | `Testing/Backend/02-tests-unitarios.md` | Tests de servicios, [Theory], generación de datos |
+  | Testcontainers + PostgreSQL | `Testing/Backend/03-testcontainers.md` | Tests de integración con BD real |
+  | Mocking EF Core | `Testing/Backend/04-mocking-efcore.md` | Mockear DbContext, DbSet, transacciones |
+  | Autenticación JWT | `Testing/Backend/05-autenticacion-jwt.md` | Tests de login, tokens, roles, endpoints protegidos |
+  | GitHub Actions CI/CD | `Testing/Backend/06-github-actions.md` | Workflows de CI/CD, matriz de tests |
+  | Cobertura de código | `Testing/Backend/07-cobertura-codigo.md` | Coverlet, reportes, umbrales mínimos |
+  | Validaciones | `Testing/Backend/08-validaciones.md` | FluentValidation.TestHelper, DataAnnotations |
+  | Archivos/Uploads | `Testing/Backend/09-archivos-uploads.md` | Excel (ClosedXML), MockFileSystem, S3 |
+
+- **Tags recomendados para tickets de testing:**
+  - Tipo: `test`, `unit-test`, `integration-test`
+  - Tecnología: `xunit`, `testcontainers`, `moq`, `fluentassertions`
+  - Capa: `tests`
+
+- **Criterios de aceptación típicos para tickets de testing:**
+  - Tests cubren casos felices (happy path)
+  - Tests cubren casos de error y validaciones
+  - Tests cubren casos límite (edge cases)
+  - Nomenclatura sigue convención `Método_Escenario_ResultadoEsperado`
+  - Cobertura de código cumple umbral mínimo (70% recomendado)
+
+### Consideraciones específicas para tickets de Testing Frontend
+
+Al crear tickets de testing frontend, consultar `Documentos/testing-frontend.md` (índice principal) y `Documentos/Testing/Frontend/` (guías detalladas) para:
+
+- **Identificar tipo de test necesario:**
+  - **Tests unitarios:** Hooks, utilities, helpers y funciones puras.
+  - **Tests de componentes:** Componentes React con React Testing Library (queries accesibles, user events).
+  - **Tests E2E:** Flujos completos con Playwright (autenticación, CRUD, navegación).
+
+- **Stack y convenciones del proyecto:**
+  - **Test Runner:** Vitest 2.x
+  - **Testing de Componentes:** React Testing Library 16.x
+  - **Simulación de Usuario:** @testing-library/user-event 14.x
+  - **Mocking de API:** MSW (Mock Service Worker) 2.x
+  - **Tests E2E:** Playwright 1.x
+  - **Nomenclatura:** `should [comportamiento esperado] when [condición]`
+  - **Estructura:** Arrange, Act, Assert
+  - **Queries:** Priorizar queries accesibles (`getByRole`, `getByLabelText`) sobre `getByTestId`
+
+- **Guías detalladas por tema:**
+
+  | Tema | Documento | Cuándo consultar |
+  |------|-----------|------------------|
+  | Configuración inicial | `Testing/Frontend/01-configuracion.md` | Setup de Vitest, Playwright, estructura de carpetas |
+  | Tests unitarios | `Testing/Frontend/02-tests-unitarios.md` | Tests de hooks, utilities, mocking con Vitest |
+  | Tests de componentes | `Testing/Frontend/03-tests-componentes.md` | React Testing Library, formularios (React Hook Form + Zod), accesibilidad |
+  | Mocking de API | `Testing/Frontend/04-mocking-api.md` | MSW handlers, escenarios de error, override en tests |
+  | Tests E2E | `Testing/Frontend/05-tests-e2e.md` | Playwright, Page Objects, auth setup, multi-navegador |
+  | GitHub Actions CI/CD | `Testing/Frontend/06-github-actions.md` | Workflows, caché, reportes, artifacts |
+  | Cobertura de código | `Testing/Frontend/07-cobertura-codigo.md` | Vitest coverage, umbrales, Codecov |
+
+- **Tags recomendados para tickets de testing frontend:**
+  - Tipo: `test`, `unit-test`, `component-test`, `e2e-test`
+  - Tecnología: `vitest`, `testing-library`, `msw`, `playwright`
+  - Capa: `tests`, `frontend`
+
+- **Criterios de aceptación típicos para tickets de testing frontend:**
+  - Tests cubren casos felices (happy path)
+  - Tests cubren casos de error y estados de carga
+  - Tests cubren interacciones de usuario (clicks, typing, navigation)
+  - Queries usan selectores accesibles (getByRole, getByLabelText)
+  - Tests E2E cubren flujos críticos en múltiples navegadores
+  - Cobertura de código cumple umbral mínimo (70% recomendado)
+
 ---
 
 ## 4.6. Guía de estimación para este proyecto
@@ -340,3 +433,9 @@ Tickets/
 - [ ] Los archivos de tickets siguen la convención de nombres `T-EP[X]-[NNN]-[MMM].md`.
 - [ ] **Para tickets de frontend:** Se ha verificado si existen componentes Metronic reutilizables antes de planificar crear componentes desde cero (consultar `Documentos/Propuestas/analisis-metronic-frontend.md` sección 3 y 6).
 - [ ] **Para tickets de frontend:** Se han identificado los componentes Metronic específicos a utilizar y se han documentado en la descripción del ticket.
+- [ ] **Para tickets de testing backend:** Se ha consultado la guía de testing (`Documentos/testing-backend.md`) para identificar el tipo de test apropiado.
+- [ ] **Para tickets de testing backend:** Se ha referenciado la guía específica del tema (Testcontainers, JWT, validaciones, etc.) en `Documentos/Testing/Backend/`.
+- [ ] **Para tickets de testing backend:** Los criterios de aceptación incluyen nomenclatura correcta y cobertura de casos (happy path, errores, edge cases).
+- [ ] **Para tickets de testing frontend:** Se ha consultado la guía de testing (`Documentos/testing-frontend.md`) para identificar el tipo de test apropiado (unitario, componente, E2E).
+- [ ] **Para tickets de testing frontend:** Se ha referenciado la guía específica del tema (MSW, Playwright, formularios, etc.) en `Documentos/Testing/Frontend/`.
+- [ ] **Para tickets de testing frontend:** Los criterios de aceptación incluyen uso de queries accesibles y cobertura de interacciones de usuario.

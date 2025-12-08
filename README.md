@@ -62,6 +62,10 @@ Esta sección proporciona acceso rápido a toda la documentación técnica del p
 
 - **[Modelo C4](Documentos/modelo-c4.md)**: Arquitectura del sistema utilizando el modelo C4, proporcionando diferentes niveles de abstracción desde el contexto general hasta los componentes internos del backend y frontend.
 
+- **[Testing Backend](Documentos/testing-backend.md)**: Guía completa de testing para el backend .NET 10 (xUnit, Moq, FluentAssertions), incluyendo tests unitarios, integración, CI/CD y guías detalladas por tema.
+
+- **[Testing Frontend](Documentos/testing-frontend.md)**: Guía completa de testing para el frontend React 19 + TypeScript + Vite (Vitest, React Testing Library, MSW, Playwright), incluyendo tests unitarios, de componentes, E2E y guías detalladas por tema.
+
 ### Procedimientos
 
 Documentación de procedimientos y metodologías de trabajo del proyecto:

@@ -1,0 +1,104 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/test-backend.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/test-backend.yml'
+
+defaults:
+  run:
+    working-directory: backend/src
+
+jobs:
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('backend/src/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore JoiabagurPV.sln
+
+      - name: Build solution
+        run: dotnet build JoiabagurPV.sln --configuration Release --no-restore
+
+      - name: Run tests with coverage
+        run: |
+          dotnet test JoiabagurPV.sln \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            --logger "trx;LogFileName=test-results.trx" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+
+      - name: Install ReportGenerator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage report
+        run: |
+          reportgenerator \
+            -reports:"./TestResults/**/coverage.cobertura.xml" \
+            -targetdir:"./TestResults/CoverageReport" \
+            -reporttypes:"Html;Cobertura;TextSummary" \
+            -assemblyfilters:"-*Tests*"
+
+      - name: Display coverage summary
+        run: cat ./TestResults/CoverageReport/Summary.txt
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(grep -oP 'Line coverage: \K[0-9.]+' ./TestResults/CoverageReport/Summary.txt || echo "0")
+          echo "Line coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo "::error::Code coverage ($COVERAGE%) is below the minimum threshold of 70%"
+            exit 1
+          fi
+          echo "✅ Coverage threshold met: $COVERAGE% >= 70%"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: backend/src/TestResults/*.trx
+          retention-days: 30
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: backend/src/TestResults/CoverageReport
+          retention-days: 30
+
+      - name: Publish test results to GitHub
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Backend Test Results
+          path: backend/src/TestResults/*.trx
+          reporter: dotnet-trx

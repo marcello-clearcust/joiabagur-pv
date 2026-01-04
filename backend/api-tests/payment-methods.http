@@ -1,0 +1,74 @@
+### Payment Method Management API Tests
+### Requires: Admin authentication
+@baseUrl = http://localhost:5056/api
+@contentType = application/json
+
+### Get All Payment Methods (Active Only)
+GET {{baseUrl}}/payment-methods
+
+### Get All Payment Methods (Including Inactive)
+GET {{baseUrl}}/payment-methods?includeInactive=true
+
+### Get Payment Method by ID
+@methodId = replace-with-actual-id
+GET {{baseUrl}}/payment-methods/{{methodId}}
+
+### Create Custom Payment Method
+POST {{baseUrl}}/payment-methods
+Content-Type: {{contentType}}
+
+{
+  "code": "CRYPTO",
+  "name": "Criptomonedas",
+  "description": "Pago con Bitcoin o Ethereum"
+}
+
+### Create Another Payment Method
+POST {{baseUrl}}/payment-methods
+Content-Type: {{contentType}}
+
+{
+  "code": "MOBILE_WALLET",
+  "name": "Monedero Móvil",
+  "description": "Apple Pay, Google Pay, Samsung Pay"
+}
+
+### Update Payment Method
+@methodId = replace-with-actual-id
+PUT {{baseUrl}}/payment-methods/{{methodId}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Criptomonedas Actualizado",
+  "description": "Bitcoin, Ethereum, y otras criptomonedas"
+}
+
+### Activate Payment Method
+@methodId = replace-with-actual-id
+PATCH {{baseUrl}}/payment-methods/{{methodId}}/status
+Content-Type: {{contentType}}
+
+{
+  "isActive": true
+}
+
+### Deactivate Payment Method
+@methodId = replace-with-actual-id
+PATCH {{baseUrl}}/payment-methods/{{methodId}}/status
+Content-Type: {{contentType}}
+
+{
+  "isActive": false
+}
+
+###############################################
+### Predefined Payment Methods (Seed Data) ###
+###############################################
+
+### These methods are automatically created:
+### - CASH (Efectivo)
+### - BIZUM (Bizum)
+### - TRANSFER (Transferencia)
+### - CARD_OWN (Tarjeta propia)
+### - CARD_POS (Tarjeta TPV)
+### - PAYPAL (PayPal)

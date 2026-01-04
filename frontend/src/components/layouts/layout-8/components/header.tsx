@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { toAbsoluteUrl } from '@/lib/helpers';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -12,6 +11,7 @@ import {
 } from '@/components/ui/sheet';
 import { SidebarFooter } from './sidebar-footer';
 import { SidebarMenu } from './sidebar-menu';
+import logoUrl from '@/assets/logo.svg';
 
 export function Header() {
   const { pathname } = useLocation();
@@ -25,17 +25,8 @@ export function Header() {
   return (
     <header className="flex items-center fixed z-10 top-0 start-0 end-0 shrink-0 bg-muted h-(--header-height)">
       <div className="container flex items-center justify-between flex-wrap gap-3">
-        <Link to="/">
-          <img
-            src={toAbsoluteUrl('/media/app/mini-logo-gray.svg')}
-            className="dark:hidden h-[30px]"
-            alt="image"
-          />
-          <img
-            src={toAbsoluteUrl('/media/app/mini-logo-gray-dark.svg')}
-            className="hidden dark:inline-block h-[30px]"
-            alt="image"
-          />
+        <Link to="/dashboard" className="flex items-center">
+          <img src={logoUrl} alt="Joia Bagur" className="h-8 w-auto" />
         </Link>
 
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>

@@ -1,0 +1,6 @@
+@JoiabagurPV.API_HostAddress = http://localhost:5056
+
+GET {{JoiabagurPV.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

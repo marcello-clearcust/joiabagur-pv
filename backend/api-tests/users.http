@@ -1,0 +1,72 @@
+### User Management API Tests
+### Requires: Admin authentication
+@baseUrl = http://localhost:5056/api
+@contentType = application/json
+
+### Get All Users
+GET {{baseUrl}}/users
+
+### Get User by ID
+@userId = replace-with-actual-id
+GET {{baseUrl}}/users/{{userId}}
+
+### Create Operator User
+POST {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+{
+  "username": "operator1",
+  "password": "Operator123!",
+  "firstName": "Juan",
+  "lastName": "Pérez",
+  "email": "juan@test.com",
+  "role": "Operator"
+}
+
+### Create Admin User
+POST {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+{
+  "username": "admin2",
+  "password": "Admin123!",
+  "firstName": "María",
+  "lastName": "García",
+  "email": "maria@test.com",
+  "role": "Administrator"
+}
+
+### Update User
+@userId = replace-with-actual-id
+PUT {{baseUrl}}/users/{{userId}}
+Content-Type: {{contentType}}
+
+{
+  "firstName": "Juan Updated",
+  "lastName": "Pérez",
+  "email": "juan.updated@test.com",
+  "role": "Operator"
+}
+
+### Change User Password
+@userId = replace-with-actual-id
+PUT {{baseUrl}}/users/{{userId}}/password
+Content-Type: {{contentType}}
+
+{
+  "newPassword": "NewPassword123!"
+}
+
+### Get User Point of Sales
+@userId = replace-with-actual-id
+GET {{baseUrl}}/users/{{userId}}/point-of-sales
+
+### Assign User to Point of Sale
+@userId = replace-with-actual-id
+@pointOfSaleId = replace-with-pos-id
+POST {{baseUrl}}/users/{{userId}}/point-of-sales/{{pointOfSaleId}}
+
+### Unassign User from Point of Sale
+@userId = replace-with-actual-id
+@pointOfSaleId = replace-with-pos-id
+DELETE {{baseUrl}}/users/{{userId}}/point-of-sales/{{pointOfSaleId}}

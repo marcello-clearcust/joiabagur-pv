@@ -1,0 +1,24 @@
+### Authentication API Tests
+### Base URL
+@baseUrl = http://localhost:5056/api
+@contentType = application/json
+
+### Login as Admin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "Admin123!"
+}
+
+### Refresh Token
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+### Get Current User
+GET {{baseUrl}}/auth/me
+
+### Logout
+POST {{baseUrl}}/auth/logout
+Content-Type: {{contentType}}

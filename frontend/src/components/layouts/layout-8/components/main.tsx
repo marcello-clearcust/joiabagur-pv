@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useBodyClass } from '@/hooks/use-body-class';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Footer } from './footer';
@@ -7,9 +7,6 @@ import { Sidebar } from './sidebar';
 
 export function Main() {
   const isMobile = useIsMobile();
-  const { pathname } = useLocation();
-
-  console.log(pathname);
 
   // Using the custom hook to set classes on the body
   useBodyClass(`
@@ -27,7 +24,7 @@ export function Main() {
 
         <div className="flex flex-col grow rounded-xl bg-background border border-input lg:ms-(--sidebar-width) mt-0 m-4 lg:m-5">
           <div className="flex flex-col grow kt-scrollable-y-auto lg:[scrollbar-width:auto] pt-5">
-            <main className="grow" role="content">           
+            <main className="grow px-5 lg:px-8 pb-5" role="content">           
               <Outlet />
             </main>
           </div>

@@ -252,10 +252,13 @@ function DataGridTableBodyRow<TData>({
 }) {
   const { props, table } = useDataGrid();
 
+  // Get row props from table configuration (e.g., custom className)
+  const rowProps = table.options.getRowProps?.(row) || {};
+
   return (
     <tr
       ref={dndRef}
-      style={{ ...(dndStyle ? dndStyle : null) }}
+      style={{ ...(dndStyle ? dndStyle : null), ...rowProps.style }}
       data-state={table.options.enableRowSelection && row.getIsSelected() ? 'selected' : undefined}
       onClick={() => props.onRowClick && props.onRowClick(row.original)}
       className={cn(
@@ -268,6 +271,7 @@ function DataGridTableBodyRow<TData>({
         props.tableLayout?.stripped && 'odd:bg-muted/90 hover:bg-transparent odd:hover:bg-muted',
         table.options.enableRowSelection && '[&_>:first-child]:relative',
         props.tableClassNames?.bodyRow,
+        rowProps.className, // Add custom row className
       )}
     >
       {children}

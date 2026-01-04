@@ -1,0 +1,4 @@
+---
+alwaysApply: false
+---
+We are on Windows OS. When you have to execute a command, ALWAYS use Powershell instead of bash.

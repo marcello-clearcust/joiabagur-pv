@@ -1,0 +1,100 @@
+### Point of Sale Management API Tests
+### Requires: Admin authentication
+@baseUrl = http://localhost:5056/api
+@contentType = application/json
+
+### Get All Points of Sale
+GET {{baseUrl}}/point-of-sales
+
+### Get Point of Sale by ID
+@posId = replace-with-actual-id
+GET {{baseUrl}}/point-of-sales/{{posId}}
+
+### Create Point of Sale
+POST {{baseUrl}}/point-of-sales
+Content-Type: {{contentType}}
+
+{
+  "name": "Tienda Centro",
+  "code": "CENTRO-001",
+  "address": "Calle Principal 123, Madrid",
+  "phone": "+34 600 123 456",
+  "email": "centro@test.com"
+}
+
+### Create Another Point of Sale
+POST {{baseUrl}}/point-of-sales
+Content-Type: {{contentType}}
+
+{
+  "name": "Hotel Plaza",
+  "code": "HOTEL-PLZ",
+  "address": "Plaza Mayor 1, Barcelona",
+  "phone": "+34 600 789 012",
+  "email": "plaza@test.com"
+}
+
+### Update Point of Sale
+@posId = replace-with-actual-id
+PUT {{baseUrl}}/point-of-sales/{{posId}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Tienda Centro Actualizada",
+  "code": "CENTRO-001",
+  "address": "Nueva Dirección 456, Madrid",
+  "phone": "+34 600 999 888",
+  "email": "centro.updated@test.com"
+}
+
+### Activate Point of Sale
+@posId = replace-with-actual-id
+PATCH {{baseUrl}}/point-of-sales/{{posId}}/status
+Content-Type: {{contentType}}
+
+{
+  "isActive": true
+}
+
+### Deactivate Point of Sale
+@posId = replace-with-actual-id
+PATCH {{baseUrl}}/point-of-sales/{{posId}}/status
+Content-Type: {{contentType}}
+
+{
+  "isActive": false
+}
+
+### Assign Operator to Point of Sale
+@posId = replace-with-actual-id
+@userId = replace-with-operator-id
+POST {{baseUrl}}/point-of-sales/{{posId}}/operators/{{userId}}
+
+### Unassign Operator from Point of Sale
+@posId = replace-with-actual-id
+@userId = replace-with-operator-id
+DELETE {{baseUrl}}/point-of-sales/{{posId}}/operators/{{userId}}
+
+### Get Payment Methods for Point of Sale
+@posId = replace-with-actual-id
+GET {{baseUrl}}/point-of-sales/{{posId}}/payment-methods
+
+### Assign Payment Method to Point of Sale
+@posId = replace-with-actual-id
+@paymentMethodId = replace-with-method-id
+POST {{baseUrl}}/point-of-sales/{{posId}}/payment-methods/{{paymentMethodId}}
+
+### Unassign Payment Method from Point of Sale
+@posId = replace-with-actual-id
+@paymentMethodId = replace-with-method-id
+DELETE {{baseUrl}}/point-of-sales/{{posId}}/payment-methods/{{paymentMethodId}}
+
+### Change Payment Method Assignment Status
+@posId = replace-with-actual-id
+@paymentMethodId = replace-with-method-id
+PATCH {{baseUrl}}/point-of-sales/{{posId}}/payment-methods/{{paymentMethodId}}/status
+Content-Type: {{contentType}}
+
+{
+  "isActive": false
+}

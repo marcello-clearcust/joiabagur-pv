@@ -1,0 +1,39 @@
+using FluentValidation;
+using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.Application.Services;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace JoiabagurPV.Application.Extensions;
+
+/// <summary>
+/// Extension methods for configuring application services.
+/// </summary>
+public static class ServiceCollectionExtensions
+{
+    /// <summary>
+    /// Adds application services to the dependency injection container.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection with application services added.</returns>
+    public static IServiceCollection AddApplication(this IServiceCollection services)
+    {
+        // Register validators from the assembly
+        services.AddValidatorsFromAssembly(typeof(ServiceCollectionExtensions).Assembly);
+
+        // Register authentication services
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+        // Register user management services
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IUserPointOfSaleService, UserPointOfSaleService>();
+
+        // Register point of sale management services
+        services.AddScoped<IPointOfSaleService, PointOfSaleService>();
+
+        // Register payment method management services
+        services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+
+        return services;
+    }
+}

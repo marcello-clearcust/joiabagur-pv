@@ -1,0 +1,14 @@
+{
+  "admin": {
+    "email": "admin@joiabagur.com",
+    "password": "TestPassword123!",
+    "name": "Admin User",
+    "role": "Admin"
+  },
+  "operator": {
+    "email": "operator@joiabagur.com",
+    "password": "TestPassword123!",
+    "name": "Operator User",
+    "role": "Operator"
+  }
+}

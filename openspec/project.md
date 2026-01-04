@@ -35,6 +35,7 @@
 - **ORM**: Entity Framework Core
 - **Database**: PostgreSQL 15+
 - **Authentication**: JWT (JSON Web Tokens)
+- **API Documentation**: Scalar (modern alternative to Swagger)
 - **Logging**: Serilog
 - **Architecture**: Monolithic with layered separation (Domain → Infrastructure → Application → API)
 

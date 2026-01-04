@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: joiabagur-pv-postgres-prod
+    environment:
+      POSTGRES_DB: joiabagur_pv_prod
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - joiabagur-network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/JoiabagurPV.API/Dockerfile
+    container_name: joiabagur-pv-api-prod
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=joiabagur_pv_prod;Username=${DB_USER};Password=${DB_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - joiabagur-network
+    restart: unless-stopped
+
+volumes:
+  postgres_prod_data:
+
+networks:
+  joiabagur-network:
+    driver: bridge

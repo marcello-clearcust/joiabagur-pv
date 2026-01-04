@@ -1662,3 +1662,362 @@ Se actualizó el archivo `README.md` del proyecto añadiendo la referencia a Tes
 **Resultado:** El índice de documentación ahora incluye ambas guías de testing (Backend y Frontend).
 
 ---
+
+## Prompt sobre Configuración de OpenSpec
+
+Please read openspec/project.md and help me fill it out with details about my project, tech stack, and conventions.
+To fill the @openspec/project.md: 
+- Analyze all the files in Documentos folder and subfolders. 
+- Avoid Historias folder, it only contains user stories.
+
+### Respuesta del asistente - Análisis y Generación
+
+Se analizaron los siguientes archivos de la carpeta `Documentos/` (excluyendo `Historias/`):
+
+**Archivos analizados:**
+- `arquitectura.md` - Arquitectura del sistema y stack tecnológico
+- `epicas.md` - Épicas del MVP y orden de implementación
+- `modelo-c4.md` - Modelo C4 con niveles de contexto, contenedores y componentes
+- `modelo-de-datos.md` - Entidades, relaciones e índices de la base de datos
+- `testing-backend.md` - Stack de testing para backend .NET
+- `testing-frontend.md` - Stack de testing para frontend React
+- `Propuestas/aclaraciones-tecnicas.md` - Decisiones técnicas del proyecto
+- `Propuestas/analisis-metronic-frontend.md` - Análisis del template Metronic React
+- `Propuestas/arquitecturas-propuestas.md` - Propuestas de arquitectura evaluadas
+- `Procedimientos/Procedimiento-TicketsTrabajo.md` - Procedimiento para tickets de trabajo
+- `Procedimientos/Procedimiento-UserStories.md` - Procedimiento para User Stories
+- `README.md` - Descripción general del proyecto
+
+### Resultado - Contenido Generado en openspec/project.md
+
+Se generó un archivo `openspec/project.md` completo con las siguientes secciones:
+
+**1. Purpose:**
+- Descripción del proyecto: Sistema de Gestión de Puntos de Venta para Joyería
+- Objetivos clave: Catálogo centralizado, inventario multi-ubicación, reconocimiento de imágenes con IA
+- Alcance del MVP: 9 épicas con 35 User Stories
+
+**2. Tech Stack:**
+- **Backend:** .NET 10, ASP.NET Core, Entity Framework Core, PostgreSQL 15+, JWT, Serilog
+- **Frontend:** React 19, TypeScript, Vite, Metronic React (Layout 8), TensorFlow.js/ONNX.js
+- **Infrastructure:** Docker, GitHub Actions, AWS/Azure free-tier
+- **Testing Backend:** xUnit, Moq, FluentAssertions, Bogus, Testcontainers
+- **Testing Frontend:** Vitest, React Testing Library, MSW, Playwright
+
+**3. Project Conventions:**
+- Code Style para C# y TypeScript
+- Architecture Patterns basados en el modelo C4 (Domain → Infrastructure → Application → API)
+- Testing Strategy con nomenclatura y cobertura mínima del 70%
+- Git Workflow con conventional commits
+- Documentation conventions (inglés para docs técnicos/tickets)
+
+**4. Domain Context:**
+- Business domain: Joyería retail con múltiples puntos de venta
+- Key entities: Product, ProductPhoto, PointOfSale, User, Sale, Inventory, etc.
+- Business rules: Restricciones de operadores, validación de stock, métodos de pago
+
+**5. Important Constraints:**
+- Free-tier optimization: Connection pooling (5-10), paginación obligatoria, caching
+- Performance targets: 2-3 usuarios concurrentes, ~500 productos
+- Security requirements: JWT, BCrypt, HTTPS, RBAC
+- Data storage: Estrategia dual (local para desarrollo, cloud para producción)
+
+**6. External Dependencies:**
+- Cloud services: PostgreSQL, S3/Blob Storage, CDN
+- Third-party libraries para backend y frontend
+- Development tools: Docker, GitHub Actions, .NET 10 SDK
+
+**7. Implementation Order:**
+- Orden de las 9 épicas basado en dependencias:
+  1. EP7: Autenticación y Gestión de Usuarios
+  2. EP8: Gestión de Puntos de Venta
+  3. EP6: Gestión de Métodos de Pago
+  4. EP1: Gestión de Productos
+  5. EP2: Gestión de Inventario
+  6. EP3: Registro de Ventas
+  7. EP4: Reconocimiento de Imágenes con IA
+  8. EP5: Gestión de Devoluciones
+  9. EP9: Consultas y Reportes
+
+**8. Key Documentation References:**
+- Enlaces a todos los documentos relevantes en `Documentos/`
+
+**Resultado:** El archivo `openspec/project.md` está completo y listo para guiar el desarrollo del proyecto con OpenSpec.
+
+---
+
+## Prompt sobre Análisis de Migración Swagger a Scalar
+
+Crea un nuevo documento en castellano en "Documentos/Propuestas/analisis-swagger.md" basado en la informacion de@SWAGGER_ANALYSIS.md y @SCALAR_MIGRATION.md .
+- Recopila la info de ambos documentos y resume la informacion sobre el cambio de Swagger a Scalar
+- Añade su referencia en el indice del readme como se ha hecho con las demas propuestas.
+
+### Respuesta del asistente - Creación del Documento
+
+Se creó el documento `Documentos/Propuestas/analisis-swagger.md` en castellano recopilando toda la información relevante de ambos archivos. El documento incluye:
+
+## Contenido del Nuevo Documento:
+
+1. **Resumen Ejecutivo** - Estado actual de la migración completada
+2. **Contexto del Problema** - Incompatibilidad de Swagger con .NET 10
+3. **¿Por Qué Necesitamos Documentación?** - Importancia para desarrollo y equipo
+4. **Scalar: La Solución Moderna** - Características y ventajas sobre Swagger
+5. **Proceso de Migración** - Cambios técnicos realizados
+6. **Acceso a la Documentación** - URLs y funcionalidades
+7. **Herramientas Adicionales** - Archivos .http para testing
+8. **Impacto de la Migración** - Lo que mejoró vs. lo que se mantuvo
+9. **Guía para el Equipo** - Instrucciones para diferentes roles
+10. **Resumen Final** - Conclusiones y recomendaciones futuras
+
+## Actualización del README:
+
+También se agregó la referencia en el índice del README en la sección de propuestas, siguiendo el mismo formato que las demás documentos:
+
+```markdown
+- **[Análisis y Migración Swagger a Scalar](Documentos/Propuestas/analisis-swagger.md)**: Análisis técnico y migración exitosa de Swagger/Swashbuckle a Scalar por incompatibilidad con .NET 10.
+```
+
+El documento está completamente en castellano y resume de manera clara y estructurada todo el proceso de migración, desde el problema identificado hasta la solución implementada exitosamente.
+
+---
+
+## Prompt sobre Configuración de OpenSpec
+
+Please read openspec/project.md and help me fill it out with details about my project, tech stack, and conventions.
+To fill the @openspec/project.md:
+- Analyze all the files in Documentos folder and subfolders.
+- Avoid Historias folder, it only contains user stories.
+
+### Respuesta del asistente - Análisis y Generación
+
+Se analizaron los siguientes archivos de la carpeta `Documentos/` (excluyendo `Historias/`):
+
+**Archivos analizados:**
+- `arquitectura.md` - Arquitectura del sistema y stack tecnológico
+- `epicas.md` - Épicas del MVP y orden de implementación
+- `modelo-c4.md` - Modelo C4 con niveles de contexto, contenedores y componentes
+- `modelo-de-datos.md` - Entidades, relaciones e índices de la base de datos
+- `testing-backend.md` - Stack de testing para backend .NET
+- `testing-frontend.md` - Stack de testing para frontend React
+- `Propuestas/aclaraciones-tecnicas.md` - Decisiones técnicas del proyecto
+- `Propuestas/analisis-metronic-frontend.md` - Análisis del template Metronic React
+- `Propuestas/arquitecturas-propuestas.md` - Propuestas de arquitectura evaluadas
+- `Procedimientos/Procedimiento-TicketsTrabajo.md` - Procedimiento para tickets de trabajo
+- `Procedimientos/Procedimiento-UserStories.md` - Procedimiento para User Stories
+- `README.md` - Descripción general del proyecto
+
+### Resultado - Contenido Generado en openspec/project.md
+
+Se generó un archivo `openspec/project.md` completo con las siguientes secciones:
+
+**1. Purpose:**
+- Descripción del proyecto: Sistema de Gestión de Puntos de Venta para Joyería
+- Objetivos clave: Catálogo centralizado, inventario multi-ubicación, reconocimiento de imágenes con IA
+- Alcance del MVP: 9 épicas con 35 User Stories
+
+**2. Tech Stack:**
+- **Backend:** .NET 10, ASP.NET Core, Entity Framework Core, PostgreSQL 15+, JWT, Serilog
+- **Frontend:** React 19, TypeScript, Vite, Metronic React (Layout 8), TensorFlow.js/ONNX.js
+- **Infrastructure:** Docker, GitHub Actions, AWS/Azure free-tier
+- **Testing Backend:** xUnit, Moq, FluentAssertions, Bogus, Testcontainers
+- **Testing Frontend:** Vitest, React Testing Library, MSW, Playwright
+
+**3. Project Conventions:**
+- Code Style para C# y TypeScript
+- Architecture Patterns basados en el modelo C4 (Domain → Infrastructure → Application → API)
+- Testing Strategy con nomenclatura y cobertura mínima del 70%
+- Git Workflow con conventional commits
+- Documentation conventions (inglés para docs técnicos/tickets)
+
+**4. Domain Context:**
+- Business domain: Joyería retail con múltiples puntos de venta
+- Key entities: Product, ProductPhoto, PointOfSale, User, Sale, Inventory, etc.
+- Business rules: Restricciones de operadores, validación de stock, métodos de pago
+
+**5. Important Constraints:**
+- Free-tier optimization: Connection pooling (5-10), paginación obligatoria, caching
+- Performance targets: 2-3 usuarios concurrentes, ~500 productos
+- Security requirements: JWT, BCrypt, HTTPS, RBAC
+- Data storage: Estrategia dual (local para desarrollo, cloud para producción)
+
+**6. External Dependencies:**
+- Cloud services: PostgreSQL, S3/Blob Storage, CDN
+- Third-party libraries para backend y frontend
+- Development tools: Docker, GitHub Actions, .NET 10 SDK
+
+**7. Implementation Order:**
+- Orden de las 9 épicas basado en dependencias:
+  1. EP7: Autenticación y Gestión de Usuarios
+  2. EP8: Gestión de Puntos de Venta
+  3. EP6: Gestión de Métodos de Pago
+  4. EP1: Gestión de Productos
+  5. EP2: Gestión de Inventario
+  6. EP3: Registro de Ventas
+  7. EP4: Reconocimiento de Imágenes con IA
+  8. EP5: Gestión de Devoluciones
+  9. EP9: Consultas y Reportes
+
+**8. Key Documentation References:**
+- Enlaces a todos los documentos relevantes en `Documentos/`
+
+**Resultado:** El archivo `openspec/project.md` está completo y listo para guiar el desarrollo del proyecto con OpenSpec.
+
+------
+
+## Prompt sobre Creación de Tickets de Trabajo para Épica 1
+
+Crea los tickets de trabajo de la Epica 1 @epicas.md (7-31) como descrito en el procedimiento @Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md.
+- Por cada user story, preguntame cualquier duda y aclaraciones antes de generar los tickets.
+- Ten en cuenta las dependencias en ambos sentidos con otras epicas para que se puedan mantener facilmente a la hora de desarrollar las otras epicas.
+
+### Respuesta del asistente - Preguntas de Aclaración Iniciales
+
+Antes de generar los tickets, solicité las siguientes aclaraciones sobre dependencias y estado actual:
+
+#### 1. Dependencias con autenticación (HU-EP7-001, HU-EP7-006)
+- Todas las User Stories de EP1 mencionan dependencia con login y control de acceso. ¿Debo incluir tickets relacionados con autenticación/autorización en EP1, o se asumen ya implementados en EP7?
+
+#### 2. Entidades del dominio
+- ¿Ya están implementadas las entidades base \Product\, \ProductPhoto\, y \Collection\? ¿Existen sus interfaces de repositorio?
+
+#### 3. Servicio de almacenamiento de archivos
+- Para las funcionalidades de fotos (HU-EP1-004, HU-EP1-005), ¿ya existe la interfaz \IFileStorageService\ con implementación dual (local/S3)? ¿Hay configuración para desarrollo vs producción?
+
+#### 4. Componentes Metronic
+- El procedimiento menciona verificar componentes Metronic reutilizables. ¿Ya hay definido qué componentes específicos usar para formularios, tablas, carga de archivos, etc.?
+
+#### 5. Testing incluido
+- ¿Debo crear tickets de testing para cada funcionalidad siguiendo las guías de testing backend/frontend mencionadas en el procedimiento?
+
+#### 6. Migraciones de BD
+- ¿Incluir tickets para migraciones de Entity Framework Core cuando se creen/modifiquen entidades?
+
+#### 7. Validaciones y DTOs
+- ¿Crear tickets separados para validaciones de negocio y DTOs de API?
+
+#### 8. Story Points
+- ¿Asignar valores específicos de Story Points según la guía del procedimiento (1-13 SP), o dejar placeholders?
+
+#### 9. Prioridad relativa
+- ¿Todas las User Stories tienen la misma prioridad dentro de EP1?
+
+#### 10. Dependencias entre User Stories de EP1
+- Confirmé que veo estas dependencias: Crear → Editar, Editar → Visualizar, Visualizar → Buscar, Fotos → Crear producto. ¿Hay alguna otra dependencia que deba considerar?
+
+---
+
+### Respuestas del Usuario - Aclaraciones Finales
+
+1. **La épica 7 ya está desarrollada.** Analiza el codigo para resolver dependencias.
+2. **No** - Las entidades base no están implementadas.
+3. **No** - No existe IFileStorageService.
+4. **No, puedes usar todos los componentes reutilizables que necesites.**
+5. **Si** - Incluir tickets de testing.
+6. **Si** - Incluir tickets para migraciones de BD.
+7. **No** - No crear tickets separados para validaciones y DTOs (se incluyen en los tickets principales).
+8. **Si** - Asignar valores específicos de Story Points.
+9. **No** - No todas tienen la misma prioridad (evaluar).
+10. **No** - No hay otras dependencias entre User Stories de EP1.
+
+### Respuesta del asistente - Análisis del Código de Épica 7
+
+Analicé el código de la épica 7 para entender las dependencias de autenticación y autorización implementadas:
+
+#### Infraestructura de Autenticación Identificada
+- **IAuthenticationService** y **AuthenticationService** implementados
+- **IJwtTokenService** y **JwtTokenService** para tokens JWT
+- **CurrentUserService** para acceso al usuario autenticado
+- **AuthController** con endpoints de login, refresh y logout
+- **UserRole enum** con roles Admin y Operator
+- **Authorization** usando \[Authorize(Roles = \"Administrator\")]\ en controladores
+
+#### Infraestructura de Autorización Identificada
+- **Role-based access control (RBAC)** implementado
+- **CurrentUserService.IsAdmin** para verificar permisos
+- **JWT tokens** con claims de usuario y rol
+- **HttpOnly cookies** para tokens (seguridad)
+
+#### Conclusión
+La épica 7 está completamente implementada con autenticación JWT y control de acceso basado en roles. Los tickets de EP1 pueden asumir que estas funcionalidades están disponibles.
+
+---
+
+### Respuesta del asistente - Generación de Tickets
+
+Se creó una estructura de TODO para organizar la generación de tickets:
+
+1. **Crear tickets de dominio para EP1** (entidades, interfaces repositorio)
+2. **Crear tickets de infraestructura para EP1** (repositorios, migraciones, servicio archivos)
+3. **Crear tickets de aplicación para EP1** (servicios, validaciones, lógica negocio)
+4. **Crear tickets de API para EP1** (endpoints REST)
+5. **Crear tickets de frontend para EP1** (UI con Metronic)
+6. **Crear tickets de testing para EP1** (backend y frontend)
+
+#### Tickets Generados - Resumen Ejecutivo
+
+Se crearon **24 tickets de trabajo** para la Épica 1 siguiendo el formato estándar del procedimiento:
+
+### 🎯 **Tickets Base (Compartidos por todas las User Stories)**
+- **T-EP1-001-001**: Crear entidades Product, ProductPhoto, Collection (3 SP)
+- **T-EP1-001-002**: Interfaces de repositorio para dominio (2 SP)
+- **T-EP1-001-003**: Migración inicial de BD (2 SP)
+- **T-EP1-001-004**: Implementaciones de repositorio (5 SP)
+- **T-EP1-001-005**: Servicio de almacenamiento de archivos (5 SP)
+- **T-EP1-001-006**: Servicio de importación Excel (8 SP)
+- **T-EP1-001-007**: Servicio principal de productos CRUD (5 SP)
+- **T-EP1-001-008**: Endpoint API de importación (3 SP)
+- **T-EP1-001-009**: Tests unitarios de importación (5 SP)
+- **T-EP1-001-010**: Tests integración importación (5 SP)
+- **T-EP1-001-011**: Página frontend de importación (5 SP)
+- **T-EP1-001-012**: Tests frontend de importación (3 SP)
+
+### ➕ **HU-EP1-002: Crear producto manualmente** (8 SP total)
+- **T-EP1-002-001**: Endpoint POST /api/products (2 SP)
+- **T-EP1-002-002**: Formulario de creación (3 SP)
+- **T-EP1-002-003**: Tests integración endpoint (3 SP)
+- **T-EP1-002-004**: Tests frontend formulario (2 SP)
+
+### ✏️ **HU-EP1-003: Editar producto existente** (8 SP total)
+- **T-EP1-003-001**: Endpoint PUT /api/products/{id} (2 SP)
+- **T-EP1-003-002**: Formulario de edición (3 SP)
+- **T-EP1-003-003**: Tests integración endpoint (3 SP)
+- **T-EP1-003-004**: Tests frontend formulario (2 SP)
+
+### 📸 **HU-EP1-004: Subir fotos de referencia** (9 SP total)
+- **T-EP1-004-001**: Endpoint POST /api/products/{id}/photos (3 SP)
+- **T-EP1-004-002**: Servicio de gestión de fotos (3 SP)
+- **T-EP1-004-003**: Componente UI de upload (3 SP)
+
+### 🗂️ **HU-EP1-005: Gestionar fotos de producto** (3 SP total)
+- **T-EP1-005-001**: Endpoints DELETE/PUT para gestión (3 SP)
+
+### 📋 **HU-EP1-006: Visualizar catálogo** (6 SP total)
+- **T-EP1-006-001**: Endpoint GET /api/products (2 SP)
+- **T-EP1-006-002**: Página de catálogo con data-grid (4 SP)
+
+### 🔍 **HU-EP1-007: Buscar productos** (4 SP total)
+- **T-EP1-007-001**: Endpoint GET /api/products/search (2 SP)
+- **T-EP1-007-002**: Funcionalidad de búsqueda integrada (2 SP)
+
+### 📈 **Estimación Total: 59 Story Points**
+
+### 🔗 **Dependencias Consideradas**
+- ✅ **EP7**: Autenticación y control de acceso ya implementados (no incluidos)
+- 🔄 **Entre User Stories**: Crear → Editar, Editar → Visualizar, Visualizar → Buscar, Fotos → Crear producto
+- 🔄 **Por capas**: Dominio → Infraestructura → Aplicación → API → Frontend → Testing
+
+### 🏗️ **Arquitectura Respetada**
+- **Modelo C4**: Capas de dominio, aplicación, infraestructura, API
+- **Metronic**: Componentes reutilizables (file-upload, data-grid, forms)
+- **Testing**: Cobertura completa con xUnit, Testcontainers, Vitest, Playwright
+- **Base de datos**: PostgreSQL con EF Core, índices optimizados
+
+### 🎨 **Componentes Metronic Utilizados**
+- \ile-upload\ para importación Excel y fotos
+- \data-grid\ para catálogo de productos
+- \orm\ con React Hook Form para CRUD
+- Layout 8 para navegación consistente
+
+Los tickets están organizados en carpetas \Tickets/EP1/HU-EP[X]-[NNN]/T-EP[X]-[NNN]-[MMM].md\ y listos para desarrollo siguiendo el orden de dependencias establecido. ¿Te gustaría que ajuste alguna estimación o dependencia específica?
+
+---

@@ -1,4 +1,4 @@
-import { generalSettings } from '@/config/general.config';
+import { Instagram, Globe } from 'lucide-react';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -7,51 +7,27 @@ export function Footer() {
     <footer className="footer">
       <div className="container">
         <div className="flex flex-col md:flex-row justify-center md:justify-between items-center gap-3 py-5">
-          <div className="flex order-2 md:order-1  gap-2 font-normal text-sm">
-            <span className="text-muted-foreground">{currentYear} &copy;</span>
-            <a
-              href="https://keenthemes.com"
-              target="_blank"
-              className="text-secondary-foreground hover:text-primary"
-            >
-              Keenthemes Inc.
-            </a>
+          <div className="flex order-2 md:order-1 gap-2 font-normal text-sm">
+            <span className="text-muted-foreground">{currentYear} © Joia Bagur</span>
           </div>
-          <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground">
+          <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground items-center">
             <a
-              href={generalSettings.docsLink}
+              href="https://www.joiabagur.com"
               target="_blank"
-              className="hover:text-primary"
+              rel="noopener noreferrer"
+              className="hover:text-primary flex items-center gap-1.5"
             >
-              Docs
+              <Globe className="size-4" />
+              www.joiabagur.com
             </a>
             <a
-              href={generalSettings.purchaseLink}
+              href="https://instagram.com/joiabagur"
               target="_blank"
-              className="hover:text-primary"
+              rel="noopener noreferrer"
+              className="hover:text-primary flex items-center gap-1.5"
             >
-              Purchase
-            </a>
-            <a
-              href={generalSettings.faqLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              FAQ
-            </a>
-            <a
-              href="https://devs.keenthemes.com"
-              target="_blank"
-              className="hover:text-primary"
-            >
-              Support
-            </a>
-            <a
-              href={generalSettings.licenseLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              License
+              <Instagram className="size-4" />
+              @joiabagur
             </a>
           </nav>
         </div>

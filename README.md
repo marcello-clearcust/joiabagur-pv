@@ -82,6 +82,8 @@ Documentos de propuestas técnicas y análisis:
 
 - **[Análisis de Metronic Frontend](Documentos/Propuestas/analisis-metronic-frontend.md)**: Análisis y evaluación del framework Metronic para el frontend.
 
+- **[Análisis y Migración Swagger a Scalar](Documentos/Propuestas/analisis-swagger.md)**: Análisis técnico y migración exitosa de Swagger/Swashbuckle a Scalar por incompatibilidad con .NET 10.
+
 - **[Arquitecturas Propuestas](Documentos/Propuestas/arquitecturas-propuestas.md)**: Diferentes propuestas arquitectónicas evaluadas para el proyecto.
 
 ---

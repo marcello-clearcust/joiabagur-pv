@@ -34,6 +34,11 @@ public static class ServiceCollectionExtensions
         // Register payment method management services
         services.AddScoped<IPaymentMethodService, PaymentMethodService>();
 
+        // Register product management services
+        services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IExcelImportService, ExcelImportService>();
+        services.AddScoped<IProductPhotoService, ProductPhotoService>();
+
         return services;
     }
 }

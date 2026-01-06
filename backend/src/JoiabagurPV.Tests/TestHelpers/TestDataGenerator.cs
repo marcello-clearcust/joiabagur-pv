@@ -162,4 +162,98 @@ public static class TestDataGenerator
     {
         return CreateUsers(count).Cast<BaseEntity>();
     }
+
+    /// <summary>
+    /// Creates a Product faker with customizable rules.
+    /// </summary>
+    public static Faker<Product> ProductFaker(bool? isActive = null, Guid? collectionId = null)
+    {
+        return new Faker<Product>()
+            .RuleFor(p => p.Id, f => f.Random.Guid())
+            .RuleFor(p => p.SKU, f => $"JOY-{f.Random.Number(1000, 9999)}")
+            .RuleFor(p => p.Name, f => f.Commerce.ProductName())
+            .RuleFor(p => p.Description, f => f.Commerce.ProductDescription())
+            .RuleFor(p => p.Price, f => f.Random.Decimal(10, 5000))
+            .RuleFor(p => p.CollectionId, f => collectionId)
+            .RuleFor(p => p.IsActive, f => isActive ?? true)
+            .RuleFor(p => p.CreatedAt, f => f.Date.Past())
+            .RuleFor(p => p.UpdatedAt, f => f.Date.Recent());
+    }
+
+    /// <summary>
+    /// Creates a single Product with optional customization.
+    /// </summary>
+    public static Product CreateProduct(bool? isActive = null, string? sku = null, string? name = null, decimal? price = null, Guid? collectionId = null)
+    {
+        var product = ProductFaker(isActive, collectionId).Generate();
+        if (sku != null) product.SKU = sku;
+        if (name != null) product.Name = name;
+        if (price.HasValue) product.Price = price.Value;
+        return product;
+    }
+
+    /// <summary>
+    /// Creates multiple Product instances.
+    /// </summary>
+    public static List<Product> CreateProducts(int count, bool? isActive = null, Guid? collectionId = null)
+    {
+        return ProductFaker(isActive, collectionId).Generate(count);
+    }
+
+    /// <summary>
+    /// Creates a Collection faker with customizable rules.
+    /// </summary>
+    public static Faker<Collection> CollectionFaker()
+    {
+        return new Faker<Collection>()
+            .RuleFor(c => c.Id, f => f.Random.Guid())
+            .RuleFor(c => c.Name, f => f.Commerce.Department())
+            .RuleFor(c => c.Description, f => f.Lorem.Sentence())
+            .RuleFor(c => c.CreatedAt, f => f.Date.Past())
+            .RuleFor(c => c.UpdatedAt, f => f.Date.Recent());
+    }
+
+    /// <summary>
+    /// Creates a single Collection with optional customization.
+    /// </summary>
+    public static Collection CreateCollection(string? name = null, string? description = null)
+    {
+        var collection = CollectionFaker().Generate();
+        if (name != null) collection.Name = name;
+        if (description != null) collection.Description = description;
+        return collection;
+    }
+
+    /// <summary>
+    /// Creates multiple Collection instances.
+    /// </summary>
+    public static List<Collection> CreateCollections(int count)
+    {
+        return CollectionFaker().Generate(count);
+    }
+
+    /// <summary>
+    /// Creates a ProductPhoto faker with customizable rules.
+    /// </summary>
+    public static Faker<ProductPhoto> ProductPhotoFaker(Guid? productId = null, bool? isPrimary = null)
+    {
+        return new Faker<ProductPhoto>()
+            .RuleFor(pp => pp.Id, f => f.Random.Guid())
+            .RuleFor(pp => pp.ProductId, f => productId ?? f.Random.Guid())
+            .RuleFor(pp => pp.FileName, f => $"{f.Random.AlphaNumeric(8)}.jpg")
+            .RuleFor(pp => pp.DisplayOrder, f => f.Random.Int(0, 10))
+            .RuleFor(pp => pp.IsPrimary, f => isPrimary ?? false)
+            .RuleFor(pp => pp.CreatedAt, f => f.Date.Past())
+            .RuleFor(pp => pp.UpdatedAt, f => f.Date.Recent());
+    }
+
+    /// <summary>
+    /// Creates a single ProductPhoto with optional customization.
+    /// </summary>
+    public static ProductPhoto CreateProductPhoto(Guid? productId = null, bool? isPrimary = null, string? fileName = null)
+    {
+        var photo = ProductPhotoFaker(productId, isPrimary).Generate();
+        if (fileName != null) photo.FileName = fileName;
+        return photo;
+    }
 }

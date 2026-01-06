@@ -35,19 +35,23 @@ Permite gestionar el catálogo centralizado de productos de la joyería, incluye
 ## Épica 2: Gestión de Inventario
 
 **Descripción:**  
-Gestiona el stock de productos por punto de venta, permitiendo importaciones masivas, ajustes manuales y consultas del inventario actual.
+Gestiona la asignación de productos a puntos de venta y el stock de dichos productos, permitiendo asignaciones manuales, importaciones masivas, ajustes manuales y consultas del inventario actual.
+
+**Regla de negocio clave:** La presencia de un registro en `Inventory` (independientemente de la cantidad) determina que el producto está asignado al punto de venta y es visible para los operadores asignados a dicho punto de venta.
 
 **Alcance:**
-- Importación de stock desde Excel (suma a cantidades existentes)
+- **Asignación manual de productos a puntos de venta** (crear registros en Inventory con cantidad inicial 0)
+- **Desasignación de productos** de puntos de venta (soft delete con preservación de historial)
+- Importación de stock desde Excel (suma a cantidades existentes, con asignación implícita si el producto no está en el inventario del POS)
 - Visualización de stock por punto de venta
 - Vista centralizada de stock total y por ubicación
 - Ajustes manuales de inventario con trazabilidad
 - Validación de stock no negativo
 
 **Entidades del modelo de datos relacionadas:**
-- `Inventory` (stock actual por producto y punto de venta)
+- `Inventory` (asignación de productos a POS y stock actual por producto y punto de venta)
 - `InventoryMovement` (historial completo de movimientos con trazabilidad)
-- `Product` (referencia al producto)
+- `Product` (referencia al producto del catálogo global)
 - `PointOfSale` (referencia al punto de venta)
 
 **User Stories:**
@@ -56,6 +60,7 @@ Gestiona el stock de productos por punto de venta, permitiendo importaciones mas
 - [HU-EP2-003: Visualizar stock centralizado (todos los puntos de venta)](Historias/HU-EP2-003.md)
 - [HU-EP2-004: Realizar ajuste manual de inventario](Historias/HU-EP2-004.md)
 - [HU-EP2-005: Consultar historial de movimientos de inventario](Historias/HU-EP2-005.md)
+- [HU-EP2-006: Asignar/desasignar productos a puntos de venta](Historias/HU-EP2-006.md)
 
 ---
 
@@ -249,7 +254,7 @@ Proporciona funcionalidades de consulta y visualización de datos históricos de
 | Épica | Descripción Breve | User Stories Estimadas |
 |-------|-------------------|------------------------|
 | **EP1** | Gestión de Productos | 7 |
-| **EP2** | Gestión de Inventario | 5 |
+| **EP2** | Gestión de Inventario | 6 |
 | **EP3** | Registro de Ventas | 2 |
 | **EP4** | Reconocimiento de Imágenes con IA | 1 |
 | **EP5** | Gestión de Devoluciones | 3 |
@@ -257,7 +262,7 @@ Proporciona funcionalidades de consulta y visualización de datos históricos de
 | **EP7** | Autenticación y Gestión de Usuarios | 6 |
 | **EP8** | Gestión de Puntos de Venta | 4 |
 | **EP9** | Consultas y Reportes | 4 |
-| **TOTAL** | | **35** |
+| **TOTAL** | | **36** |
 
 ---
 

@@ -54,7 +54,7 @@
 
 ### 8. Business Rules
 - [ ] ⏸️ **DEFERRED** Prevent deactivation of payment methods assigned to active sales (requires EP3 - Sales system)
-- [ ] ⏸️ **OPTIONAL** Ensure at least one payment method per point of sale (business decision - not required)
+- [x] ✅ **IMPLEMENTED** Ensure at least one payment method per point of sale
 - [x] Validate payment method codes are unique and follow naming convention
 - [x] Maintain audit trail for assignment changes (CreatedAt, UpdatedAt, DeactivatedAt tracked)
 
@@ -150,8 +150,8 @@ The following items are deferred because they require the sales system (EP3):
 - Sales creation with payment method validation
 - End-to-end sales validation tests
 
-Optional items not implemented:
-- Ensure at least one payment method per point of sale (business decision)
+Previously Optional items now implemented:
+- ✅ Ensure at least one payment method per point of sale (business rule enforced)
 
 ### Next Steps
 

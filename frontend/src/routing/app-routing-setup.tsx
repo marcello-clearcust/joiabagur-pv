@@ -8,6 +8,9 @@ import { ROUTES } from './routes';
 const LoginPage = lazy(() => import('@/pages/auth/login'));
 const DashboardPage = lazy(() => import('@/pages/dashboard/page'));
 const ProductsPage = lazy(() => import('@/pages/products'));
+const ProductCreatePage = lazy(() => import('@/pages/products/create'));
+const ProductEditPage = lazy(() => import('@/pages/products/edit'));
+const ProductImportPage = lazy(() => import('@/pages/products/import'));
 const InventoryPage = lazy(() => import('@/pages/inventory'));
 const SalesPage = lazy(() => import('@/pages/sales'));
 const ReturnsPage = lazy(() => import('@/pages/returns'));
@@ -55,7 +58,10 @@ export function AppRoutingSetup() {
         {/* Admin-only Routes - Require Administrator role */}
         <Route element={<AdminRoute />}>
           <Route element={<Layout8 />}>
-            <Route path={ROUTES.PRODUCTS} element={<ProductsPage />} />
+            <Route path={ROUTES.PRODUCTS.ROOT} element={<ProductsPage />} />
+            <Route path={ROUTES.PRODUCTS.CREATE} element={<ProductCreatePage />} />
+            <Route path="/products/:productId/edit" element={<ProductEditPage />} />
+            <Route path={ROUTES.PRODUCTS.IMPORT} element={<ProductImportPage />} />
             <Route path={ROUTES.PAYMENT_METHODS} element={<PaymentMethodsPage />} />
             <Route path={ROUTES.USERS} element={<UsersPage />} />
             <Route path={ROUTES.POINTS_OF_SALE} element={<PointsOfSalePage />} />

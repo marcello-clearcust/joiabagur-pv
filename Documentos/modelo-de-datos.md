@@ -173,12 +173,14 @@ erDiagram
         uuid ProductId FK
         uuid PointOfSaleId FK
         int Quantity "stock actual"
+        bool IsActive "true=asignado, false=desasignado"
         int? MinimumThreshold "para alertas futuras (Fase 2)"
         datetime LastUpdatedAt
         datetime CreatedAt
         unique(ProductId, PointOfSaleId)
         indexed(PointOfSaleId, Quantity)
         indexed(ProductId)
+        indexed(PointOfSaleId, ProductId, IsActive)
     }
     
     InventoryMovement {
@@ -400,21 +402,36 @@ Registro de devoluciones de productos vendidos.
 
 ### Inventory (Inventario)
 
-Stock actual de cada producto en cada punto de venta.
+Stock actual de cada producto en cada punto de venta. **La presencia de un registro activo (`IsActive = true`) en esta tabla indica que el producto está asignado a ese punto de venta**, independientemente de la cantidad.
 
 **Campos Clave:**
 - `Id`: Identificador único (UUID)
 - `ProductId`: Referencia al producto
 - `PointOfSaleId`: Referencia al punto de venta
-- `Quantity`: Cantidad actual en stock
+- `Quantity`: Cantidad actual en stock (**puede ser 0, el producto sigue asignado al POS si IsActive = true**)
+- `IsActive`: Indica si el producto está asignado (true) o desasignado (false) - permite soft delete
 - `MinimumThreshold`: Umbral mínimo para alertas (preparado para Fase 2)
 - `LastUpdatedAt`: Última actualización del stock
+- `CreatedAt`: Fecha de creación del registro
 
 **Restricción:** Constraint único en `(ProductId, PointOfSaleId)` para garantizar un solo registro por combinación producto-punto de venta.
+
+**Regla de Visibilidad:**
+- Los operadores solo pueden ver/acceder a productos que tienen registro **activo** (`IsActive = true`) en `Inventory` para sus puntos de venta asignados
+- Un producto puede existir en la tabla `Product` sin ningún registro en `Inventory` (no asignado a ningún POS)
+- Registros con `IsActive = false` se preservan para auditoría pero el producto no es visible para operadores
+
+**Campo IsActive (Soft Delete):**
+- `true`: Producto asignado y visible para operadores del POS
+- `false`: Producto desasignado (soft delete), no visible pero historial preservado
+- Permite reasignación sin perder datos históricos
+- Solo se puede desasignar (`IsActive = false`) si `Quantity = 0`
 
 **Optimizaciones:**
 - Índice compuesto en `(PointOfSaleId, Quantity)` para consultas de stock bajo
 - Índice en `ProductId` para consultas de stock total por producto
+- **Índice compuesto en `(PointOfSaleId, ProductId, IsActive)` para filtrado eficiente de catálogo por operador**
+- Índice parcial en `(PointOfSaleId, ProductId) WHERE IsActive = true` para consultas frecuentes de productos activos
 
 ---
 
@@ -474,10 +491,13 @@ Historial completo y trazable de todos los movimientos de inventario (ventas, de
 1. **Usuarios Administradores:**
    - No requieren asignación en `UserPointOfSale`
    - Tienen acceso a todos los puntos de venta por lógica de aplicación
+   - Pueden ver y gestionar todos los productos del catálogo global
 
 2. **Usuarios Operadores:**
    - Deben estar asignados al menos a un punto de venta en `UserPointOfSale`
    - Solo pueden registrar ventas en puntos de venta asignados
+   - **Solo pueden ver productos que tienen registros en `Inventory` para sus puntos de venta asignados** (independientemente de la cantidad)
+   - Pueden seleccionar productos con `Quantity = 0` pero el sistema impedirá completar la venta
 
 3. **Métodos de Pago:**
    - Un punto de venta debe tener al menos un método de pago asignado

@@ -70,10 +70,52 @@ const userHandlers = [
 ];
 
 /**
+ * Product handlers
+ */
+const productHandlers = [
+  // Get products list
+  http.get(`${API_BASE}/products`, () => {
+    return HttpResponse.json([
+      { id: '1', sku: 'JOY-001', name: 'Gold Ring', price: 299.99, isActive: true },
+      { id: '2', sku: 'JOY-002', name: 'Silver Necklace', price: 199.99, isActive: true },
+    ]);
+  }),
+
+  // Import products
+  http.post(`${API_BASE}/products/import`, () => {
+    return HttpResponse.json({
+      success: true,
+      totalRows: 2,
+      createdCount: 1,
+      updatedCount: 1,
+      collectionsCreatedCount: 0,
+      errors: [],
+      warnings: [],
+      message: 'Import successful',
+    });
+  }),
+
+  // Validate import
+  http.post(`${API_BASE}/products/import/validate`, () => {
+    return HttpResponse.json({
+      success: true,
+      totalRows: 2,
+      createdCount: 0,
+      updatedCount: 0,
+      collectionsCreatedCount: 0,
+      errors: [],
+      warnings: [],
+      message: 'Validation passed',
+    });
+  }),
+];
+
+/**
  * All handlers combined
  * Export for use in MSW server setup
  */
 export const handlers = [
   ...authHandlers,
   ...userHandlers,
+  ...productHandlers,
 ];

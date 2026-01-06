@@ -66,3 +66,27 @@ beforeAll(() => {
     }
   };
 });
+
+// Polyfill Pointer Capture APIs (Radix UI relies on these; jsdom doesn't implement them)
+beforeAll(() => {
+  if (!('hasPointerCapture' in HTMLElement.prototype)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (HTMLElement.prototype as any).hasPointerCapture = () => false;
+  }
+  if (!('setPointerCapture' in HTMLElement.prototype)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (HTMLElement.prototype as any).setPointerCapture = () => {};
+  }
+  if (!('releasePointerCapture' in HTMLElement.prototype)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (HTMLElement.prototype as any).releasePointerCapture = () => {};
+  }
+});
+
+// Polyfill scrollIntoView (Radix Select uses it; jsdom doesn't implement it)
+beforeAll(() => {
+  if (!('scrollIntoView' in Element.prototype)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Element.prototype as any).scrollIntoView = () => {};
+  }
+});

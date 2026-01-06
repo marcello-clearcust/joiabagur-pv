@@ -13,7 +13,12 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
 
   // Module routes - organized by epic
-  PRODUCTS: '/products',
+  PRODUCTS: {
+    ROOT: '/products',
+    CREATE: '/products/create',
+    EDIT: (id: string) => `/products/${id}/edit`,
+    IMPORT: '/products/import',
+  },
   INVENTORY: '/inventory',
   SALES: '/sales',
   RETURNS: '/returns',

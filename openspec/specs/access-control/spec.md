@@ -141,6 +141,50 @@ The system SHALL automatically filter data for operators based on their assignme
 - **THEN** system returns data from all points of sale
 - **AND** admin can filter by any point of sale
 
+### Requirement: Product Catalog Filtering by Inventory Assignment
+
+The system SHALL filter product catalog and search results based on user role and inventory assignments.
+
+#### Scenario: Admin views all products
+
+- **WHEN** authenticated admin requests product catalog or searches products
+- **THEN** system returns all products from the global Product table
+- **AND** includes products with or without Inventory records
+
+#### Scenario: Operator views only assigned products
+
+- **WHEN** authenticated operator requests product catalog or searches products
+- **THEN** system returns ONLY products that have Inventory records at operator's assigned points of sale
+- **AND** includes products with Quantity = 0 if Inventory record exists
+- **AND** excludes products with no Inventory records at assigned points of sale
+
+#### Scenario: Operator has multiple POS assignments
+
+- **WHEN** operator is assigned to multiple points of sale
+- **AND** requests product catalog
+- **THEN** system returns products that have Inventory records at ANY of the assigned points of sale
+- **AND** aggregates results without duplicates
+
+#### Scenario: Product exists globally but not in operator's inventory
+
+- **WHEN** operator searches for or accesses a product that exists in Product table
+- **BUT** has no Inventory record at operator's assigned points of sale
+- **THEN** system returns 404 Not Found or excludes from search results
+- **AND** operator cannot view product details
+
+#### Scenario: Operator attempts direct access to unassigned product
+
+- **WHEN** operator directly accesses product detail URL for unassigned product
+- **THEN** backend validates inventory assignment
+- **AND** returns 403 Forbidden with message "No tiene acceso a este producto"
+
+#### Scenario: Product with zero quantity visible to operator
+
+- **WHEN** operator views catalog or searches products
+- **AND** product has Inventory.Quantity = 0 at assigned POS
+- **THEN** product is included in results with quantity indicator
+- **AND** displays warning message about zero inventory when selected
+
 ### Requirement: Assignment History
 
 The system SHALL maintain history of operator assignments.

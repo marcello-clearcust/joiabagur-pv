@@ -1,7 +1,9 @@
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
+using JoiabagurPV.Domain.Interfaces.Services;
 using JoiabagurPV.Infrastructure.Data;
 using JoiabagurPV.Infrastructure.Data.Repositories;
+using JoiabagurPV.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,12 +62,26 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPointOfSaleRepository, PointOfSaleRepository>();
         services.AddScoped<IPaymentMethodRepository, PaymentMethodRepository>();
         services.AddScoped<IPointOfSalePaymentMethodRepository, PointOfSalePaymentMethodRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IProductPhotoRepository, ProductPhotoRepository>();
+        services.AddScoped<ICollectionRepository, CollectionRepository>();
 
         // Register unit of work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Register database seeder
         services.AddScoped<DatabaseSeeder>();
+
+        // Register file storage service based on configuration
+        var storageProvider = configuration["FileStorage:Provider"]?.ToLowerInvariant() ?? "local";
+        if (storageProvider == "cloud")
+        {
+            services.AddScoped<IFileStorageService, CloudFileStorageService>();
+        }
+        else
+        {
+            services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        }
 
         return services;
     }

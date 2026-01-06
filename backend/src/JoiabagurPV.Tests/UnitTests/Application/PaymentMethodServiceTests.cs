@@ -351,4 +351,191 @@ public class PaymentMethodServiceTests
     }
 
     #endregion
+
+    #region UnassignFromPointOfSaleAsync Tests
+
+    [Fact]
+    public async Task UnassignFromPointOfSaleAsync_WhenMultipleActivePaymentMethods_ShouldSucceed()
+    {
+        // Arrange
+        var pointOfSaleId = Guid.NewGuid();
+        var paymentMethodId = Guid.NewGuid();
+        var assignment = new PointOfSalePaymentMethod
+        {
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = paymentMethodId,
+            IsActive = true
+        };
+
+        var activeAssignments = new List<PointOfSalePaymentMethod>
+        {
+            assignment,
+            new() { Id = Guid.NewGuid(), PointOfSaleId = pointOfSaleId, PaymentMethodId = Guid.NewGuid(), IsActive = true }
+        };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+            .ReturnsAsync(assignment);
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
+            .ReturnsAsync(activeAssignments);
+
+        // Act
+        await _service.UnassignFromPointOfSaleAsync(pointOfSaleId, paymentMethodId);
+
+        // Assert
+        _posPaymentMethodRepositoryMock.Verify(r => r.DeleteAsync(assignment.Id), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task UnassignFromPointOfSaleAsync_WhenLastActivePaymentMethod_ShouldThrowException()
+    {
+        // Arrange
+        var pointOfSaleId = Guid.NewGuid();
+        var paymentMethodId = Guid.NewGuid();
+        var assignment = new PointOfSalePaymentMethod
+        {
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = paymentMethodId,
+            IsActive = true
+        };
+
+        var activeAssignments = new List<PointOfSalePaymentMethod> { assignment };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+            .ReturnsAsync(assignment);
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
+            .ReturnsAsync(activeAssignments);
+
+        // Act
+        var act = () => _service.UnassignFromPointOfSaleAsync(pointOfSaleId, paymentMethodId);
+
+        // Assert
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*debe tener al menos un método de pago asignado*");
+        _posPaymentMethodRepositoryMock.Verify(r => r.DeleteAsync(It.IsAny<Guid>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UnassignFromPointOfSaleAsync_WhenAssignmentNotFound_ShouldThrowException()
+    {
+        // Arrange
+        var pointOfSaleId = Guid.NewGuid();
+        var paymentMethodId = Guid.NewGuid();
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+            .ReturnsAsync((PointOfSalePaymentMethod?)null);
+
+        // Act
+        var act = () => _service.UnassignFromPointOfSaleAsync(pointOfSaleId, paymentMethodId);
+
+        // Assert
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*Asignación de método de pago no encontrada*");
+    }
+
+    #endregion
+
+    #region ChangeAssignmentStatusAsync Tests
+
+    [Fact]
+    public async Task ChangeAssignmentStatusAsync_DeactivateWhenMultipleActive_ShouldSucceed()
+    {
+        // Arrange
+        var pointOfSaleId = Guid.NewGuid();
+        var paymentMethodId = Guid.NewGuid();
+        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Efectivo", IsActive = true };
+        var assignment = new PointOfSalePaymentMethod
+        {
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = paymentMethodId,
+            IsActive = true,
+            PaymentMethod = paymentMethod
+        };
+
+        var activeAssignments = new List<PointOfSalePaymentMethod>
+        {
+            assignment,
+            new() { Id = Guid.NewGuid(), PointOfSaleId = pointOfSaleId, PaymentMethodId = Guid.NewGuid(), IsActive = true }
+        };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+            .ReturnsAsync(assignment);
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
+            .ReturnsAsync(activeAssignments);
+
+        // Act
+        var result = await _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethodId, false);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.IsActive.Should().BeFalse();
+        _posPaymentMethodRepositoryMock.Verify(r => r.UpdateAsync(assignment), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task ChangeAssignmentStatusAsync_DeactivateLastActive_ShouldThrowException()
+    {
+        // Arrange
+        var pointOfSaleId = Guid.NewGuid();
+        var paymentMethodId = Guid.NewGuid();
+        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Efectivo", IsActive = true };
+        var assignment = new PointOfSalePaymentMethod
+        {
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = paymentMethodId,
+            IsActive = true,
+            PaymentMethod = paymentMethod
+        };
+
+        var activeAssignments = new List<PointOfSalePaymentMethod> { assignment };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+            .ReturnsAsync(assignment);
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
+            .ReturnsAsync(activeAssignments);
+
+        // Act
+        var act = () => _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethodId, false);
+
+        // Assert
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*debe tener al menos un método de pago activo*");
+        _posPaymentMethodRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<PointOfSalePaymentMethod>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ChangeAssignmentStatusAsync_ActivateInactive_ShouldSucceed()
+    {
+        // Arrange
+        var pointOfSaleId = Guid.NewGuid();
+        var paymentMethodId = Guid.NewGuid();
+        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Efectivo", IsActive = true };
+        var assignment = new PointOfSalePaymentMethod
+        {
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = paymentMethodId,
+            IsActive = false,
+            PaymentMethod = paymentMethod
+        };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+            .ReturnsAsync(assignment);
+
+        // Act
+        var result = await _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethodId, true);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.IsActive.Should().BeTrue();
+        _posPaymentMethodRepositoryMock.Verify(r => r.UpdateAsync(assignment), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+    }
+
+    #endregion
 }

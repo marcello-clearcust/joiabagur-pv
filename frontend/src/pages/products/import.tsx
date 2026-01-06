@@ -1,0 +1,430 @@
+/**
+ * Product Import Page - EP1
+ * Allows administrators to import products from Excel files
+ */
+
+import { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { 
+  Upload, 
+  FileSpreadsheet, 
+  Download, 
+  AlertCircle, 
+  CheckCircle2, 
+  X,
+  Loader2,
+  AlertTriangle
+} from 'lucide-react';
+import { productService } from '@/services/product.service';
+import { ImportResult, ImportError } from '@/types/product.types';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+// Excel template columns
+const TEMPLATE_COLUMNS = ['SKU', 'Name', 'Description', 'Price', 'Collection'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ACCEPTED_EXTENSIONS = ['.xlsx', '.xls'];
+
+export function ProductImportPage() {
+  const [file, setFile] = useState<File | null>(null);
+  const [validationResult, setValidationResult] = useState<ImportResult | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  // Handle file drop
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+
+    const selectedFile = acceptedFiles[0];
+    
+    // Reset state
+    setValidationResult(null);
+    setImportResult(null);
+    setFile(selectedFile);
+
+    // Validate file
+    setIsValidating(true);
+    try {
+      const result = await productService.validateImport(selectedFile);
+      setValidationResult(result);
+      
+      if (result.success) {
+        toast.success(`Archivo válido: ${result.totalRows} productos encontrados`);
+      } else {
+        toast.warning(`Se encontraron ${result.errors.length} errores de validación`);
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al validar el archivo';
+      toast.error(errorMessage);
+      setValidationResult({
+        success: false,
+        totalRows: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        collectionsCreatedCount: 0,
+        errors: [{ rowNumber: 0, field: 'File', message: errorMessage }],
+        warnings: [],
+        message: errorMessage,
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
+    onDrop,
+    accept: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls'],
+    },
+    maxSize: MAX_FILE_SIZE,
+    multiple: false,
+    disabled: isValidating || isImporting,
+  });
+
+  // Download template
+  const handleDownloadTemplate = () => {
+    // Create a simple CSV template (browsers can open in Excel)
+    const csvContent = TEMPLATE_COLUMNS.join(',') + '\nJOY-001,Anillo de Oro,Anillo de oro de 18k,299.99,Colección Verano\nJOY-002,Collar de Plata,Collar de plata 925,149.99,';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'plantilla_productos.csv';
+    link.click();
+    toast.info('Plantilla descargada. Puedes abrirla en Excel y guardarla como .xlsx');
+  };
+
+  // Handle import confirmation
+  const handleImportClick = () => {
+    setShowConfirmDialog(true);
+  };
+
+  // Execute import
+  const handleConfirmImport = async () => {
+    if (!file) return;
+
+    setShowConfirmDialog(false);
+    setIsImporting(true);
+
+    try {
+      const result = await productService.importProducts(file);
+      setImportResult(result);
+
+      if (result.success) {
+        toast.success(
+          `Importación exitosa: ${result.createdCount} creados, ${result.updatedCount} actualizados`
+        );
+        // Reset for new import
+        setFile(null);
+        setValidationResult(null);
+      } else {
+        toast.error(`Error en la importación: ${result.message}`);
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al importar productos';
+      toast.error(errorMessage);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Clear current file
+  const handleClearFile = () => {
+    setFile(null);
+    setValidationResult(null);
+    setImportResult(null);
+  };
+
+  // Check if can import
+  const canImport = file && validationResult?.success && !isImporting && !isValidating;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Importar Productos</h1>
+          <p className="text-muted-foreground">
+            Carga productos de forma masiva desde un archivo Excel
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleDownloadTemplate}>
+          <Download className="mr-2 size-4" />
+          Descargar Plantilla
+        </Button>
+      </div>
+
+      {/* Drop Zone */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="size-5" />
+            Archivo Excel
+          </CardTitle>
+          <CardDescription>
+            Arrastra y suelta un archivo Excel (.xlsx, .xls) o haz clic para seleccionar
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div
+            {...getRootProps()}
+            className={cn(
+              'relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors',
+              isDragActive && !isDragReject && 'border-primary bg-primary/5',
+              isDragReject && 'border-destructive bg-destructive/5',
+              !isDragActive && 'border-muted-foreground/25 hover:border-primary/50',
+              (isValidating || isImporting) && 'pointer-events-none opacity-50'
+            )}
+          >
+            <input {...getInputProps()} />
+            
+            {isValidating ? (
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="size-10 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Validando archivo...</p>
+              </div>
+            ) : isImporting ? (
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="size-10 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Importando productos...</p>
+                <Progress value={33} className="w-48" />
+              </div>
+            ) : file ? (
+              <div className="flex flex-col items-center gap-3">
+                <FileSpreadsheet className="size-10 text-green-600" />
+                <div className="text-center">
+                  <p className="font-medium">{file.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(file.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClearFile();
+                  }}
+                >
+                  <X className="mr-1 size-4" />
+                  Quitar archivo
+                </Button>
+              </div>
+            ) : isDragReject ? (
+              <div className="flex flex-col items-center gap-3 text-destructive">
+                <AlertCircle className="size-10" />
+                <p className="text-sm">Formato de archivo no válido</p>
+                <p className="text-xs">Solo se aceptan archivos .xlsx y .xls</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                <Upload className="size-10 text-muted-foreground" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">
+                    {isDragActive ? 'Suelta el archivo aquí' : 'Arrastra y suelta un archivo Excel'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    o haz clic para seleccionar (máx. 10 MB)
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Validation Results */}
+      {validationResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {validationResult.success ? (
+                <>
+                  <CheckCircle2 className="size-5 text-green-600" />
+                  <span className="text-green-600">Validación Exitosa</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="size-5 text-destructive" />
+                  <span className="text-destructive">Errores de Validación</span>
+                </>
+              )}
+            </CardTitle>
+            <CardDescription>
+              {validationResult.totalRows} filas encontradas en el archivo
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Summary badges */}
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">
+                Total: {validationResult.totalRows} productos
+              </Badge>
+              {validationResult.success && (
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  Listo para importar
+                </Badge>
+              )}
+              {validationResult.errors.length > 0 && (
+                <Badge variant="destructive">
+                  {validationResult.errors.length} error(es)
+                </Badge>
+              )}
+            </div>
+
+            {/* Error table */}
+            {validationResult.errors.length > 0 && (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-20">Fila</TableHead>
+                      <TableHead className="w-32">Campo</TableHead>
+                      <TableHead>Error</TableHead>
+                      <TableHead className="w-32">Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {validationResult.errors.slice(0, 20).map((error, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-mono">{error.rowNumber}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{error.field}</Badge>
+                        </TableCell>
+                        <TableCell className="text-destructive">{error.message}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {error.value || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {validationResult.errors.length > 20 && (
+                  <div className="border-t bg-muted/50 p-2 text-center text-sm text-muted-foreground">
+                    ... y {validationResult.errors.length - 20} errores más
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Import button */}
+            {validationResult.success && (
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleImportClick} 
+                  disabled={!canImport}
+                  size="lg"
+                >
+                  <Upload className="mr-2 size-4" />
+                  Importar Productos
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Import Results */}
+      {importResult && importResult.success && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle2 className="size-5" />
+              Importación Completada
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+                <p className="text-3xl font-bold text-green-600">{importResult.createdCount}</p>
+                <p className="text-sm text-muted-foreground">Productos creados</p>
+              </div>
+              <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+                <p className="text-3xl font-bold text-blue-600">{importResult.updatedCount}</p>
+                <p className="text-sm text-muted-foreground">Productos actualizados</p>
+              </div>
+              <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+                <p className="text-3xl font-bold text-purple-600">{importResult.collectionsCreatedCount}</p>
+                <p className="text-sm text-muted-foreground">Colecciones creadas</p>
+              </div>
+            </div>
+
+            {importResult.warnings.length > 0 && (
+              <div className="mt-4 rounded-md border border-yellow-200 bg-yellow-50 p-4">
+                <div className="flex items-center gap-2 text-yellow-800">
+                  <AlertTriangle className="size-4" />
+                  <span className="font-medium">Advertencias:</span>
+                </div>
+                <ul className="mt-2 list-inside list-disc text-sm text-yellow-700">
+                  {importResult.warnings.map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Importación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas importar los productos del archivo{' '}
+              <strong>{file?.name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="rounded-md bg-muted p-4">
+              <p className="text-sm">
+                Se procesarán <strong>{validationResult?.totalRows}</strong> productos.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Los productos existentes (mismo SKU) serán actualizados.
+                Los nuevos productos serán creados.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmImport}>
+              <Upload className="mr-2 size-4" />
+              Confirmar Importación
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+export default ProductImportPage;
+
+
+

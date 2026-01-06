@@ -36,6 +36,18 @@ public class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
+        catch (BadHttpRequestException ex)
+        {
+            // Covers malformed JSON, invalid request bodies, etc.
+            _logger.LogWarning(ex, "Bad HTTP request: {Message}", ex.Message);
+            await HandleExceptionAsync(context, ex, HttpStatusCode.BadRequest);
+        }
+        catch (JsonException ex)
+        {
+            // System.Text.Json deserialization errors (including missing required members)
+            _logger.LogWarning(ex, "JSON deserialization error: {Message}", ex.Message);
+            await HandleExceptionAsync(context, ex, HttpStatusCode.BadRequest);
+        }
         catch (DomainException ex)
         {
             _logger.LogWarning(ex, "Domain exception caught by middleware: {Message}", ex.Message);

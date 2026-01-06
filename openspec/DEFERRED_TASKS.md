@@ -83,13 +83,16 @@ This document tracks tasks that were deferred during implementation of completed
 
 ---
 
-## Optional Business Rules (Not Required)
+## Completed Integrations
 
 ### From: add-payment-method-management
-- [ ] **OPTIONAL**: Ensure at least one payment method per point of sale
-  - **Business Decision Required**: Is this constraint needed?
-  - **If Yes**: Validate in PointOfSaleService before unassigning last payment method
-  - **Error Message**: "El punto de venta debe tener al menos un método de pago asignado"
+- [x] ✅ **COMPLETED**: Ensure at least one payment method per point of sale
+  - **Implementation**: Validation added in PaymentMethodService
+  - **Methods**: UnassignFromPointOfSaleAsync, ChangeAssignmentStatusAsync
+  - **Error Messages**: 
+    - "El punto de venta debe tener al menos un método de pago asignado" (unassign)
+    - "El punto de venta debe tener al menos un método de pago activo" (deactivate)
+  - **Test Coverage**: 5 new unit tests added to PaymentMethodServiceTests
 
 ---
 
@@ -131,10 +134,10 @@ This document tracks tasks that were deferred during implementation of completed
 | Future Docs | Both specs | 4 tasks | LOW |
 | Optional | add-payment-method-management | 1 task | N/A |
 
-### Total Deferred: 12 tasks
+### Total Deferred: 11 tasks
 - **High Priority** (EP3): 7 tasks
 - **Low Priority** (Docs): 4 tasks  
-- **Optional**: 1 task
+- **Completed**: 1 task (previously optional)
 
 ---
 

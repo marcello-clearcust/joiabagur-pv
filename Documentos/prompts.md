@@ -2021,3 +2021,260 @@ Se crearon **24 tickets de trabajo** para la Épica 1 siguiendo el formato está
 Los tickets están organizados en carpetas \Tickets/EP1/HU-EP[X]-[NNN]/T-EP[X]-[NNN]-[MMM].md\ y listos para desarrollo siguiendo el orden de dependencias establecido. ¿Te gustaría que ajuste alguna estimación o dependencia específica?
 
 ---
+
+## Prompt sobre Aclaración de Regla de Negocio - Visibilidad de Productos por Inventario
+
+Verifica esta regla de negocio: los operadores solo pueden ver los productos asignados a su punto de venta
+
+### Respuesta del asistente - Identificación de Contradicción
+
+Se identificó una contradicción crítica entre documentos:
+
+**HU-EP1-006 decía:**
+> "Los operadores ven todos los productos (no hay restricción por punto de venta en el catálogo)."
+
+**Pero la especificación de access-control establecía:**
+- Operadores ven inventario filtrado por POS asignados
+- Operadores ven historial de ventas filtrado por POS asignados
+
+**Preguntas de aclaración realizadas:**
+
+1. **Q1.1**: ¿Cómo se asignan productos a POS?
+   - Opción A: Durante import Excel se especifica POS
+   - Opción B: Productos globales, luego admin asigna a POS
+   - Opción C: Todos los productos a todos los POS automáticamente
+
+2. **Q1.2**: ¿Existe UI para asignar/desasignar productos?
+   - Si es así, ¿es parte del alcance actual o futuro (EP2)?
+
+3. **Q1.3**: ¿Puede existir un producto en `Product` sin registros en `Inventory`?
+
+4. **Q2.1**: Cuando operador registra venta, ¿debe mostrar:
+   - Solo productos en su inventario POS (incluso con qty=0)?
+   - O solo productos con qty > 0?
+
+5. **Q2.2**: ¿Se puede vender producto con qty=0?
+
+6. **Q2.3**: ¿Operadores pueden ver detalles de productos NO en su inventario?
+
+7. **Q3.1**: Gestión de fotos (eliminar, reordenar, marcar principal):
+   - ¿Es admin-only o también operadores?
+
+8. **Q4.1**: Catálogo/búsqueda para operadores:
+   - ¿Productos con registro `Inventory` (cualquier cantidad)?
+   - ¿O solo productos con `Inventory.Quantity > 0`?
+
+9. **Q5.1**: ¿Añadir índice `(PointOfSaleId, ProductId)` en Inventory?
+
+### Respuestas del Usuario - Aclaraciones Definitivas
+
+1.1) Opción B.
+
+1.2) Es parte de la gestión de inventario
+
+1.3) Un producto puede existir en la tabla Product global pero NO tener registros en Inventory
+
+2.1) Mostrar solo productos en su inventario POS (incluso si qty=0) pero mostrar una advertencia de que la cantidad de inventario es 0.
+
+2.2) El sistema debe prevenir la venta. Mostrar un error diciendo que la venta no puede procesarse si el operador intenta enviar la venta.
+
+2.3) No, solo pueden "conocer" los productos de su POS
+
+3.1) Solo administrador
+
+4.1) Productos con registros Inventory en sus POS asignados
+
+4.2) Sí
+
+5.1) Sí
+
+### Respuesta del asistente - Implementación de Cambios
+
+Se realizaron actualizaciones completas en toda la documentación y especificaciones:
+
+**Archivos actualizados:**
+
+1. **`Documentos/Historias/HU-EP1-006.md`** - Catálogo de productos
+   - Actualizado para especificar filtrado por rol
+   - Administradores ven catálogo global completo
+   - Operadores ven solo productos con registros en Inventory para sus POS
+   - Agregados escenarios para operadores sin productos asignados
+
+2. **`Documentos/Historias/HU-EP1-007.md`** - Búsqueda de productos
+   - Actualizado para especificar búsqueda filtrada por rol
+   - Administradores buscan en catálogo global
+   - Operadores buscan solo en productos de su inventario
+   - Agregado escenario de búsqueda de producto no asignado
+
+3. **`Documentos/modelo-de-datos.md`**
+   - Actualizada entidad Inventory con campo `IsActive` para soft delete
+   - Agregadas reglas de visibilidad basadas en inventario
+   - Agregado índice compuesto `(PointOfSaleId, ProductId, IsActive)`
+   - Documentada la lógica: presencia de registro Inventory = producto asignado
+
+4. **`openspec/specs/access-control/spec.md`**
+   - Agregado nuevo requerimiento: Product Catalog Filtering by Inventory Assignment
+   - 6 nuevos escenarios cubriendo acceso admin vs operador
+   - Reglas de visibilidad de productos
+   - Prevención de acceso directo a productos no asignados
+   - Manejo de productos con cantidad cero
+
+5. **`openspec/changes/extend-product-catalog-search/`**
+   - Actualizado `proposal.md` con requisitos de filtrado por rol
+   - Actualizado `specs/product-management/spec.md` con escenarios de filtrado
+   - Actualizado `tasks.md` con tareas de implementación de filtros (81 tareas totales)
+   - Agregadas tareas para extracción de contexto de usuario desde JWT
+   - Agregadas tareas para JOIN con Inventory y UserPointOfSale
+
+6. **Tickets actualizados:**
+   - `T-EP1-006-001.md` - Backend catálogo API con filtrado por rol
+   - `T-EP1-006-002.md` - Frontend catálogo con indicadores de cantidad
+   - `T-EP1-007-001.md` - Backend búsqueda API con filtrado por rol
+   - `T-EP1-007-002.md` - Frontend búsqueda con advertencias de stock
+
+**Patrón de consulta especificado:**
+```csharp
+// Para operadores: filtrar por inventario
+var operatorProducts = from p in Products
+                       join i in Inventory on p.Id equals i.ProductId
+                       join ups in UserPointOfSale on i.PointOfSaleId equals ups.PointOfSaleId
+                       where ups.UserId == currentUserId 
+                         && ups.IsActive == true
+                         && i.IsActive == true
+                       select p;
+```
+
+**Validación:** Todos los cambios validados con `openspec validate extend-product-catalog-search --strict` ✅
+
+---
+
+## Prompt sobre Verificación de Épica de Inventario
+
+Verifica si la épica de Inventario (y las historias de usuario) necesitan alguna actualización debido a la nueva regla de negocio.
+
+### Respuesta del asistente - Análisis de EP2 y Problemas Identificados
+
+Se realizó un análisis exhaustivo de la Épica 2 (Gestión de Inventario) y se identificaron **problemas críticos**:
+
+**Documento de análisis creado:** `openspec/INVENTORY_EPIC_ANALYSIS.md` (posteriormente eliminado tras implementar cambios)
+
+**Problemas identificados:**
+
+1. **❌ MISSING USER STORY** - No existe historia para asignar/desasignar productos a POS
+   - Según Q1.2: "It's part of inventory management"
+   - Pero EP2 no tiene ninguna historia para esta funcionalidad crítica
+
+2. **⚠️ HU-EP2-001 conflata dos operaciones:**
+   - Importar cantidades (actualización de stock)
+   - Asignación de productos a POS (crear registros Inventory)
+   - No hay forma de asignar productos con qty=0 sin importar Excel
+
+3. **⚠️ HU-EP2-004 incompleto:**
+   - Solo cubre ajustes de cantidad
+   - No cubre asignación/desasignación de productos
+
+4. **⚠️ Descripción de épica no menciona asignación de productos**
+
+**Preguntas realizadas al usuario:**
+
+1. **Q1: Comportamiento de importación de stock (HU-EP2-001)**
+   - ¿Debe permitir asignación implícita (crear registros Inventory)?
+   - Opciones: A) Sí, B) No (requiere asignación explícita primero)
+
+2. **Q2: Reglas de desasignación**
+   - ¿Se puede desasignar producto con qty > 0?
+   - Opciones: A) Sí con advertencia, B) No (requiere qty=0 primero)
+
+3. **Q3: Implementación de desasignación**
+   - ¿Soft delete (`IsActive=false`) o hard delete?
+   - Opciones: A) Soft delete, B) Hard delete
+
+4. **Q4: Prioridad de la nueva historia**
+   - Recomendación: HIGH (crítico para workflows de operadores)
+
+### Respuestas del Usuario
+
+1. A
+
+2. B
+
+3. A
+
+4. Alta
+
+### Respuesta del asistente - Implementación de Cambios en EP2
+
+Se creó e implementó completamente la nueva funcionalidad:
+
+**1. Nuevo archivo creado: `Documentos/Historias/HU-EP2-006.md`**
+
+**Título:** Asignar/desasignar productos a puntos de venta
+
+**Funcionalidad principal:**
+- Asignar productos del catálogo global a inventarios de POS específicos
+- Crear registros en `Inventory` con `Quantity=0` y `IsActive=true`
+- Desasignar productos (soft delete: `IsActive=false`)
+- Asignación masiva (múltiples productos a un POS)
+- Validación: no desasignar si `Quantity > 0`
+- Reasignación de productos previamente desasignados
+
+**8 escenarios de aceptación:**
+1. Asignar producto a POS (qty=0)
+2. Asignación masiva
+3. Prevención de asignación duplicada
+4. Desasignar con qty=0
+5. Error al desasignar con qty>0
+6. Visualizar productos asignados
+7. Error al asignar producto inactivo
+8. Reasignar producto previamente desasignado
+
+**Prioridad:** Alta - Funcionalidad crítica para visibilidad de operadores
+
+**2. Actualizado: `Documentos/epicas.md`**
+- Descripción de EP2 actualizada incluyendo asignación/desasignación
+- Regla de negocio clave agregada sobre registros Inventory
+- Lista de User Stories actualizada (5 → 6 historias)
+- Conteo total de historias MVP: 35 → 36
+
+**3. Actualizado: `Documentos/Historias/HU-EP2-001.md`**
+- Clarificada asignación implícita durante importación Excel
+- Nuevo Escenario 2: Asignación implícita con mensaje claro
+- Nuevo Escenario 4: Relación con asignación manual HU-EP2-006
+- Nota sobre dos workflows posibles (import con asignación implícita vs asignación manual primero)
+
+**4. Actualizado: `Documentos/Historias/HU-EP2-004.md`**
+- Agregada nota: solo funciona en productos ya asignados
+- Nuevo Escenario 3: Error al intentar ajustar producto no asignado
+- Referencia a HU-EP2-006 para asignar productos primero
+
+**5. Actualizado: `Documentos/modelo-de-datos.md`**
+- Campo `IsActive` agregado a diagrama de entidad Inventory
+- Descripción extendida del campo IsActive y su propósito
+- Documentado comportamiento de soft delete
+- Índices actualizados: `indexed(PointOfSaleId, ProductId, IsActive)`
+- Índice parcial sugerido: `WHERE IsActive = true`
+
+**Workflows de operador documentados:**
+
+**Workflow Opción 1 (Asignación manual primero):**
+1. Admin importa productos a catálogo global (EP1)
+2. Admin asigna 50 productos a POS-A con qty=0 (HU-EP2-006)
+3. Operador ve 50 productos con "Sin stock"
+4. Admin importa cantidades vía Excel (HU-EP2-001)
+5. Operador puede vender productos
+
+**Workflow Opción 2 (Import con asignación implícita):**
+1. Admin importa productos a catálogo global (EP1)
+2. Admin importa stock vía Excel (HU-EP2-001)
+3. Sistema crea registros Inventory (asignación implícita)
+4. Operador ve productos con cantidades
+
+**Resultado final:**
+- ✅ EP2 ahora tiene 6 historias (era 5)
+- ✅ MVP completo ahora tiene 36 historias (era 35)
+- ✅ Funcionalidad crítica de asignación de productos documentada
+- ✅ Regla de negocio de visibilidad correctamente implementada
+- ✅ Soft delete con `IsActive` para auditoría
+- ✅ Todos los workflows de operador cubiertos
+
+---

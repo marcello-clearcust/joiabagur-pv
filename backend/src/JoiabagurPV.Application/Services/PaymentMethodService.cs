@@ -187,6 +187,13 @@ public class PaymentMethodService : IPaymentMethodService
             throw new DomainException("Asignación de método de pago no encontrada");
         }
 
+        // Business rule: Ensure at least one active payment method per point of sale
+        var activeAssignments = await _posPaymentMethodRepository.GetByPointOfSaleAsync(pointOfSaleId, includeInactive: false);
+        if (activeAssignments.Count <= 1)
+        {
+            throw new DomainException("El punto de venta debe tener al menos un método de pago asignado");
+        }
+
         await _posPaymentMethodRepository.DeleteAsync(assignment.Id);
         await _unitOfWork.SaveChangesAsync();
 
@@ -201,6 +208,16 @@ public class PaymentMethodService : IPaymentMethodService
         if (assignment == null)
         {
             throw new DomainException("Asignación de método de pago no encontrada");
+        }
+
+        // Business rule: Ensure at least one active payment method per point of sale
+        if (!isActive && assignment.IsActive)
+        {
+            var activeAssignments = await _posPaymentMethodRepository.GetByPointOfSaleAsync(pointOfSaleId, includeInactive: false);
+            if (activeAssignments.Count <= 1)
+            {
+                throw new DomainException("El punto de venta debe tener al menos un método de pago activo");
+            }
         }
 
         assignment.IsActive = isActive;

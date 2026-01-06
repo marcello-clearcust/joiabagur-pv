@@ -48,6 +48,21 @@ public class ApplicationDbContext : DbContext
     public DbSet<PointOfSalePaymentMethod> PointOfSalePaymentMethods { get; set; }
 
     /// <summary>
+    /// Gets or sets the Products DbSet.
+    /// </summary>
+    public DbSet<Product> Products { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ProductPhotos DbSet.
+    /// </summary>
+    public DbSet<ProductPhoto> ProductPhotos { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Collections DbSet.
+    /// </summary>
+    public DbSet<Collection> Collections { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>

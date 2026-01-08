@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/providers/auth-provider';
 import { productService } from '@/services/product.service';
 import { ProductPhoto } from '@/types/product.types';
+import { getImageUrl } from '@/lib/image-url';
 
 interface ProductPhotoUploadProps {
   productId: string;
@@ -221,7 +222,7 @@ export function ProductPhotoUpload({ productId, photos, onPhotosChange }: Produc
                 <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
                   {photo.url ? (
                     <img
-                      src={photo.url}
+                      src={getImageUrl(photo.url)}
                       alt={`Foto ${photo.displayOrder + 1}`}
                       className="w-full h-full object-cover"
                     />

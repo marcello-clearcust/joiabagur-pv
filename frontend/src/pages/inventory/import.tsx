@@ -117,9 +117,18 @@ export function InventoryImportPage() {
       try {
         const result = await inventoryService.validateImport(file, selectedPosId);
         setValidationResult(result);
+        // Clear file input if validation fails to allow retry
+        if (!result.success && fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       } catch (error) {
         toast.error('Error al validar el archivo');
         console.error(error);
+        // Clear file input on error to allow retry
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setSelectedFile(null);
       } finally {
         setValidating(false);
       }
@@ -322,7 +331,7 @@ export function InventoryImportPage() {
               </div>
             )}
 
-            {validationResult.success && (
+            {validationResult.success ? (
               <div className="flex gap-2">
                 <Button onClick={handleImport} disabled={importing}>
                   {importing ? (
@@ -339,6 +348,12 @@ export function InventoryImportPage() {
                 </Button>
                 <Button variant="outline" onClick={handleReset}>
                   Cancelar
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleReset}>
+                  Reintentar
                 </Button>
               </div>
             )}

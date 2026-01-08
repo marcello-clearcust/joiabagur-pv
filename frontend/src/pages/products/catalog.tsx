@@ -39,6 +39,7 @@ import { productService } from '@/services/product.service';
 import { ProductListItem, PaginatedResult, CatalogQueryParams } from '@/types/product.types';
 import { ROUTES } from '@/routing/routes';
 import { useDebouncedCallback } from '@/hooks/use-debounced-callback';
+import { getImageUrl } from '@/lib/image-url';
 
 const PAGE_SIZE = 50;
 
@@ -54,9 +55,7 @@ interface ProductCardProps {
  * Product Card Component
  */
 function ProductCard({ product, isAdmin }: ProductCardProps) {
-  const photoUrl = product.primaryPhotoUrl
-    ? `/api/files/${product.primaryPhotoUrl}`
-    : null;
+  const photoUrl = getImageUrl(product.primaryPhotoUrl);
 
   return (
     <Card className="group overflow-hidden transition-shadow hover:shadow-md">

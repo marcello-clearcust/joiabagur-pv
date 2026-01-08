@@ -3,6 +3,7 @@ using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
+using JoiabagurPV.Domain.Interfaces.Services;
 using Microsoft.Extensions.Logging;
 
 namespace JoiabagurPV.Application.Services;
@@ -16,6 +17,7 @@ public class ProductService : IProductService
     private readonly ICollectionRepository _collectionRepository;
     private readonly IInventoryRepository _inventoryRepository;
     private readonly IUserPointOfSaleService _userPointOfSaleService;
+    private readonly IFileStorageService _fileStorageService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ProductService> _logger;
 
@@ -24,6 +26,7 @@ public class ProductService : IProductService
         ICollectionRepository collectionRepository,
         IInventoryRepository inventoryRepository,
         IUserPointOfSaleService userPointOfSaleService,
+        IFileStorageService fileStorageService,
         IUnitOfWork unitOfWork,
         ILogger<ProductService> logger)
     {
@@ -31,6 +34,7 @@ public class ProductService : IProductService
         _collectionRepository = collectionRepository;
         _inventoryRepository = inventoryRepository;
         _userPointOfSaleService = userPointOfSaleService;
+        _fileStorageService = fileStorageService;
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -39,14 +43,19 @@ public class ProductService : IProductService
     public async Task<List<ProductDto>> GetAllAsync(bool includeInactive = true)
     {
         var products = await _productRepository.GetAllAsync(includeInactive);
-        return products.Select(MapToDto).ToList();
+        var productDtos = new List<ProductDto>();
+        foreach (var product in products)
+        {
+            productDtos.Add(await MapToDtoAsync(product));
+        }
+        return productDtos;
     }
 
     /// <inheritdoc/>
     public async Task<ProductDto?> GetByIdAsync(Guid productId)
     {
         var product = await _productRepository.GetWithPhotosAsync(productId);
-        return product != null ? MapToDto(product) : null;
+        return product != null ? await MapToDtoAsync(product) : null;
     }
 
     /// <inheritdoc/>
@@ -54,7 +63,7 @@ public class ProductService : IProductService
     {
         var normalizedSku = (sku ?? string.Empty).Trim().ToUpperInvariant();
         var product = await _productRepository.GetBySkuAsync(normalizedSku);
-        return product != null ? MapToDto(product) : null;
+        return product != null ? await MapToDtoAsync(product) : null;
     }
 
     /// <inheritdoc/>
@@ -119,7 +128,7 @@ public class ProductService : IProductService
 
         _logger.LogInformation("Product created: {SKU} - {Name}", product.SKU, product.Name);
 
-        return MapToDto(product);
+        return await MapToDtoAsync(product);
     }
 
     /// <inheritdoc/>
@@ -163,7 +172,7 @@ public class ProductService : IProductService
 
         _logger.LogInformation("Product updated: {SKU} - {Name}", product.SKU, product.Name);
 
-        return MapToDto(product);
+        return await MapToDtoAsync(product);
     }
 
     /// <inheritdoc/>
@@ -258,7 +267,11 @@ public class ProductService : IProductService
         var inventoryQuantities = await GetInventoryQuantitiesAsync(productIds, allowedProductIds != null ? userId : null, isAdmin);
 
         // Map to DTOs
-        var items = pagedProducts.Select(p => MapToListDto(p, inventoryQuantities)).ToList();
+        var items = new List<ProductListDto>();
+        foreach (var product in pagedProducts)
+        {
+            items.Add(await MapToListDtoAsync(product, inventoryQuantities));
+        }
 
         return PaginatedResultDto<ProductListDto>.Create(items, totalCount, page, pageSize);
     }
@@ -336,7 +349,12 @@ public class ProductService : IProductService
         var productIds = results.Select(p => p.Id).ToList();
         var inventoryQuantities = await GetInventoryQuantitiesAsync(productIds, allowedProductIds != null ? userId : null, isAdmin);
 
-        return results.Select(p => MapToListDto(p, inventoryQuantities)).ToList();
+        var listItems = new List<ProductListDto>();
+        foreach (var product in results)
+        {
+            listItems.Add(await MapToListDtoAsync(product, inventoryQuantities));
+        }
+        return listItems;
     }
 
     private static List<Product> ApplySorting(List<Product> products, string sortBy, string sortDirection)
@@ -391,10 +409,16 @@ public class ProductService : IProductService
         return quantities;
     }
 
-    private static ProductListDto MapToListDto(Product product, Dictionary<Guid, int> inventoryQuantities)
+    private async Task<ProductListDto> MapToListDtoAsync(Product product, Dictionary<Guid, int> inventoryQuantities)
     {
         var primaryPhoto = product.Photos?.FirstOrDefault(p => p.IsPrimary) 
             ?? product.Photos?.OrderBy(p => p.DisplayOrder).FirstOrDefault();
+
+        string? primaryPhotoUrl = null;
+        if (primaryPhoto != null)
+        {
+            primaryPhotoUrl = await _fileStorageService.GetUrlAsync(primaryPhoto.FileName, "products");
+        }
 
         return new ProductListDto
         {
@@ -402,7 +426,7 @@ public class ProductService : IProductService
             SKU = product.SKU,
             Name = product.Name,
             Price = product.Price,
-            PrimaryPhotoUrl = primaryPhoto?.FileName,
+            PrimaryPhotoUrl = primaryPhotoUrl,
             CollectionName = product.Collection?.Name,
             IsActive = product.IsActive,
             AvailableQuantity = inventoryQuantities.GetValueOrDefault(product.Id, 0),
@@ -410,8 +434,18 @@ public class ProductService : IProductService
         };
     }
 
-    private static ProductDto MapToDto(Product product)
+    private async Task<ProductDto> MapToDtoAsync(Product product)
     {
+        // Map photos with URLs
+        var photoDtos = new List<ProductPhotoDto>();
+        if (product.Photos != null)
+        {
+            foreach (var photo in product.Photos)
+            {
+                photoDtos.Add(await MapPhotoToDtoAsync(photo));
+            }
+        }
+
         return new ProductDto
         {
             Id = product.Id,
@@ -424,13 +458,24 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt,
-            Photos = product.Photos?.Select(p => new ProductPhotoDto
-            {
-                Id = p.Id,
-                FileName = p.FileName,
-                DisplayOrder = p.DisplayOrder,
-                IsPrimary = p.IsPrimary
-            }).ToList() ?? new List<ProductPhotoDto>()
+            Photos = photoDtos
+        };
+    }
+
+    private async Task<ProductPhotoDto> MapPhotoToDtoAsync(ProductPhoto photo)
+    {
+        var url = await _fileStorageService.GetUrlAsync(photo.FileName, "products");
+
+        return new ProductPhotoDto
+        {
+            Id = photo.Id,
+            ProductId = photo.ProductId,
+            FileName = photo.FileName,
+            Url = url,
+            DisplayOrder = photo.DisplayOrder,
+            IsPrimary = photo.IsPrimary,
+            CreatedAt = photo.CreatedAt,
+            UpdatedAt = photo.UpdatedAt
         };
     }
 }

@@ -66,7 +66,10 @@ public class ProductRepository : Repository<Product>, IProductRepository
     /// <inheritdoc/>
     public async Task<List<Product>> GetAllAsync(bool includeInactive = true)
     {
-        var query = _context.Products.AsQueryable();
+        var query = _context.Products
+            .Include(p => p.Photos)
+            .Include(p => p.Collection)
+            .AsQueryable();
 
         if (!includeInactive)
         {

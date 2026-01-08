@@ -52,13 +52,14 @@ The system SHALL have comprehensive integration tests for the POST /api/products
 - **AND** use Testcontainers for real database operations
 
 ### Requirement: Product Catalog Listing API
-The system SHALL provide a paginated product catalog endpoint with role-based filtering: administrators see all products, operators see only products with Inventory records at their assigned points of sale.
+The system SHALL provide a paginated product catalog endpoint with role-based filtering: administrators see all products, operators see only products with Inventory records at their assigned points of sale. **Product photos SHALL include accessible URL fields for display in UI.**
 
 #### Scenario: Administrator retrieves full product catalog
 - **WHEN** an authenticated administrator requests GET /api/products with page=1, pageSize=50
 - **THEN** the system returns a paginated result with up to 50 products from the global Product table
 - **AND** includes pagination metadata (totalCount, totalPages, currentPage)
 - **AND** each product includes Id, SKU, Name, Price, PrimaryPhotoUrl, and AvailableQuantity
+- **AND** PrimaryPhotoUrl is a complete, accessible URL (not just filename) if a primary photo exists
 
 #### Scenario: Operator retrieves filtered product catalog
 - **WHEN** an authenticated operator requests GET /api/products with page=1, pageSize=50
@@ -66,14 +67,6 @@ The system SHALL provide a paginated product catalog endpoint with role-based fi
 - **AND** includes products with Quantity = 0 if Inventory record exists
 - **AND** excludes products with no Inventory records at assigned POS
 - **AND** aggregates quantities from all assigned POS for multi-POS operators
-
-#### Scenario: Operator with multiple POS assignments
-- **WHEN** an operator assigned to POS-A and POS-B requests GET /api/products
-- **AND** Product-1 has Inventory at POS-A only
-- **AND** Product-2 has Inventory at POS-B only
-- **AND** Product-3 has Inventory at both POS-A and POS-B
-- **THEN** all three products are returned without duplicates
-- **AND** quantities are aggregated across assigned POS
 
 #### Scenario: Sort products by name
 - **WHEN** an authenticated user requests GET /api/products?sortBy=Name
@@ -96,17 +89,19 @@ The system SHALL provide a paginated product catalog endpoint with role-based fi
 - **THEN** the request is rejected with 401 Unauthorized
 
 ### Requirement: Product Search API
-The system SHALL provide a search endpoint that performs SKU exact match and name partial match with role-based filtering: administrators search all products, operators search only products with Inventory records at their assigned points of sale.
+The system SHALL provide a search endpoint that performs SKU exact match and name partial match with role-based filtering: administrators search all products, operators search only products with Inventory records at their assigned points of sale. **Product photos in search results SHALL include accessible URL fields.**
 
 #### Scenario: Administrator searches by exact SKU match
 - **WHEN** an authenticated administrator requests GET /api/products/search?query=JOY-001
 - **AND** a product with SKU "JOY-001" exists in the global catalog
 - **THEN** the system returns the matching product with its primary photo
+- **AND** the primary photo URL is a complete, accessible URL (not just filename)
 
 #### Scenario: Operator searches by exact SKU match in assigned inventory
 - **WHEN** an authenticated operator requests GET /api/products/search?query=JOY-001
 - **AND** a product with SKU "JOY-001" has Inventory records at operator's assigned POS
 - **THEN** the system returns the matching product with its primary photo and quantity
+- **AND** the primary photo URL is a complete, accessible URL if photo exists
 
 #### Scenario: Operator searches for product not in assigned inventory
 - **WHEN** an authenticated operator requests GET /api/products/search?query=JOY-999
@@ -288,4 +283,27 @@ The system SHALL provide UI controls for deleting and designating primary photos
 - **WHEN** a photo operation fails
 - **THEN** an error toast notification is displayed
 - **AND** the gallery state is reverted or refreshed
+
+### Requirement: Product Detail Endpoint Returns Photo URLs
+The system SHALL return complete photo information including accessible URLs when retrieving individual product details via GET /api/products/{id}.
+
+#### Scenario: Get product with photos
+- **WHEN** an authenticated user requests GET /api/products/{id}
+- **AND** the product has uploaded photos
+- **THEN** the response includes a Photos array
+- **AND** each photo object contains Id, ProductId, FileName, Url, DisplayOrder, IsPrimary, CreatedAt, UpdatedAt
+- **AND** the Url field contains a complete, accessible URL constructed via IFileStorageService
+- **AND** photos are ordered by DisplayOrder
+
+#### Scenario: Get product without photos
+- **WHEN** an authenticated user requests GET /api/products/{id}
+- **AND** the product has no uploaded photos
+- **THEN** the response includes an empty Photos array
+- **AND** no errors are returned
+
+#### Scenario: Photo URLs are accessible
+- **WHEN** a product detail response includes photo URLs
+- **THEN** each URL can be used directly in an HTML <img> src attribute
+- **AND** URLs point to the correct storage location (local filesystem or cloud storage)
+- **AND** URLs follow the format returned by IFileStorageService.GetUrlAsync()
 

@@ -26,7 +26,7 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
   {
     title: 'Productos',
     icon: Package,
-    path: ROUTES.PRODUCTS.CATALOG,
+    path: ROUTES.PRODUCTS.ROOT,
   },
   {
     title: 'Inventario',

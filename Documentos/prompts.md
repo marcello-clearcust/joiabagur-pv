@@ -2138,7 +2138,7 @@ Se realizaron actualizaciones completas en toda la documentación y especificaci
 var operatorProducts = from p in Products
                        join i in Inventory on p.Id equals i.ProductId
                        join ups in UserPointOfSale on i.PointOfSaleId equals ups.PointOfSaleId
-                       where ups.UserId == currentUserId 
+                       where ups.UserId == currentUserId
                          && ups.IsActive == true
                          && i.IsActive == true
                        select p;
@@ -2276,5 +2276,79 @@ Se creó e implementó completamente la nueva funcionalidad:
 - ✅ Regla de negocio de visibilidad correctamente implementada
 - ✅ Soft delete con `IsActive` para auditoría
 - ✅ Todos los workflows de operador cubiertos
+
+---
+
+## Prompt sobre Integración entre Épica 1 y Épica 4
+
+En estas funcionalidades @epicas.md (28-29) no se está teniendo en cuenta la funcionalidad de la @epicas.md (93-115).
+
+Cuando subimos las imagenes se deberia actualizar la "base de datos" sobre la cual se hará el match a la hora de buscar productos a traves de una foto.
+
+Actualmente no hay nada desarrollado. Deberiamos delegar toda esta gestion a la epica 4 o actualizar la epica 1?
+
+### Respuesta del asistente - Análisis del Problema
+
+Basándome en el análisis de las épicas y las historias de usuario, tienes razón en identificar este problema de integración. Vamos a analizar las opciones:
+
+## Análisis del Problema
+
+**Épica 1 (HU-EP1-004)** menciona explícitamente que subir fotos es "para **permitir el reconocimiento de imágenes mediante IA**", pero actualmente no hay ningún mecanismo para actualizar el modelo de IA cuando se agregan nuevas fotos.
+
+**Épica 4 (HU-EP4-001)** describe un sistema donde:
+- El modelo de IA se ejecuta en cliente (TensorFlow.js/ONNX.js)
+- Se descarga una vez y se ejecuta localmente
+- Necesita fotos de referencia para funcionar
+- **No hay mecanismo actual para actualizar el modelo** cuando se suben nuevas fotos
+
+## Recomendación: Delegar a la Épica 4
+
+**Recomiendo delegar toda la gestión del modelo de IA a la Épica 4** por estas razones:
+
+### 1. **Separación de Responsabilidades**
+- **EP1**: Gestiona el catálogo de productos y sus fotos (persistencia en BD)
+- **EP4**: Gestiona todo lo relacionado con IA (entrenamiento, actualización, distribución del modelo)
+
+### 2. **Complejidad Técnica**
+El entrenamiento y actualización de modelos de IA es una funcionalidad compleja que requiere:
+- Conocimientos especializados en ML
+- Infraestructura de entrenamiento
+- Gestión de versiones de modelos
+- Estrategias de actualización incremental
+
+Esta complejidad debería estar centralizada en EP4, no distribuida en EP1.
+
+### 3. **Dependencias ya establecidas**
+La HU-EP4-001 ya declara dependencia de HU-EP1-004:
+```
+Dependencias: HU-EP1-004 (fotos de productos), modelo de IA entrenado
+```
+
+### 4. **Arquitectura más limpia**
+- EP1 solo guarda fotos y notifica que hay cambios
+- EP4 se subscribe a estos cambios y actualiza el modelo
+- El modelo de IA se convierte en un servicio independiente gestionado por EP4
+
+### 5. **Evolución del sistema**
+Si en el futuro se cambia la tecnología de IA (de TensorFlow.js a otra), solo EP4 se vería afectada.
+
+## Implementación sugerida
+
+**Opción A: Event-driven (recomendada)**
+- EP1 emite eventos cuando se suben/eliminar fotos
+- EP4 se subscribe y actualiza el modelo automáticamente
+
+**Opción B: API explícita**
+- EP4 expone endpoint `/api/ai/model/update`
+- EP1 llama a este endpoint después de guardar fotos
+
+**Opción C: Batch updates**
+- EP4 tiene un proceso programado que verifica cambios en fotos periódicamente
+
+## Conclusión
+
+**Actualizar la Épica 1 sería un error de arquitectura** porque mezclaría responsabilidades de negocio (gestión de productos) con infraestructura técnica compleja (IA).
+
+La **Épica 4 ya debería incluir la lógica de actualización del modelo** como parte de su alcance, ya que es un requerimiento implícito para que el reconocimiento funcione correctamente en un entorno dinámico donde se agregan nuevos productos constantemente.
 
 ---

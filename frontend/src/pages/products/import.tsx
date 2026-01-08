@@ -159,15 +159,22 @@ export function ProductImportPage() {
   });
 
   // Download template
-  const handleDownloadTemplate = () => {
-    // Create a simple CSV template (browsers can open in Excel)
-    const csvContent = TEMPLATE_COLUMNS.join(',') + '\nJOY-001,Anillo de Oro,Anillo de oro de 18k,299.99,Colección Verano\nJOY-002,Collar de Plata,Collar de plata 925,149.99,';
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'plantilla_productos.csv';
-    link.click();
-    toast.info('Plantilla descargada. Puedes abrirla en Excel y guardarla como .xlsx');
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await productService.downloadImportTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'product-import-template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('Plantilla descargada en formato Excel (.xlsx)');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al descargar la plantilla';
+      toast.error(errorMessage);
+    }
   };
 
   // Handle import confirmation

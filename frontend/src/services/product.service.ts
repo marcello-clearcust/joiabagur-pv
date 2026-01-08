@@ -26,6 +26,7 @@ const PRODUCT_ENDPOINTS = {
   SET_PRIMARY_PHOTO: (productId: string, photoId: string) => `/products/${productId}/photos/${photoId}/set-primary`,
   IMPORT: '/products/import',
   IMPORT_VALIDATE: '/products/import/validate',
+  IMPORT_TEMPLATE: '/products/import-template',
 } as const;
 
 /**
@@ -274,6 +275,16 @@ export const productService = {
     await apiClient.delete(
       PRODUCT_ENDPOINTS.PRODUCT_PHOTO(productId, photoId)
     );
+  },
+
+  /**
+   * Download product import template
+   */
+  downloadImportTemplate: async (): Promise<Blob> => {
+    const response = await apiClient.get(PRODUCT_ENDPOINTS.IMPORT_TEMPLATE, {
+      responseType: 'blob',
+    });
+    return response.data;
   },
 };
 

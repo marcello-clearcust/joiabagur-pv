@@ -6,8 +6,10 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Store } from 'lucide-react';
 import { userService } from '@/services/user.service';
+import { pointOfSaleService } from '@/services/point-of-sale.service';
 import { UserListItem } from '@/types/user.types';
 import { UserPointOfSale } from '@/types/auth.types';
+import { PointOfSale } from '@/types/point-of-sale.types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -19,12 +21,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-
-interface PointOfSale {
-  id: string;
-  name: string;
-  code: string;
-}
 
 interface UserAssignmentsDialogProps {
   open: boolean;
@@ -56,6 +52,9 @@ export function UserAssignmentsDialog({
 
     setIsLoading(true);
     try {
+      // Fetch all available points of sale (admin sees all, including inactive)
+      const allPointsOfSale = await pointOfSaleService.getPointsOfSale();
+      
       // Fetch user's current assignments
       const userAssignments = await userService.getUserPointOfSales(user.id);
       setAssignments(userAssignments);
@@ -67,20 +66,8 @@ export function UserAssignmentsDialog({
       setSelectedIds(assignedIds);
       setInitialSelectedIds(new Set(assignedIds));
 
-      // TODO: Fetch all available points of sale from EP8 API
-      // For now, use the assignments to show assigned ones
-      // This will be updated when PointOfSale API is available
-      const posFromAssignments: PointOfSale[] = userAssignments.map((a) => ({
-        id: a.pointOfSaleId,
-        name: a.name,
-        code: a.code,
-      }));
-
-      // Remove duplicates
-      const uniquePos = Array.from(
-        new Map(posFromAssignments.map((p) => [p.id, p])).values()
-      );
-      setPointsOfSale(uniquePos);
+      // Set all available points of sale
+      setPointsOfSale(allPointsOfSale);
     } catch (error) {
       toast.error('Error al cargar los puntos de venta');
       console.error('Failed to fetch assignments:', error);

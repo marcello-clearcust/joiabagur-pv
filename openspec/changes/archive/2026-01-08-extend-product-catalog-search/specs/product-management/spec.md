@@ -120,27 +120,6 @@ The system SHALL provide an endpoint for deleting product photos with automatic 
 - **WHEN** an operator or unauthenticated user attempts to delete a photo
 - **THEN** the request is rejected with 401 Unauthorized or 403 Forbidden
 
-### Requirement: Product Photo Reordering API
-The system SHALL provide an endpoint for updating photo display order. This operation is restricted to administrators only.
-
-#### Scenario: Reorder photo successfully
-- **WHEN** an authenticated administrator PUTs to /api/products/{id}/photos/{photoId}/order with newOrder=2
-- **THEN** the photo's DisplayOrder is updated to 2
-- **AND** other photos' DisplayOrder values are adjusted accordingly
-- **AND** the operation returns 200 OK with updated photo
-
-#### Scenario: Reorder with invalid order
-- **WHEN** an authenticated administrator provides a DisplayOrder less than 1 or greater than photo count
-- **THEN** the request is rejected with 400 Bad Request
-
-#### Scenario: Reorder photo in non-existent product
-- **WHEN** an authenticated administrator attempts to reorder a photo for a non-existent product
-- **THEN** the system returns 404 Not Found
-
-#### Scenario: Unauthorized photo reordering
-- **WHEN** an operator or unauthenticated user attempts to reorder photos
-- **THEN** the request is rejected with 401 Unauthorized or 403 Forbidden
-
 ### Requirement: Product Photo Primary Designation API
 The system SHALL provide an endpoint for changing the primary photo of a product. This operation is restricted to administrators only.
 
@@ -231,7 +210,7 @@ The system SHALL provide a search interface integrated into the product catalog 
 - **THEN** a loading indicator is displayed in the search input
 
 ### Requirement: Product Photo Management Frontend
-The system SHALL provide UI controls for deleting, reordering, and designating primary photos in the product edit page. These controls are visible and functional only for administrators.
+The system SHALL provide UI controls for deleting and designating primary photos in the product edit page. These controls are visible and functional only for administrators.
 
 #### Scenario: Delete photo with confirmation
 - **WHEN** an administrator clicks the delete button on a photo
@@ -241,13 +220,8 @@ The system SHALL provide UI controls for deleting, reordering, and designating p
 
 #### Scenario: Photo management controls hidden for operators
 - **WHEN** an operator views the product edit page (if accessible)
-- **THEN** photo management controls (delete, reorder, set primary) are hidden
+- **THEN** photo management controls (delete, set primary) are hidden
 - **AND** photos are displayed in read-only mode
-
-#### Scenario: Drag and drop photo reordering
-- **WHEN** an administrator drags a photo to a new position in the gallery
-- **THEN** the photo's DisplayOrder is updated via PUT endpoint
-- **AND** the gallery reflects the new order
 
 #### Scenario: Set primary photo
 - **WHEN** an administrator clicks the "set as primary" button on a photo
@@ -255,7 +229,7 @@ The system SHALL provide UI controls for deleting, reordering, and designating p
 - **AND** the primary indicator (badge/star) moves to the selected photo
 
 #### Scenario: Photo management loading states
-- **WHEN** a photo operation (delete, reorder, set primary) is in progress
+- **WHEN** a photo operation (delete, set primary) is in progress
 - **THEN** the UI shows a loading indicator on the affected photo
 - **AND** prevents additional operations until completion
 

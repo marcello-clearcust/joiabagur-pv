@@ -16,7 +16,8 @@ The system needs comprehensive product catalog management as the foundation for 
 - **Application Layer**: Add ProductService with full CRUD operations and business rules
 - **Application Layer**: Add ProductPhotoService for photo management with primary designation logic
 - **API Layer**: Add ProductsController with endpoints:
-  - POST /api/products/import (Excel bulk import)
+  - GET /api/products/import-template (download Excel template)
+  - POST /api/products/import (Excel bulk import with validation)
   - PUT /api/products/{id} (update existing product)
   - POST /api/products/{id}/photos (upload product photos)
 - **Frontend**: Add product management pages:

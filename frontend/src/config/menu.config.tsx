@@ -24,9 +24,14 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
     path: ROUTES.DASHBOARD,
   },
   {
+    title: 'Productos',
+    icon: Package,
+    path: ROUTES.PRODUCTS.CATALOG,
+  },
+  {
     title: 'Inventario',
     icon: Warehouse,
-    path: ROUTES.INVENTORY,
+    path: ROUTES.INVENTORY.ROOT,
   },
   {
     title: 'Ventas',
@@ -48,9 +53,9 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
     icon: Settings,
     children: [
       {
-        title: 'Productos',
+        title: 'Gestión de Productos',
         icon: Package,
-        path: ROUTES.PRODUCTS,
+        path: ROUTES.PRODUCTS.ROOT,
       },
       {
         title: 'Métodos de Pago',
@@ -82,6 +87,11 @@ export const MENU_OPERATOR: MenuConfig = [
     path: ROUTES.DASHBOARD,
   },
   {
+    title: 'Productos',
+    icon: Package,
+    path: ROUTES.PRODUCTS.CATALOG,
+  },
+  {
     title: 'Ventas',
     icon: ShoppingCart,
     path: ROUTES.SALES,
@@ -94,7 +104,7 @@ export const MENU_OPERATOR: MenuConfig = [
   {
     title: 'Inventario',
     icon: Warehouse,
-    path: ROUTES.INVENTORY,
+    path: ROUTES.INVENTORY.STOCK,
   },
 ];
 

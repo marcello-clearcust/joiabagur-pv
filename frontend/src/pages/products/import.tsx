@@ -3,7 +3,7 @@
  * Allows administrators to import products from Excel files
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { 
   Upload, 
@@ -13,10 +13,14 @@ import {
   CheckCircle2, 
   X,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  Plus,
+  RefreshCw
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { productService } from '@/services/product.service';
-import { ImportResult, ImportError } from '@/types/product.types';
+import { ImportResult } from '@/types/product.types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +44,17 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+/**
+ * Preview row data from Excel
+ */
+interface PreviewRow {
+  sku: string;
+  name: string;
+  description?: string;
+  price: string | number;
+  collection?: string;
+}
+
 // Excel template columns
 const TEMPLATE_COLUMNS = ['SKU', 'Name', 'Description', 'Price', 'Collection'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -47,11 +62,46 @@ const ACCEPTED_EXTENSIONS = ['.xlsx', '.xls'];
 
 export function ProductImportPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const [validationResult, setValidationResult] = useState<ImportResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  /**
+   * Parse Excel file to get preview data (first 5 rows)
+   */
+  const parseExcelPreview = useCallback(async (selectedFile: File) => {
+    setIsLoadingPreview(true);
+    try {
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      
+      // Convert to JSON, including all rows
+      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
+        defval: '',
+      });
+
+      // Map to preview format (first 5 rows)
+      const preview: PreviewRow[] = jsonData.slice(0, 5).map((row) => ({
+        sku: String(row['SKU'] || row['sku'] || ''),
+        name: String(row['Name'] || row['name'] || row['Nombre'] || ''),
+        description: String(row['Description'] || row['description'] || row['Descripción'] || ''),
+        price: row['Price'] || row['price'] || row['Precio'] || '',
+        collection: String(row['Collection'] || row['collection'] || row['Colección'] || ''),
+      }));
+
+      setPreviewData(preview);
+    } catch (error) {
+      console.error('Error parsing Excel for preview:', error);
+      setPreviewData([]);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  }, []);
 
   // Handle file drop
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -62,9 +112,13 @@ export function ProductImportPage() {
     // Reset state
     setValidationResult(null);
     setImportResult(null);
+    setPreviewData([]);
     setFile(selectedFile);
 
-    // Validate file
+    // Parse Excel for preview first
+    await parseExcelPreview(selectedFile);
+
+    // Validate file on server
     setIsValidating(true);
     try {
       const result = await productService.validateImport(selectedFile);
@@ -91,7 +145,7 @@ export function ProductImportPage() {
     } finally {
       setIsValidating(false);
     }
-  }, []);
+  }, [parseExcelPreview]);
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop,
@@ -153,6 +207,7 @@ export function ProductImportPage() {
   // Clear current file
   const handleClearFile = () => {
     setFile(null);
+    setPreviewData([]);
     setValidationResult(null);
     setImportResult(null);
   };
@@ -254,6 +309,59 @@ export function ProductImportPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Preview Section */}
+      {file && previewData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="size-5" />
+              Vista Previa
+            </CardTitle>
+            <CardDescription>
+              Primeras {previewData.length} filas del archivo
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="text-right">Precio</TableHead>
+                    <TableHead>Colección</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {previewData.map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-mono text-sm">{row.sku || '-'}</TableCell>
+                      <TableCell>{row.name || '-'}</TableCell>
+                      <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                        {row.description || '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {typeof row.price === 'number' 
+                          ? `$${row.price.toFixed(2)}`
+                          : row.price || '-'}
+                      </TableCell>
+                      <TableCell>{row.collection || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {isLoadingPreview && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Cargando vista previa...
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Validation Results */}
       {validationResult && (
@@ -390,7 +498,7 @@ export function ProductImportPage() {
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Confirmar Importación</DialogTitle>
             <DialogDescription>
@@ -398,16 +506,53 @@ export function ProductImportPage() {
               <strong>{file?.name}</strong>?
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="rounded-md bg-muted p-4">
-              <p className="text-sm">
-                Se procesarán <strong>{validationResult?.totalRows}</strong> productos.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Los productos existentes (mismo SKU) serán actualizados.
-                Los nuevos productos serán creados.
-              </p>
+          <div className="space-y-4 py-4">
+            {/* Summary breakdown */}
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <h4 className="mb-3 font-medium">Resumen de la importación</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-sm">
+                    <Plus className="size-4 text-green-600" />
+                    Productos nuevos a crear
+                  </span>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    {validationResult?.createdCount ?? 0}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-sm">
+                    <RefreshCw className="size-4 text-blue-600" />
+                    Productos existentes a actualizar
+                  </span>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    {validationResult?.updatedCount ?? 0}
+                  </Badge>
+                </div>
+                <hr className="my-2" />
+                <div className="flex items-center justify-between font-medium">
+                  <span className="text-sm">Total de productos</span>
+                  <Badge variant="outline">
+                    {validationResult?.totalRows ?? 0}
+                  </Badge>
+                </div>
+              </div>
             </div>
+
+            {/* Warnings if any collections will be created */}
+            {validationResult && validationResult.collectionsCreatedCount > 0 && (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 p-3">
+                <AlertTriangle className="mt-0.5 size-4 text-yellow-600" />
+                <div className="text-sm text-yellow-800">
+                  Se crearán <strong>{validationResult.collectionsCreatedCount}</strong> colecciones nuevas.
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              Los productos con SKU existente serán actualizados con los nuevos valores.
+              Los productos con SKU nuevo serán creados.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
@@ -425,6 +570,7 @@ export function ProductImportPage() {
 }
 
 export default ProductImportPage;
+
 
 
 

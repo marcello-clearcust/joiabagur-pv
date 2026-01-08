@@ -1,5 +1,6 @@
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Products;
+using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
@@ -17,6 +18,8 @@ public class ProductServiceTests
 {
     private readonly Mock<IProductRepository> _productRepositoryMock;
     private readonly Mock<ICollectionRepository> _collectionRepositoryMock;
+    private readonly Mock<IInventoryRepository> _inventoryRepositoryMock;
+    private readonly Mock<IUserPointOfSaleService> _userPointOfSaleServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<ProductService>> _loggerMock;
     private readonly ProductService _sut;
@@ -25,12 +28,16 @@ public class ProductServiceTests
     {
         _productRepositoryMock = new Mock<IProductRepository>();
         _collectionRepositoryMock = new Mock<ICollectionRepository>();
+        _inventoryRepositoryMock = new Mock<IInventoryRepository>();
+        _userPointOfSaleServiceMock = new Mock<IUserPointOfSaleService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<ProductService>>();
 
         _sut = new ProductService(
             _productRepositoryMock.Object,
             _collectionRepositoryMock.Object,
+            _inventoryRepositoryMock.Object,
+            _userPointOfSaleServiceMock.Object,
             _unitOfWorkMock.Object,
             _loggerMock.Object);
     }
@@ -330,6 +337,7 @@ public class ProductServiceTests
 
     #endregion
 }
+
 
 
 

@@ -13,6 +13,7 @@ This directory contains HTTP request files for testing the Joiabagur PV API endp
 - `users.http` - User management CRUD operations
 - `point-of-sales.http` - Point of sale CRUD and assignments
 - `payment-methods.http` - Payment method CRUD operations
+- `inventory.http` - Inventory management (assignment, import, adjustment, movements)
 
 ## How to Use
 
@@ -61,7 +62,15 @@ curl http://localhost:5056/api/users -b cookies.txt
 2. Create custom payment methods if needed
 3. Assign payment methods to points of sale
 
-### 4. Test Authorization
+### 4. Test Inventory Management
+1. Assign products to a point of sale
+2. Download Excel template and create import file
+3. Import stock from Excel
+4. Adjust stock manually with reasons
+5. View movement history
+6. Test unassignment (requires 0 stock)
+
+### 5. Test Authorization
 1. Try accessing admin endpoints without auth → 401
 2. Create operator and login as operator
 3. Try accessing admin endpoints as operator → 403

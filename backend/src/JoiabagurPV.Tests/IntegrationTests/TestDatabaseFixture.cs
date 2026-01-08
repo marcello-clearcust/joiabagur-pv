@@ -4,13 +4,15 @@ using JoiabagurPV.Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace JoiabagurPV.Tests.IntegrationTests;
 
 /// <summary>
-/// Database fixture for integration tests using Testcontainers.
+/// Database fixture for integration tests using Testcontainers and Respawn.
 /// </summary>
 public class TestDatabaseFixture : IAsyncLifetime
 {
@@ -18,6 +20,7 @@ public class TestDatabaseFixture : IAsyncLifetime
     private IServiceProvider? _serviceProvider;
     private IServiceScopeFactory? _scopeFactory;
     private string? _connectionString;
+    private Respawner? _respawner;
 
     public TestDatabaseFixture()
     {
@@ -74,5 +77,35 @@ public class TestDatabaseFixture : IAsyncLifetime
         {
             disposable.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Resets the database using Respawn for reliable cleanup between tests.
+    /// </summary>
+    public async Task ResetDatabaseAsync()
+    {
+        if (_connectionString == null)
+        {
+            throw new InvalidOperationException("Database not initialized. Call InitializeAsync first.");
+        }
+
+        // Initialize Respawner on first use
+        if (_respawner == null)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            
+            _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
+            {
+                DbAdapter = DbAdapter.Postgres,
+                SchemasToInclude = ["public"],
+                TablesToIgnore = ["__EFMigrationsHistory"]
+            });
+        }
+
+        // Reset database using Respawn
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await _respawner.ResetAsync(conn);
     }
 }

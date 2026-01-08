@@ -63,6 +63,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<Collection> Collections { get; set; }
 
     /// <summary>
+    /// Gets or sets the Inventories DbSet.
+    /// </summary>
+    public DbSet<Inventory> Inventories { get; set; }
+
+    /// <summary>
+    /// Gets or sets the InventoryMovements DbSet.
+    /// </summary>
+    public DbSet<InventoryMovement> InventoryMovements { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>

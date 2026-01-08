@@ -19,18 +19,6 @@ public class ProductDto
 }
 
 /// <summary>
-/// Data transfer object for product photo information.
-/// </summary>
-public class ProductPhotoDto
-{
-    public Guid Id { get; set; }
-    public required string FileName { get; set; }
-    public string? Url { get; set; }
-    public int DisplayOrder { get; set; }
-    public bool IsPrimary { get; set; }
-}
-
-/// <summary>
 /// Data transfer object for collection information.
 /// </summary>
 public class CollectionDto
@@ -42,6 +30,7 @@ public class CollectionDto
     public DateTime UpdatedAt { get; set; }
     public int ProductCount { get; set; }
 }
+
 
 
 

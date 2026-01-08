@@ -17,10 +17,11 @@ Product Management is a core feature that serves as the foundation for inventory
 
 **Goals**:
 - Enable bulk product import/update via Excel with UPSERT by SKU
+- Provide Excel template download to prevent format errors
 - Support product photos with primary photo designation
 - Automatic collection creation during import
 - Atomic transactions (all-or-nothing import)
-- Clear validation error reporting before import confirmation
+- Clear validation error reporting before import confirmation (validate all rows first, show all errors)
 
 **Non-Goals**:
 - Product photo upload (covered by HU-EP1-004)
@@ -49,6 +50,23 @@ Product Management is a core feature that serves as the foundation for inventory
 ### Decision 5: Transaction Handling
 - **What**: Wrap entire import in database transaction with rollback on any error
 - **Why**: Ensures data consistency, aligns with user story requirement for atomicity
+
+### Decision 6: Excel Template Download
+- **What**: Provide downloadable Excel template with exact column names (SKU, Name, Description, Price, Collection) to prevent format errors
+- **Why**: Reduces user errors, ensures consistent format, improves user experience
+- **Implementation**: Backend endpoint generates template file, frontend provides download button
+- **Consistency**: Same pattern applies to Inventory Management Excel import
+
+### Decision 7: Shared Excel Template Utility
+- **What**: Create shared `IExcelTemplateService` interface and implementation for consistent template generation across Product and Inventory imports
+- **Why**: DRY principle, ensures consistent formatting, easier maintenance, single place to update template logic
+- **Implementation**: Shared service in Application layer, used by both ProductImportService and StockImportService
+- **Benefits**: Consistent header formatting, data validation rules, example data patterns
+
+### Decision 8: Template Quality and Formatting
+- **What**: Excel templates include data validation rules, protected header row, proper formatting (bold headers, number formats), and instructions
+- **Why**: Reduces user errors, improves UX, guides users on correct format
+- **Implementation**: Use ClosedXML features for data validation, cell protection, and formatting
 
 ### Alternatives Considered
 - **Individual row processing**: Rejected - too many DB roundtrips

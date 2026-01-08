@@ -14,7 +14,8 @@ namespace JoiabagurPV.Tests.IntegrationTests;
 /// Integration tests for PaymentMethodsController.
 /// Tests all CRUD operations, authorization, and validation scenarios.
 /// </summary>
-public class PaymentMethodsControllerTests : IClassFixture<ApiWebApplicationFactory>, IAsyncLifetime
+[Collection(IntegrationTestCollection.Name)]
+public class PaymentMethodsControllerTests : IAsyncLifetime
 {
     private readonly ApiWebApplicationFactory _factory;
     private readonly HttpClient _client;

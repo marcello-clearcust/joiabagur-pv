@@ -15,7 +15,8 @@ namespace JoiabagurPV.Tests.IntegrationTests;
 /// <summary>
 /// Integration tests for PointOfSalesController.
 /// </summary>
-public class PointOfSalesControllerTests : IClassFixture<ApiWebApplicationFactory>, IAsyncLifetime
+[Collection(IntegrationTestCollection.Name)]
+public class PointOfSalesControllerTests : IAsyncLifetime
 {
     private readonly ApiWebApplicationFactory _factory;
     private readonly HttpClient _client;

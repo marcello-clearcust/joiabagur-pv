@@ -153,7 +153,7 @@ public class ProductPhotoService : IProductPhotoService
         }
 
         // Delete photo entity
-        await _photoRepository.DeleteAsync(photo);
+        await _photoRepository.DeleteAsync(photo.Id);
         await _unitOfWork.SaveChangesAsync();
 
         _logger.LogInformation(

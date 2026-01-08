@@ -10,8 +10,8 @@ namespace JoiabagurPV.Infrastructure.Data;
 /// <typeparam name="TEntity">The entity type.</typeparam>
 public class Repository<TEntity> : IRepository<TEntity> where TEntity : BaseEntity
 {
-    private readonly ApplicationDbContext _context;
-    private readonly DbSet<TEntity> _dbSet;
+    protected readonly ApplicationDbContext _context;
+    protected readonly DbSet<TEntity> _dbSet;
 
     /// <summary>
     /// Initializes a new instance of the Repository class.

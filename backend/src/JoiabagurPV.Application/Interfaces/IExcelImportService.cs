@@ -22,6 +22,12 @@ public interface IExcelImportService
     Task<ImportResult> ImportAsync(Stream stream);
 
     /// <summary>
+    /// Generates an Excel template for product import.
+    /// </summary>
+    /// <returns>A memory stream containing the template Excel file.</returns>
+    MemoryStream GenerateTemplate();
+
+    /// <summary>
     /// Gets the allowed file extensions for import.
     /// </summary>
     string[] AllowedExtensions { get; }
@@ -31,6 +37,7 @@ public interface IExcelImportService
     /// </summary>
     long MaxFileSizeBytes { get; }
 }
+
 
 
 

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FluentValidation;
 using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Application.Interfaces;
@@ -18,6 +19,7 @@ public class ProductsController : ControllerBase
     private readonly IProductService _productService;
     private readonly IExcelImportService _excelImportService;
     private readonly IProductPhotoService _productPhotoService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly IValidator<CreateProductRequest> _createValidator;
     private readonly IValidator<UpdateProductRequest> _updateValidator;
     private readonly ILogger<ProductsController> _logger;
@@ -26,6 +28,7 @@ public class ProductsController : ControllerBase
         IProductService productService,
         IExcelImportService excelImportService,
         IProductPhotoService productPhotoService,
+        ICurrentUserService currentUserService,
         IValidator<CreateProductRequest> createValidator,
         IValidator<UpdateProductRequest> updateValidator,
         ILogger<ProductsController> logger)
@@ -33,23 +36,72 @@ public class ProductsController : ControllerBase
         _productService = productService;
         _excelImportService = excelImportService;
         _productPhotoService = productPhotoService;
+        _currentUserService = currentUserService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _logger = logger;
     }
 
     /// <summary>
-    /// Gets all products.
+    /// Gets a paginated catalog of products with role-based filtering.
+    /// Administrators see all products; operators see only products with inventory at their assigned points of sale.
     /// </summary>
-    /// <param name="includeInactive">Whether to include inactive products. Defaults to true.</param>
-    /// <returns>List of products.</returns>
+    /// <param name="page">Page number (1-based). Defaults to 1.</param>
+    /// <param name="pageSize">Items per page. Defaults to 50. Max 100.</param>
+    /// <param name="sortBy">Sort field: "name", "createdAt", "price". Defaults to "name".</param>
+    /// <param name="sortDirection">Sort direction: "asc" or "desc". Defaults to "asc".</param>
+    /// <param name="includeInactive">Include inactive products. Defaults to false.</param>
+    /// <returns>Paginated list of products.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(List<ProductDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaginatedResultDto<ProductListDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetAll([FromQuery] bool? includeInactive = null)
+    public async Task<IActionResult> GetCatalog(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string sortBy = "name",
+        [FromQuery] string sortDirection = "asc",
+        [FromQuery] bool includeInactive = false)
     {
-        var products = await _productService.GetAllAsync(includeInactive ?? true);
-        return Ok(products);
+        var parameters = new CatalogQueryParameters
+        {
+            Page = page,
+            PageSize = pageSize,
+            SortBy = sortBy,
+            SortDirection = sortDirection,
+            IncludeInactive = includeInactive
+        };
+
+        var result = await _productService.GetProductsAsync(
+            parameters,
+            _currentUserService.UserId,
+            _currentUserService.IsAdmin);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Searches products by SKU (exact match) or name (partial match).
+    /// Role-based filtering applies: operators only see products with inventory at their assigned points of sale.
+    /// </summary>
+    /// <param name="query">Search query. Minimum 2 characters.</param>
+    /// <returns>List of matching products (max 50).</returns>
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(List<ProductListDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Search([FromQuery] string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+        {
+            return BadRequest(new { error = "La búsqueda requiere al menos 2 caracteres." });
+        }
+
+        var results = await _productService.SearchProductsAsync(
+            query,
+            _currentUserService.UserId,
+            _currentUserService.IsAdmin);
+
+        return Ok(results);
     }
 
     /// <summary>
@@ -211,6 +263,29 @@ public class ProductsController : ControllerBase
         {
             return NotFound(new { error = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Downloads an Excel template for product import.
+    /// Only administrators can access this endpoint.
+    /// </summary>
+    /// <returns>An Excel file template with headers and example data.</returns>
+    [HttpGet("import-template")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public IActionResult DownloadImportTemplate()
+    {
+        _logger.LogInformation("Generating product import template");
+
+        var templateStream = _excelImportService.GenerateTemplate();
+        var content = templateStream.ToArray();
+
+        return File(
+            content,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "product-import-template.xlsx");
     }
 
     /// <summary>
@@ -516,6 +591,42 @@ public class ProductsController : ControllerBase
         catch (DomainException ex)
         {
             return NotFound(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Updates the display order of photos for a product.
+    /// Only administrators can reorder photos.
+    /// </summary>
+    /// <param name="productId">The product ID.</param>
+    /// <param name="request">Dictionary mapping photo IDs to new display order values.</param>
+    /// <returns>204 No Content on success.</returns>
+    [HttpPut("{productId:guid}/photos/order")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdatePhotoOrder(Guid productId, [FromBody] Dictionary<Guid, int> request)
+    {
+        if (request == null || request.Count == 0)
+        {
+            return BadRequest(new { error = "Photo order mapping is required." });
+        }
+
+        try
+        {
+            await _productPhotoService.UpdateDisplayOrderAsync(productId, request);
+            return NoContent();
+        }
+        catch (DomainException ex) when (ex.Message.Contains("not found"))
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (DomainException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
     }
 

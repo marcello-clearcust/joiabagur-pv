@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using FluentAssertions;
+using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
@@ -17,6 +18,7 @@ public class ExcelImportServiceTests
     private readonly Mock<IProductRepository> _productRepositoryMock;
     private readonly Mock<ICollectionRepository> _collectionRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<IExcelTemplateService> _templateServiceMock;
     private readonly Mock<ILogger<ExcelImportService>> _loggerMock;
     private readonly ExcelImportService _sut;
 
@@ -25,12 +27,14 @@ public class ExcelImportServiceTests
         _productRepositoryMock = new Mock<IProductRepository>();
         _collectionRepositoryMock = new Mock<ICollectionRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _templateServiceMock = new Mock<IExcelTemplateService>();
         _loggerMock = new Mock<ILogger<ExcelImportService>>();
 
         _sut = new ExcelImportService(
             _productRepositoryMock.Object,
             _collectionRepositoryMock.Object,
             _unitOfWorkMock.Object,
+            _templateServiceMock.Object,
             _loggerMock.Object);
     }
 
@@ -371,6 +375,7 @@ public class ExcelImportServiceTests
 
     #endregion
 }
+
 
 
 

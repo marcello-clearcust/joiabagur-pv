@@ -36,9 +36,9 @@ export function ProductsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
+        <Card className="border-primary/50">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-primary">
               <Package className="size-5" />
               Catálogo de Productos
             </CardTitle>
@@ -50,15 +50,17 @@ export function ProductsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Lista completa de productos con opciones de búsqueda, filtrado y edición.
             </p>
-            <Button variant="secondary" disabled className="w-full">
-              Ver Catálogo (Próximamente)
+            <Button asChild className="w-full">
+              <Link to={ROUTES.PRODUCTS.CATALOG}>
+                Ver Catálogo
+              </Link>
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border-primary/50">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary">
+            <CardTitle className="flex items-center gap-2">
               <Plus className="size-5" />
               Crear Producto
             </CardTitle>
@@ -70,7 +72,7 @@ export function ProductsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Crea un nuevo producto manualmente con todos sus detalles.
             </p>
-            <Button asChild className="w-full">
+            <Button variant="secondary" asChild className="w-full">
               <Link to={ROUTES.PRODUCTS.CREATE}>
                 Crear Producto
               </Link>

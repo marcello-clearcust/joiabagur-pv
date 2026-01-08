@@ -8,10 +8,16 @@ import { ROUTES } from './routes';
 const LoginPage = lazy(() => import('@/pages/auth/login'));
 const DashboardPage = lazy(() => import('@/pages/dashboard/page'));
 const ProductsPage = lazy(() => import('@/pages/products'));
+const ProductCatalogPage = lazy(() => import('@/pages/products/catalog'));
 const ProductCreatePage = lazy(() => import('@/pages/products/create'));
 const ProductEditPage = lazy(() => import('@/pages/products/edit'));
 const ProductImportPage = lazy(() => import('@/pages/products/import'));
 const InventoryPage = lazy(() => import('@/pages/inventory'));
+const InventoryAssignPage = lazy(() => import('@/pages/inventory/assign'));
+const InventoryImportPage = lazy(() => import('@/pages/inventory/import'));
+const InventoryAdjustPage = lazy(() => import('@/pages/inventory/adjust'));
+const InventoryMovementsPage = lazy(() => import('@/pages/inventory/movements'));
+const InventoryCentralizedPage = lazy(() => import('@/pages/inventory/centralized'));
 const SalesPage = lazy(() => import('@/pages/sales'));
 const ReturnsPage = lazy(() => import('@/pages/returns'));
 const PaymentMethodsPage = lazy(() => import('@/pages/payment-methods'));
@@ -49,7 +55,10 @@ export function AppRoutingSetup() {
           <Route element={<Layout8 />}>
             {/* Routes accessible by all authenticated users */}
             <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
-            <Route path={ROUTES.INVENTORY} element={<InventoryPage />} />
+            <Route path={ROUTES.PRODUCTS.CATALOG} element={<ProductCatalogPage />} />
+            <Route path={ROUTES.INVENTORY.ROOT} element={<InventoryPage />} />
+            <Route path={ROUTES.INVENTORY.STOCK} element={<InventoryPage />} />
+            <Route path={ROUTES.INVENTORY.MOVEMENTS} element={<InventoryMovementsPage />} />
             <Route path={ROUTES.SALES} element={<SalesPage />} />
             <Route path={ROUTES.RETURNS} element={<ReturnsPage />} />
           </Route>
@@ -58,6 +67,12 @@ export function AppRoutingSetup() {
         {/* Admin-only Routes - Require Administrator role */}
         <Route element={<AdminRoute />}>
           <Route element={<Layout8 />}>
+            {/* Inventory admin routes */}
+            <Route path={ROUTES.INVENTORY.ASSIGN} element={<InventoryAssignPage />} />
+            <Route path={ROUTES.INVENTORY.IMPORT} element={<InventoryImportPage />} />
+            <Route path={ROUTES.INVENTORY.ADJUST} element={<InventoryAdjustPage />} />
+            <Route path={ROUTES.INVENTORY.CENTRALIZED} element={<InventoryCentralizedPage />} />
+            
             <Route path={ROUTES.PRODUCTS.ROOT} element={<ProductsPage />} />
             <Route path={ROUTES.PRODUCTS.CREATE} element={<ProductCreatePage />} />
             <Route path="/products/:productId/edit" element={<ProductEditPage />} />

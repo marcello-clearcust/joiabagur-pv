@@ -256,4 +256,69 @@ public static class TestDataGenerator
         if (fileName != null) photo.FileName = fileName;
         return photo;
     }
+
+    /// <summary>
+    /// Creates an Inventory faker with customizable rules.
+    /// </summary>
+    public static Faker<Inventory> InventoryFaker(Guid? productId = null, Guid? pointOfSaleId = null, bool? isActive = null, int? quantity = null)
+    {
+        return new Faker<Inventory>()
+            .RuleFor(i => i.Id, f => f.Random.Guid())
+            .RuleFor(i => i.ProductId, f => productId ?? f.Random.Guid())
+            .RuleFor(i => i.PointOfSaleId, f => pointOfSaleId ?? f.Random.Guid())
+            .RuleFor(i => i.Quantity, f => quantity ?? f.Random.Int(0, 100))
+            .RuleFor(i => i.IsActive, f => isActive ?? true)
+            .RuleFor(i => i.LastUpdatedAt, f => f.Date.Recent())
+            .RuleFor(i => i.CreatedAt, f => f.Date.Past());
+    }
+
+    /// <summary>
+    /// Creates a single Inventory with optional customization.
+    /// </summary>
+    public static Inventory CreateInventory(Guid? productId = null, Guid? pointOfSaleId = null, bool? isActive = null, int? quantity = null)
+    {
+        return InventoryFaker(productId, pointOfSaleId, isActive, quantity).Generate();
+    }
+
+    /// <summary>
+    /// Creates multiple Inventory instances.
+    /// </summary>
+    public static List<Inventory> CreateInventories(int count, Guid? productId = null, Guid? pointOfSaleId = null, bool? isActive = null)
+    {
+        return InventoryFaker(productId, pointOfSaleId, isActive).Generate(count);
+    }
+
+    /// <summary>
+    /// Creates an InventoryMovement faker with customizable rules.
+    /// </summary>
+    public static Faker<InventoryMovement> InventoryMovementFaker(Guid? inventoryId = null, Guid? userId = null, MovementType? movementType = null)
+    {
+        return new Faker<InventoryMovement>()
+            .RuleFor(m => m.Id, f => f.Random.Guid())
+            .RuleFor(m => m.InventoryId, f => inventoryId ?? f.Random.Guid())
+            .RuleFor(m => m.UserId, f => userId ?? f.Random.Guid())
+            .RuleFor(m => m.MovementType, f => movementType ?? f.PickRandom<MovementType>())
+            .RuleFor(m => m.QuantityChange, f => f.Random.Int(-50, 50))
+            .RuleFor(m => m.QuantityBefore, f => f.Random.Int(0, 100))
+            .RuleFor(m => m.QuantityAfter, (f, m) => m.QuantityBefore + m.QuantityChange)
+            .RuleFor(m => m.Reason, f => f.Lorem.Sentence())
+            .RuleFor(m => m.MovementDate, f => f.Date.Recent())
+            .RuleFor(m => m.CreatedAt, f => f.Date.Past());
+    }
+
+    /// <summary>
+    /// Creates a single InventoryMovement with optional customization.
+    /// </summary>
+    public static InventoryMovement CreateInventoryMovement(Guid? inventoryId = null, Guid? userId = null, MovementType? movementType = null)
+    {
+        return InventoryMovementFaker(inventoryId, userId, movementType).Generate();
+    }
+
+    /// <summary>
+    /// Creates multiple InventoryMovement instances.
+    /// </summary>
+    public static List<InventoryMovement> CreateInventoryMovements(int count, Guid? inventoryId = null, Guid? userId = null)
+    {
+        return InventoryMovementFaker(inventoryId, userId).Generate(count);
+    }
 }

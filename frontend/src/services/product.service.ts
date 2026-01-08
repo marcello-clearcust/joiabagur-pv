@@ -10,10 +10,14 @@ import {
   CreateProductRequest,
   UpdateProductRequest,
   ImportResult,
+  ProductListItem,
+  PaginatedResult,
+  CatalogQueryParams,
 } from '@/types/product.types';
 
 const PRODUCT_ENDPOINTS = {
   PRODUCTS: '/products',
+  PRODUCT_SEARCH: '/products/search',
   PRODUCT_BY_ID: (id: string) => `/products/${id}`,
   PRODUCT_BY_SKU: (sku: string) => `/products/by-sku/${sku}`,
   PRODUCT_ACTIVATE: (id: string) => `/products/${id}/activate`,
@@ -29,13 +33,65 @@ const PRODUCT_ENDPOINTS = {
  */
 export const productService = {
   /**
-   * Get all products
+   * Get paginated product catalog
+   * Role-based filtering is applied by the backend:
+   * - Administrators see all products
+   * - Operators see only products with inventory at their assigned POS
+   */
+  getCatalog: async (params: CatalogQueryParams = {}): Promise<PaginatedResult<ProductListItem>> => {
+    const response = await apiClient.get<PaginatedResult<ProductListItem>>(
+      PRODUCT_ENDPOINTS.PRODUCTS,
+      {
+        params: {
+          page: params.page ?? 1,
+          pageSize: params.pageSize ?? 50,
+          sortBy: params.sortBy ?? 'name',
+          sortDirection: params.sortDirection ?? 'asc',
+          includeInactive: params.includeInactive ?? false,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Search products by SKU (exact match) or name (partial match)
+   * Role-based filtering is applied by the backend
+   */
+  searchProducts: async (query: string): Promise<ProductListItem[]> => {
+    if (!query || query.length < 2) {
+      return [];
+    }
+    const response = await apiClient.get<ProductListItem[]>(
+      PRODUCT_ENDPOINTS.PRODUCT_SEARCH,
+      { params: { query } }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get all products (legacy - returns full Product objects)
+   * @deprecated Use getCatalog for paginated list views
    */
   getProducts: async (includeInactive = true): Promise<Product[]> => {
-    const response = await apiClient.get<Product[]>(PRODUCT_ENDPOINTS.PRODUCTS, {
-      params: { includeInactive },
-    });
-    return response.data;
+    // For backwards compatibility, fetch all pages
+    const response = await apiClient.get<PaginatedResult<ProductListItem>>(
+      PRODUCT_ENDPOINTS.PRODUCTS,
+      { params: { includeInactive, pageSize: 1000 } }
+    );
+    // Convert to Product[] format by fetching full details
+    // Note: This is inefficient, consider updating consumers to use getCatalog
+    const productIds = response.data.items.map(item => item.id);
+    const products: Product[] = [];
+    for (const id of productIds) {
+      try {
+        const product = await productService.getProduct(id);
+        products.push(product);
+      } catch {
+        // Skip products that fail to load
+      }
+    }
+    return products;
   },
 
   /**

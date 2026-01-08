@@ -1,0 +1,176 @@
+### Inventory API Tests
+### Prerequisites: Run auth.http login first, have products and points of sale created
+
+@baseUrl = http://localhost:5056/api
+
+### =====================================
+### INVENTORY ASSIGNMENT
+### =====================================
+
+### Get assigned products for a point of sale
+# @name getAssignedProducts
+GET {{baseUrl}}/inventory/assigned?pointOfSaleId={{posId}}&page=1&pageSize=50
+Content-Type: application/json
+
+### Assign a single product to a point of sale
+# @name assignProduct
+POST {{baseUrl}}/inventory/assign
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "pointOfSaleId": "{{posId}}"
+}
+
+### Bulk assign multiple products to a point of sale
+# @name bulkAssignProducts
+POST {{baseUrl}}/inventory/assign/bulk
+Content-Type: application/json
+
+{
+  "productIds": [
+    "{{productId1}}",
+    "{{productId2}}",
+    "{{productId3}}"
+  ],
+  "pointOfSaleId": "{{posId}}"
+}
+
+### Unassign a product from a point of sale
+### Note: Product must have 0 stock to unassign
+# @name unassignProduct
+POST {{baseUrl}}/inventory/unassign
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "pointOfSaleId": "{{posId}}"
+}
+
+### =====================================
+### STOCK VIEW
+### =====================================
+
+### Get stock for a point of sale
+# @name getStock
+GET {{baseUrl}}/inventory?pointOfSaleId={{posId}}&page=1&pageSize=50
+Content-Type: application/json
+
+### Get centralized stock view (Admin only)
+# @name getCentralizedStock
+GET {{baseUrl}}/inventory/centralized?page=1&pageSize=50
+Content-Type: application/json
+
+### Get stock breakdown for a specific product
+# @name getProductBreakdown
+GET {{baseUrl}}/inventory/product/{{productId}}
+Content-Type: application/json
+
+### =====================================
+### STOCK IMPORT
+### =====================================
+
+### Download Excel import template
+# @name downloadTemplate
+GET {{baseUrl}}/inventory/import-template
+
+### Validate import file (without actually importing)
+### Use form-data with file upload in Postman/Insomnia
+### Or use curl:
+### curl -X POST "http://localhost:5056/api/inventory/import/validate?pointOfSaleId=<posId>" \
+###   -H "Content-Type: multipart/form-data" \
+###   -F "file=@path/to/stock-import.xlsx" \
+###   -b cookies.txt
+
+### Import stock from Excel file
+### Use form-data with file upload in Postman/Insomnia
+### Or use curl:
+### curl -X POST "http://localhost:5056/api/inventory/import?pointOfSaleId=<posId>" \
+###   -H "Content-Type: multipart/form-data" \
+###   -F "file=@path/to/stock-import.xlsx" \
+###   -b cookies.txt
+
+### =====================================
+### STOCK ADJUSTMENT
+### =====================================
+
+### Adjust stock (increase)
+# @name adjustStockIncrease
+POST {{baseUrl}}/inventory/adjustment
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "pointOfSaleId": "{{posId}}",
+  "quantityChange": 10,
+  "reason": "Stock received from supplier"
+}
+
+### Adjust stock (decrease)
+# @name adjustStockDecrease
+POST {{baseUrl}}/inventory/adjustment
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "pointOfSaleId": "{{posId}}",
+  "quantityChange": -5,
+  "reason": "Damaged items removed from inventory"
+}
+
+### Adjust stock - should fail (negative result)
+# @name adjustStockNegativeFail
+POST {{baseUrl}}/inventory/adjustment
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "pointOfSaleId": "{{posId}}",
+  "quantityChange": -1000,
+  "reason": "This should fail"
+}
+
+### =====================================
+### MOVEMENT HISTORY
+### =====================================
+
+### Get all movements (default: last 30 days)
+# @name getMovements
+GET {{baseUrl}}/inventory/movements?page=1&pageSize=50
+Content-Type: application/json
+
+### Get movements filtered by point of sale
+# @name getMovementsByPos
+GET {{baseUrl}}/inventory/movements?pointOfSaleId={{posId}}&page=1&pageSize=50
+Content-Type: application/json
+
+### Get movements filtered by product
+# @name getMovementsByProduct
+GET {{baseUrl}}/inventory/movements?productId={{productId}}&page=1&pageSize=50
+Content-Type: application/json
+
+### Get movements with date range
+# @name getMovementsDateRange
+GET {{baseUrl}}/inventory/movements?startDate=2025-01-01&endDate=2025-12-31&page=1&pageSize=50
+Content-Type: application/json
+
+### Get movements with all filters
+# @name getMovementsAllFilters
+GET {{baseUrl}}/inventory/movements?productId={{productId}}&pointOfSaleId={{posId}}&startDate=2025-01-01&endDate=2025-12-31&page=1&pageSize=50
+Content-Type: application/json
+
+### =====================================
+### COMPLETE WORKFLOW TEST
+### =====================================
+
+### 1. First, login as admin (run from auth.http)
+### 2. Create or get a point of sale ID (from point-of-sales.http)
+### 3. Create or get a product ID (from products.http)
+### 4. Replace {{posId}} and {{productId}} with actual values
+### 5. Assign the product to the point of sale
+### 6. Import stock or adjust stock
+### 7. View movements to see audit trail
+### 8. Try to unassign (should fail if stock > 0)
+### 9. Adjust stock to 0, then unassign
+
+

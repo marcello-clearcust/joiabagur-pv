@@ -10,7 +10,8 @@ namespace JoiabagurPV.Tests.IntegrationTests;
 /// <summary>
 /// Integration tests for repository functionality.
 /// </summary>
-public class RepositoryTests : IClassFixture<TestDatabaseFixture>
+[Collection(RepositoryTestCollection.Name)]
+public class RepositoryTests
 {
     private readonly TestDatabaseFixture _fixture;
 

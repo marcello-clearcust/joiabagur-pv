@@ -186,6 +186,17 @@ The system has two roles:
 | `GET /api/users/{id}/point-of-sales` | ✅ | ❌ |
 | `POST /api/users/{id}/point-of-sales/{posId}` | ✅ | ❌ |
 | `DELETE /api/users/{id}/point-of-sales/{posId}` | ✅ | ❌ |
+| `GET /api/inventory` | ✅ | ✅* |
+| `GET /api/inventory/assigned` | ✅ | ✅* |
+| `GET /api/inventory/centralized` | ✅ | ❌ |
+| `GET /api/inventory/movements` | ✅ | ✅* |
+| `POST /api/inventory/assign` | ✅ | ❌ |
+| `POST /api/inventory/unassign` | ✅ | ❌ |
+| `POST /api/inventory/import` | ✅ | ❌ |
+| `POST /api/inventory/adjustment` | ✅ | ❌ |
+| `GET /api/inventory/import-template` | ✅ | ❌ |
+
+*Operators see only their assigned points of sale
 
 ### Point of Sale Access Control
 
@@ -208,6 +219,75 @@ Operators are assigned to specific points of sale. When accessing data:
 | `/api/users/{id}/point-of-sales` | GET | Get user's point of sale assignments |
 | `/api/users/{id}/point-of-sales/{posId}` | POST | Assign user to point of sale |
 | `/api/users/{id}/point-of-sales/{posId}` | DELETE | Unassign user from point of sale |
+
+## Inventory Management
+
+### Overview
+
+The inventory management system tracks product stock across multiple points of sale with full audit trails.
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Point of Sale │────▶│    Inventory    │────▶│   Movements     │
+│   (Location)    │     │   (Stock)       │     │   (Audit Trail) │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+### Key Features
+
+- **Product Assignment**: Assign products to points of sale before stock can be tracked
+- **Stock Import**: Bulk import stock from Excel files with validation
+- **Manual Adjustments**: Adjust stock quantities with mandatory reason tracking
+- **Movement History**: Complete audit trail of all inventory changes
+- **Centralized View**: Admin-only aggregated stock view across all locations
+
+### Inventory Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/inventory` | GET | Yes | Get stock for a point of sale |
+| `/api/inventory/assigned` | GET | Yes | Get products assigned to a point of sale |
+| `/api/inventory/centralized` | GET | Admin | Get aggregated stock view |
+| `/api/inventory/product/{id}` | GET | Yes | Get stock breakdown for a product |
+| `/api/inventory/assign` | POST | Admin | Assign product to point of sale |
+| `/api/inventory/assign/bulk` | POST | Admin | Bulk assign products |
+| `/api/inventory/unassign` | POST | Admin | Unassign product (requires 0 stock) |
+| `/api/inventory/import` | POST | Admin | Import stock from Excel |
+| `/api/inventory/import/validate` | POST | Admin | Validate Excel file without importing |
+| `/api/inventory/import-template` | GET | Admin | Download Excel import template |
+| `/api/inventory/adjustment` | POST | Admin | Manual stock adjustment |
+| `/api/inventory/movements` | GET | Yes | Get movement history with filters |
+
+### Excel Import Format
+
+The stock import feature uses Excel files with the following format:
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `SKU` | Yes | Product SKU (must exist in catalog) |
+| `Quantity` | Yes | Quantity to add (≥ 0) |
+
+**Important Notes:**
+- Column names must match exactly (case-sensitive)
+- Quantities are **added** to existing stock
+- Products not assigned to the point of sale will be **automatically assigned**
+- Download the template from `GET /api/inventory/import-template`
+
+### Stock Adjustment
+
+Manual adjustments require:
+- Product must be assigned to the point of sale
+- Reason is mandatory (max 500 characters)
+- Resulting stock cannot be negative
+
+### Movement Types
+
+| Type | Description |
+|------|-------------|
+| `Sale` | Stock decreased by sales (automatic) |
+| `Return` | Stock increased by returns (automatic) |
+| `Adjustment` | Manual adjustment with reason |
+| `Import` | Stock added via Excel import |
 
 ### Default Admin User
 

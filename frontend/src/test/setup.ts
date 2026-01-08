@@ -9,8 +9,10 @@ import { afterEach, beforeAll, afterAll } from 'vitest';
 import { server } from './mocks/server';
 
 // Start MSW server before all tests
+// Configure to warn on unhandled requests (fail fast for integration tests)
+// Using 'warn' instead of 'error' to avoid breaking unit tests that don't make API calls
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledRequest: 'warn' });
 });
 
 // Reset handlers after each test

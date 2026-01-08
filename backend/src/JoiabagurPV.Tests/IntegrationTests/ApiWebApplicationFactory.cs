@@ -4,17 +4,21 @@ using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 using Testcontainers.PostgreSql;
 
 namespace JoiabagurPV.Tests.IntegrationTests;
 
 /// <summary>
 /// Custom WebApplicationFactory for integration testing.
-/// Uses Testcontainers for PostgreSQL database.
+/// Uses Testcontainers for PostgreSQL database and Respawn for database cleanup.
 /// </summary>
 public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgresContainer;
+    private Respawner? _respawner;
+    private string? _connectionString;
 
     public ApiWebApplicationFactory()
     {
@@ -77,6 +81,10 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
     public async Task InitializeAsync()
     {
         await _postgresContainer.StartAsync();
+        _connectionString = _postgresContainer.GetConnectionString();
+        
+        // Initialize Respawn after the container is started
+        // Note: Respawner will be created after first database access to ensure schema exists
     }
 
     async Task IAsyncLifetime.DisposeAsync()
@@ -94,23 +102,38 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
     }
 
     /// <summary>
-    /// Resets the database by truncating all tables.
+    /// Resets the database using Respawn for reliable cleanup.
+    /// Automatically handles schema changes without manual SQL updates.
     /// </summary>
     public async Task ResetDatabaseAsync()
     {
+        if (_connectionString == null)
+        {
+            throw new InvalidOperationException("Database not initialized. Call InitializeAsync first.");
+        }
+
+        // Initialize Respawner on first use (after schema is created)
+        if (_respawner == null)
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            
+            _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
+            {
+                DbAdapter = DbAdapter.Postgres,
+                SchemasToInclude = ["public"],
+                // Exclude EF Core migrations table
+                TablesToIgnore = ["__EFMigrationsHistory"]
+            });
+        }
+
+        // Reset database using Respawn
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await _respawner.ResetAsync(conn);
+
+        // Re-seed the database with initial data
         using var scope = Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        // Delete all data and reseed
-        await context.Database.ExecuteSqlRawAsync(@"
-            TRUNCATE TABLE ""RefreshTokens"" CASCADE;
-            TRUNCATE TABLE ""PointOfSalePaymentMethods"" CASCADE;
-            TRUNCATE TABLE ""UserPointOfSales"" CASCADE;
-            TRUNCATE TABLE ""PaymentMethods"" CASCADE;
-            TRUNCATE TABLE ""PointOfSales"" CASCADE;
-            TRUNCATE TABLE ""Users"" CASCADE;
-        ");
-
         var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
         await seeder.SeedAsync();
     }

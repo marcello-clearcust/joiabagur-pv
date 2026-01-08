@@ -96,3 +96,42 @@ export interface SkuCheckResult {
   productId?: string;
 }
 
+/**
+ * Lightweight product DTO for catalog display
+ */
+export interface ProductListItem {
+  id: string;
+  sku: string;
+  name: string;
+  price: number;
+  primaryPhotoUrl?: string;
+  collectionName?: string;
+  isActive: boolean;
+  availableQuantity: number;
+  createdAt: string;
+}
+
+/**
+ * Paginated result wrapper
+ */
+export interface PaginatedResult<T> {
+  items: T[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+/**
+ * Catalog query parameters
+ */
+export interface CatalogQueryParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: 'name' | 'createdAt' | 'price';
+  sortDirection?: 'asc' | 'desc';
+  includeInactive?: boolean;
+}
+

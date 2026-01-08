@@ -55,6 +55,115 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.ToTable("Collections", (string)null);
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PointOfSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("PointOfSaleId", "Quantity");
+
+                    b.HasIndex("ProductId", "PointOfSaleId")
+                        .IsUnique();
+
+                    b.HasIndex("PointOfSaleId", "ProductId", "IsActive");
+
+                    b.ToTable("Inventories", (string)null);
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.InventoryMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("InventoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("MovementDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MovementType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantityAfter")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantityBefore")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantityChange")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryId");
+
+                    b.HasIndex("MovementDate");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("InventoryId", "MovementDate");
+
+                    b.ToTable("InventoryMovements", (string)null);
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.PaymentMethod", b =>
                 {
                     b.Property<Guid>("Id")
@@ -468,6 +577,44 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.ToTable("UserPointOfSales", (string)null);
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.PointOfSale", "PointOfSale")
+                        .WithMany()
+                        .HasForeignKey("PointOfSaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PointOfSale");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.InventoryMovement", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.Inventory", "Inventory")
+                        .WithMany("Movements")
+                        .HasForeignKey("InventoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Inventory");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.PointOfSalePaymentMethod", b =>
                 {
                     b.HasOne("JoiabagurPV.Domain.Entities.PaymentMethod", "PaymentMethod")
@@ -541,6 +688,11 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Collection", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.Inventory", b =>
+                {
+                    b.Navigation("Movements");
                 });
 
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.PaymentMethod", b =>

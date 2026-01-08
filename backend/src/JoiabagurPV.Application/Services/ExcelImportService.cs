@@ -15,6 +15,7 @@ public class ExcelImportService : IExcelImportService
     private readonly IProductRepository _productRepository;
     private readonly ICollectionRepository _collectionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IExcelTemplateService _templateService;
     private readonly ILogger<ExcelImportService> _logger;
 
     // Required columns
@@ -28,11 +29,13 @@ public class ExcelImportService : IExcelImportService
         IProductRepository productRepository,
         ICollectionRepository collectionRepository,
         IUnitOfWork unitOfWork,
+        IExcelTemplateService templateService,
         ILogger<ExcelImportService> logger)
     {
         _productRepository = productRepository;
         _collectionRepository = collectionRepository;
         _unitOfWork = unitOfWork;
+        _templateService = templateService;
         _logger = logger;
     }
 
@@ -41,6 +44,82 @@ public class ExcelImportService : IExcelImportService
 
     /// <inheritdoc/>
     public long MaxFileSizeBytes => 10 * 1024 * 1024; // 10 MB
+
+    /// <inheritdoc/>
+    public MemoryStream GenerateTemplate()
+    {
+        var config = new ExcelTemplateConfig
+        {
+            SheetName = "Products",
+            Instructions = "Fill in product data starting from row 2. Required columns are marked in red. " +
+                          "Example rows are shown in gray italic - delete or overwrite them with your data.",
+            Columns = new List<ExcelColumnConfig>
+            {
+                new()
+                {
+                    Name = ColSku,
+                    IsRequired = true,
+                    DataType = ExcelDataType.Text,
+                    Width = 15,
+                    Description = "Unique product identifier (required). Must be unique across all products."
+                },
+                new()
+                {
+                    Name = ColName,
+                    IsRequired = true,
+                    DataType = ExcelDataType.Text,
+                    Width = 30,
+                    Description = "Product name (required)."
+                },
+                new()
+                {
+                    Name = ColDescription,
+                    IsRequired = false,
+                    DataType = ExcelDataType.Text,
+                    Width = 40,
+                    Description = "Product description (optional)."
+                },
+                new()
+                {
+                    Name = ColPrice,
+                    IsRequired = true,
+                    DataType = ExcelDataType.Decimal,
+                    Width = 12,
+                    MinValue = 0.01m,
+                    Description = "Product price (required). Must be greater than zero."
+                },
+                new()
+                {
+                    Name = ColCollection,
+                    IsRequired = false,
+                    DataType = ExcelDataType.Text,
+                    Width = 20,
+                    Description = "Collection name (optional). If provided and doesn't exist, it will be created automatically."
+                }
+            },
+            ExampleRows = new List<Dictionary<string, object?>>
+            {
+                new()
+                {
+                    { ColSku, "RING-001" },
+                    { ColName, "Gold Ring 18K" },
+                    { ColDescription, "18 karat gold ring with diamond" },
+                    { ColPrice, 1250.00m },
+                    { ColCollection, "Luxury" }
+                },
+                new()
+                {
+                    { ColSku, "NECK-002" },
+                    { ColName, "Silver Necklace" },
+                    { ColDescription, "Sterling silver chain necklace" },
+                    { ColPrice, 89.99m },
+                    { ColCollection, "Basic" }
+                }
+            }
+        };
+
+        return _templateService.GenerateTemplate(config);
+    }
 
     /// <inheritdoc/>
     public async Task<ImportResult> ValidateAsync(Stream stream)
@@ -422,6 +501,7 @@ public class ExcelImportService : IExcelImportService
         public string? CollectionName { get; set; }
     }
 }
+
 
 
 

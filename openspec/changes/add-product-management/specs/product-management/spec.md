@@ -84,11 +84,19 @@ The system SHALL support bulk product import from Excel files (.xlsx, .xls) with
 - **AND** no partial data is persisted
 
 ### Requirement: Product Import API
-The system SHALL provide a REST API endpoint for Excel file upload with proper authentication and file validation.
+The system SHALL provide REST API endpoints for Excel template download and file upload with proper authentication and file validation.
+
+#### Scenario: Download Excel template as administrator
+- **WHEN** an authenticated administrator GETs /api/products/import-template
+- **THEN** the system returns an Excel file with exact column headers and example data
+- **AND** file has appropriate content-type header for Excel download
 
 #### Scenario: Upload Excel file as administrator
 - **WHEN** an authenticated administrator POSTs to /api/products/import with a valid Excel file
-- **THEN** the system processes the import and returns ImportResult with success/error details
+- **THEN** the system validates all rows before processing any
+- **AND** shows all validation errors before import confirmation
+- **AND** processes valid rows only after user confirmation
+- **AND** returns ImportResult with success/error details
 
 #### Scenario: Unauthorized import attempt
 - **WHEN** an operator or unauthenticated user attempts to POST to /api/products/import
@@ -131,25 +139,41 @@ The system SHALL provide a user-friendly interface for bulk product import with 
 - **THEN** a drag-and-drop zone is displayed for Excel file selection
 
 #### Scenario: Download Excel template
-- **WHEN** an administrator clicks the template download button
-- **THEN** an Excel template with required columns (SKU, Name, Description, Price, Collection) is downloaded
+- **WHEN** an administrator requests product import template
+- **THEN** system provides downloadable Excel template file via GET /api/products/import-template endpoint
+- **AND** template contains exact column headers: "SKU", "Name", "Description", "Price", "Collection" (header row protected/locked)
+- **AND** template includes example row with sample data
+- **AND** template includes data validation rules (Price > 0, SKU text format, Name required)
+- **AND** template includes instructions or comments explaining format requirements
+- **AND** template has proper formatting (bold headers, number format for Price column, text format for SKU)
+
+#### Scenario: Template accessible from help documentation
+- **WHEN** administrator accesses help or documentation pages
+- **THEN** template download link is available
+- **AND** link provides same template as import page
 
 #### Scenario: Preview before import
-- **WHEN** a valid Excel file is selected
+- **WHEN** a valid Excel file is selected (before upload)
 - **THEN** the system shows a preview with row count and basic validation status
+- **AND** displays preview table showing first few rows that will be imported
 
 #### Scenario: Display validation errors
 - **WHEN** the uploaded file has validation errors
-- **THEN** errors are displayed with row numbers and descriptions
+- **THEN** errors are displayed with detailed format: row number, field name, and error message
+- **AND** errors are grouped by type (missing columns, invalid data, business rule violations)
+- **AND** example error format: "Row 5: SKU 'ABC-123' is duplicate" or "Row 8: Price must be greater than 0"
 - **AND** the import button is disabled until errors are resolved
 
-#### Scenario: Confirm import action
+#### Scenario: Confirm import action with summary
 - **WHEN** the file is valid and the administrator clicks import
 - **THEN** a confirmation dialog is shown before processing
+- **AND** dialog displays summary: total rows to process, breakdown (e.g., "X products will be created, Y products will be updated")
+- **AND** requires explicit confirmation before processing
 
 #### Scenario: Display import progress
 - **WHEN** an import is in progress
 - **THEN** a progress indicator is shown to the user
+- **AND** import button is disabled during processing
 
 #### Scenario: Display import results
 - **WHEN** an import completes

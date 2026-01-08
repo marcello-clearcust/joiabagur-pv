@@ -14,7 +14,8 @@ namespace JoiabagurPV.Tests.IntegrationTests;
 /// <summary>
 /// Integration tests for authorization (role-based and resource-based).
 /// </summary>
-public class AuthorizationTests : IClassFixture<ApiWebApplicationFactory>, IAsyncLifetime
+[Collection(IntegrationTestCollection.Name)]
+public class AuthorizationTests : IAsyncLifetime
 {
     private readonly ApiWebApplicationFactory _factory;
     private readonly HttpClient _client;

@@ -15,11 +15,20 @@ export const ROUTES = {
   // Module routes - organized by epic
   PRODUCTS: {
     ROOT: '/products',
+    CATALOG: '/products/catalog',
     CREATE: '/products/create',
     EDIT: (id: string) => `/products/${id}/edit`,
     IMPORT: '/products/import',
   },
-  INVENTORY: '/inventory',
+  INVENTORY: {
+    ROOT: '/inventory',
+    STOCK: '/inventory/stock',
+    ASSIGN: '/inventory/assign',
+    IMPORT: '/inventory/import',
+    ADJUST: '/inventory/adjust',
+    MOVEMENTS: '/inventory/movements',
+    CENTRALIZED: '/inventory/centralized',
+  },
   SALES: '/sales',
   RETURNS: '/returns',
   PAYMENT_METHODS: '/payment-methods',

@@ -31,28 +31,40 @@
 - [x] 4.4 Add configuration-based storage provider selection (T-EP1-001-005)
 - [x] 4.5 Add file validation (format, size limits) (T-EP1-001-005)
 
+## 4A. Application Layer - Shared Excel Template Service
+
+- [x] 4A.1 Create IExcelTemplateService interface
+- [x] 4A.2 Implement ExcelTemplateService using ClosedXML
+- [x] 4A.3 Implement template generation with common formatting (bold headers, protected header row)
+- [x] 4A.4 Implement data validation rules support (number ranges, text formats)
+- [x] 4A.5 Implement example row generation
+- [x] 4A.6 Implement instructions/comments support
+
 ## 5. Application Layer - Services
 
 - [x] 5.1 Create IExcelImportService interface (T-EP1-001-006)
 - [x] 5.2 Implement ExcelImportService with ClosedXML parsing (T-EP1-001-006)
-- [x] 5.3 Add Excel validation (required columns, data formats, duplicate SKUs) (T-EP1-001-006)
+- [x] 5.3 Add Excel validation (required columns with exact name matching, data formats, duplicate SKUs) (T-EP1-001-006)
 - [x] 5.4 Implement UPSERT logic (create new, update existing by SKU) (T-EP1-001-006)
 - [x] 5.5 Add automatic collection creation during import (T-EP1-001-006)
 - [x] 5.6 Implement transaction handling for atomicity (T-EP1-001-006)
 - [x] 5.7 Create ImportResult DTO with success/error counts and details (T-EP1-001-006)
-- [x] 5.8 Create IProductService interface with CRUD operations (T-EP1-001-007)
-- [x] 5.9 Implement ProductService with business validations (T-EP1-001-007)
-- [x] 5.10 Add SKU uniqueness validation (T-EP1-001-007)
-- [x] 5.11 Add soft delete support with IsActive flag (T-EP1-001-007)
+- [x] 5.8 Implement GenerateTemplate method using shared IExcelTemplateService (create Excel template with exact column headers, example row, instructions/comments, data validation rules, protected header row, formatting)
+- [x] 5.9 Update error reporting to include detailed format (row number, field name, error message, grouped by type)
+- [x] 5.10 Create IProductService interface with CRUD operations (T-EP1-001-007)
+- [x] 5.11 Implement ProductService with business validations (T-EP1-001-007)
+- [x] 5.12 Add SKU uniqueness validation (T-EP1-001-007)
+- [x] 5.13 Add soft delete support with IsActive flag (T-EP1-001-007)
 
 ## 6. API Layer
 
 - [x] 6.1 Create ProductsController with route /api/products (T-EP1-001-008)
-- [x] 6.2 Implement POST /api/products/import endpoint (T-EP1-001-008)
-- [x] 6.3 Add file upload handling with multipart/form-data (T-EP1-001-008)
-- [x] 6.4 Add file validation middleware (size: 10MB, format: .xlsx/.xls) (T-EP1-001-008)
-- [x] 6.5 Add [Authorize(Roles = "Administrator")] authorization (T-EP1-001-008)
-- [x] 6.6 Add Swagger/Scalar documentation for endpoint (T-EP1-001-008)
+- [x] 6.2 Implement GET /api/products/import-template endpoint (download Excel template with proper content-type)
+- [x] 6.3 Implement POST /api/products/import endpoint (T-EP1-001-008)
+- [x] 6.4 Add file upload handling with multipart/form-data (T-EP1-001-008)
+- [x] 6.5 Add file validation middleware (size: 10MB, format: .xlsx/.xls) (T-EP1-001-008)
+- [x] 6.6 Add [Authorize(Roles = "Administrator")] authorization (T-EP1-001-008)
+- [x] 6.7 Add Swagger/Scalar documentation for endpoints (T-EP1-001-008)
 
 ## 7. Backend Testing
 
@@ -70,13 +82,14 @@
 
 - [x] 8.1 Create ProductImportPage component with Metronic layout (T-EP1-001-011)
 - [x] 8.2 Add drag-and-drop file upload component (T-EP1-001-011)
-- [x] 8.3 Add Excel template download functionality (T-EP1-001-011)
-- [x] 8.4 Implement file validation preview (row count, basic checks) (T-EP1-001-011)
-- [x] 8.5 Add validation error display with row numbers (T-EP1-001-011)
-- [x] 8.6 Add import confirmation dialog (T-EP1-001-011)
+- [x] 8.3 Add Excel template download button (calls GET /api/products/import-template, visible before file selection) (T-EP1-001-011)
+- [x] 8.4 Add preview functionality (show preview table with first few rows when file selected, before upload)
+- [x] 8.5 Add validation error display with detailed format (row number, field name, error message, grouped by type) (T-EP1-001-011)
+- [x] 8.6 Update import confirmation dialog to show summary (total rows, breakdown: "X products will be created, Y products will be updated")
 - [x] 8.7 Add progress indicator during import (T-EP1-001-011)
 - [x] 8.8 Add results summary display (created, updated, errors) (T-EP1-001-011)
 - [x] 8.9 Add route and navigation menu entry for import page (T-EP1-001-011)
+- [ ] 8.10 Add template download link to help/documentation pages
 
 ## 9. Frontend Testing
 

@@ -4,12 +4,35 @@
  */
 
 import { Link } from 'react-router-dom';
-import { FileSpreadsheet, Package, Plus } from 'lucide-react';
+import { FileSpreadsheet, Package, Plus, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/routing/routes';
+import { productService } from '@/services/product.service';
+import { toast } from 'sonner';
 
 export function ProductsPage() {
+  /**
+   * Download Excel template for product import
+   */
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await productService.downloadImportTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'product-import-template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('Plantilla descargada en formato Excel (.xlsx)');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al descargar la plantilla';
+      toast.error(errorMessage);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -94,11 +117,21 @@ export function ProductsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Importa o actualiza múltiples productos a la vez usando un archivo Excel.
             </p>
-            <Button variant="secondary" asChild className="w-full">
-              <Link to={ROUTES.PRODUCTS.IMPORT}>
-                Ir a Importación
-              </Link>
-            </Button>
+            <div className="space-y-2">
+              <Button variant="secondary" asChild className="w-full">
+                <Link to={ROUTES.PRODUCTS.IMPORT}>
+                  Ir a Importación
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleDownloadTemplate}
+              >
+                <Download className="mr-2 size-4" />
+                Descargar Plantilla Excel
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

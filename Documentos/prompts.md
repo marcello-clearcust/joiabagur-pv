@@ -2352,3 +2352,386 @@ Si en el futuro se cambia la tecnología de IA (de TensorFlow.js a otra), solo E
 La **Épica 4 ya debería incluir la lógica de actualización del modelo** como parte de su alcance, ya que es un requerimiento implícito para que el reconocimiento funcione correctamente en un entorno dinámico donde se agregan nuevos productos constantemente.
 
 ---
+
+## Prompt sobre Análisis y propuesta de Sales Registration con AI Image Recognition
+
+/openspec-proposal @epicas.md (67-119) 
+Antes de crear la propuesta
+- Hazme al menos 10 preguntas para aclarar dudas.
+- Propon 3 posibles mejoras.
+- Analiza si hay incongruencias o si hay dependencias no desarrolladas.
+
+---
+
+### Respuesta del asistente - Análisis Previo
+
+Se realizó un análisis exhaustivo de las Épicas 3 (Registro de Ventas) y 4 (Reconocimiento de Imágenes con IA) antes de crear la propuesta OpenSpec.
+
+**10+ Preguntas de Aclaración formuladas:**
+
+Sobre Registro de Ventas (EP3):
+1. Validación de cantidad: ¿Permite vender múltiples unidades del mismo producto?
+2. Método de pago desactivado: ¿Qué ocurre si se selecciona un método asignado pero inactivo?
+3. Foto en venta manual: ¿Se puede adjuntar foto opcionalmente?
+4. Transaccionalidad: ¿Rollback completo si falla creación de InventoryMovement?
+5. Validación de producto asignado: ¿Validar solo stock > 0 o también asignación al POS?
+6. Notas en venta: ¿Casos de uso específicos para el campo Notes?
+
+Sobre Reconocimiento de Imágenes (EP4):
+7. Formato de sugerencias: ¿Score de confianza visible o solo ordenamiento?
+8. Umbral mínimo: ¿Existe umbral mínimo de confianza para mostrar sugerencias?
+9. Almacenamiento de fotos: ¿Guardar siempre o solo si venta completa?
+10. Re-entrenamiento: ¿Incluido en MVP o modelo estático?
+11. Tamaño/compresión: ¿Restricciones de tamaño? ¿Comprimir antes de procesar?
+12. Flujo de navegación: ¿Redirección automática a venta manual si baja confianza?
+13. Cancelación: ¿Qué ocurre con la foto si se cancela el proceso?
+14. Productos sin fotos: ¿Validación previa o mensaje de error?
+
+**3 Propuestas de Mejora:**
+
+1. **Validación de Stock Crítico:** Advertencia no bloqueante cuando stock <= MinimumThreshold
+2. **Modo de Fallback Inteligente:** Si confianza <40%, mostrar sugerencias + opción "Ninguno coincide" con foto preservada
+3. **Registro Offline (Fase 2):** Cola de ventas offline con sincronización posterior
+
+**Incongruencias Detectadas:**
+- Cantidad por defecto vs validación (aclarar si es editable)
+- Fotos requeridas para IA (validación preventiva faltante)
+- Filtrado de productos por rol (confirmar aplicación en venta manual)
+
+**Dependencias No Desarrolladas:**
+- **Crítico:** EP2 (Gestión de Inventario) sin spec en openspec/specs/
+- Se necesita IStockValidationService e IInventoryService.CreateSaleMovement
+- IFileStorageService mencionado en backend spec pero no verificado
+
+---
+
+## Prompt sobre Respuestas a Preguntas de Aclaración
+
+Respuestas a Preguntas de Aclaración:
+1. Se puede vender mas de una unidad en la misma transaccion.
+2. No debe permitirse seleccionar el metodo de pago desactivado. SI por alguna razon llegase a seleccionarlo (por ejemplo antes de desactivarlo) devolver un error.
+3. Es posible adjuntar una foto.
+4. Venta y actualizacion de inventario tienen que hacerse en la misma transaccion para evitar incongruencias.
+5. ambas validaciones
+6. Es un campo de anotaciones generico. Puede ser utilizado por todas tus ipotesis
+7. Mostrar el score de confianza
+8. No estoy seguro, el 40% seria un buen porcentaje entre seguridad y operatividad? 
+9. solo si la venta se completa
+10. Si, tiene que poder entrenarse de nuevo. Seria muy costoso reentrenarlo cada vez que se sube una foto? Hay una alternativa que mantenga el modelo siempre actualizado cuando se añade o elimina una foto de un producto?
+11. No hay limites pero estaria bien comprimirla antes de guardarla. Seria conveniente comprimirla antes de procesarla o perjudicaria el reconocimeinto de imagenes?
+12. Viene redirigido
+13. No se guarda y viene descartada
+14. Si ningun producto asignado tiene fotos se enseña un mensaje de error y un enlace a la funcionalidad de venta manual
+
+Propuestas de Mejora:
+1. Ok
+2. Ok
+3. Esta mejora la dejamos para la fase 2.
+
+Análisis de Incongruencias y Dependencias:
+1. Quantity es editable.
+2. Ya se ha aclarado previamente en la respuesta a la pregunta 14 de aclaraciones.
+3. Confirmo, solo pueden manejar los productos asignados.
+
+Incongruencias:
+En openspec hay la spec add-inventory-management. Si en esa spec no se hay la parte de control de inventario que se requiere para esta propuesta, añadir la parte flatante a las specs de add-inventory-management.
+
+---
+
+### Respuesta del asistente - Propuesta OpenSpec Creada
+
+Se creó la propuesta OpenSpec completa `add-sales-and-image-recognition` con:
+
+**Estructura completa:**
+- `proposal.md` - Why, What, Impact, Scope Clarifications
+- `design.md` - 7 decisiones técnicas críticas detalladas
+- `tasks.md` - 223 tareas organizadas en 20 secciones
+- `specs/sales-management/spec.md` - 8 requirements, 40+ scenarios
+- `specs/image-recognition/spec.md` - 9 requirements, 30+ scenarios
+
+**Decisiones técnicas clave:**
+
+1. **Client-Side ML Inference:** TensorFlow.js con MobileNetV2 (~14MB, <500ms inferencia)
+2. **Umbral de Confianza:** 40% (equilibrio precisión/operatividad)
+3. **Transacciones Atómicas:** Sale + SalePhoto + InventoryMovement + Stock Update
+4. **Compresión de Fotos:** JPEG 80%, max 1920x1920px, <= 2MB
+5. **Re-entrenamiento:** Trigger manual via POST /api/image-recognition/retrain (5-30 min)
+6. **Versionado:** Timestamp-based v{num}_{YYYYMMDD}
+7. **Check de Versión:** SIEMPRE cuando hay conectividad (no restricción de 24h)
+
+**Actualizaciones a add-inventory-management:**
+- Añadido: IStockValidationService para validación de stock
+- Añadido: IInventoryService.CreateSaleMovement para movimientos automáticos
+- Añadido: Validación de asignación producto al POS
+- Añadido: Advertencia de stock bajo después de venta
+
+**Validación:** ✅ `openspec validate add-sales-and-image-recognition --strict` pasado
+
+---
+
+## Prompt sobre Control de Versiones del Modelo Local
+
+Si el modelo está guardado en el dispositivo movil, como se controla si el modelo local es la ultima version? Hay un check de versiones sobre el modelo local respecto al modelo remoto?
+
+---
+
+### Respuesta del asistente - Estrategia de Versionado Detallada
+
+Sí, el mecanismo de control de versiones está incluido en la propuesta. Se actualizó con detalles completos:
+
+**Formato de Versionado:**
+```
+v{número}_{YYYYMMDD}
+Ejemplo: "v2_20260111"
+```
+
+**Metadata API Response:**
+```json
+{
+  "version": "v2_20260111",
+  "last_trained_at": "2026-01-11T14:30:00Z",
+  "accuracy_metrics": {
+    "top_1_accuracy": 0.75,
+    "top_3_accuracy": 0.89
+  },
+  "model_url": "/api/image-recognition/model?version=v2_20260111",
+  "model_size_bytes": 14680064
+}
+```
+
+**Estrategia de Verificación:**
+- Check en cada acceso a la funcionalidad (cuando hay conectividad)
+- Comparación de versión cacheada vs servidor
+- Descarga automática en background si hay nueva versión
+- Uso de modelo cacheado mientras se verifica
+
+**6 Nuevos Escenarios añadidos a la spec:**
+1. Version check with network connectivity (verificación con red)
+2. Version check without network connectivity (uso cacheado sin red)
+3. Version check frequency (cada acceso cuando online)
+4. Outdated model notification (notificación si >7 días desactualizado)
+5. Manual model update trigger (actualización manual por usuario)
+6. Model metadata response format (formato JSON del metadata)
+
+---
+
+## Prompt sobre Check de Versión Sin Restricción de Tiempo
+
+No. En el escenario conectado, el check de version se tiene que ejecutar siempre, no solo si han pasado mas de 24 horas. El resto de escenarios son correctos. Modifica la propuesta.
+
+---
+
+### Respuesta del asistente - Actualización de Estrategia
+
+Se modificó la propuesta para eliminar la restricción de 24 horas:
+
+**Cambio en specs/image-recognition/spec.md:**
+```markdown
+- **WHEN** operator accesses image recognition functionality
+- **AND** device has internet connection
+- **THEN** frontend ALWAYS fetches model metadata from server (no time restriction)
+- **NOTE**: Version check executes on every access when online to ensure latest model
+```
+
+**Eliminado:** Escenario "Version check frequency" con restricción de 24 horas
+
+**Nuevo Diagrama de Flujo:**
+```
+Operator opens image recognition
+         ↓
+Load model from IndexedDB cache
+         ↓
+Network available?
+         ↓
+    Yes ──────────────────── No
+     ↓                        ↓
+Fetch metadata (background)  Use cached model
+     ↓                        (offline mode)
+Compare versions
+     ↓
+Same? ────── Different?
+  ↓              ↓
+Use cached    Download new model (background)
+```
+
+**Estrategia simplificada:**
+- Con red: SIEMPRE verifica versión (sin lógica de timestamps)
+- Sin red: Usa modelo cacheado silenciosamente
+
+**Validación:** ✅ Propuesta actualizada y validada
+
+---
+
+## Prompt sobre Escenarios Offline No Implementados en MVP
+
+Perfecto. Los escenarios offline no están contemplados en esta fase. Aunque estén documentados no quiero incluirlos en el desarrollo actual.
+
+---
+
+### Respuesta del asistente - Alcance MVP Clarificado
+
+Se actualizó la propuesta para clarificar que **escenarios offline están documentados pero NO se implementan en MVP:**
+
+**Añadido a proposal.md - Sección "Scope Clarifications":**
+
+**MVP Scope (This Phase):**
+- ✅ Sales registration (manual and with image recognition)
+- ✅ Image recognition with online model version check
+- ✅ Model retraining capability
+- ✅ Transaction-based inventory updates
+- ✅ Photo compression and storage
+
+**Deferred to Phase 2 (Documented but NOT Implemented):**
+- ⏭️ Offline model usage (cached model when no network)
+- ⏭️ Progressive Web App offline capabilities
+- ⏭️ Push notifications for new model versions
+- ⏭️ Automatic model retraining triggers
+
+**Cambios en design.md:**
+- Título actualizado: "Model Versioning and Update Strategy (MVP: Online-Only)"
+- Network Error Behavior: Display error "Se requiere conexión a internet", redirect to manual entry
+- Fase 2 enhancements documentados pero diferidos
+
+**Cambios en tasks.md:**
+- Task 13.2: "Implement model download (online only - NO caching in MVP)"
+- Task 13.10: "Require network connectivity for image recognition"
+- Task 12.7: "Add network connectivity check"
+- Task 12.15: "Add network error handling"
+
+**Nota en specs/image-recognition/spec.md:**
+```markdown
+**MVP Scope Note:** This specification documents complete functionality 
+including offline scenarios. However, offline capabilities (cached model 
+usage, IndexedDB storage) are deferred to Phase 2. MVP implementation 
+requires network connectivity for image recognition.
+```
+
+**Comportamiento MVP Final:**
+| Escenario | Comportamiento |
+|-----------|----------------|
+| Usuario CON red | ✅ Descarga/verifica modelo, ejecuta inferencia |
+| Usuario SIN red | ⚠️ Error "Se requiere conexión", botón "Registrar venta manual" |
+| Nueva versión | ✅ Descarga automática desde servidor |
+| Modelo cacheado | ❌ NO implementado en MVP |
+| Uso offline | ❌ NO implementado en MVP |
+
+**Validación:** ✅ `openspec validate add-sales-and-image-recognition --strict` pasado
+
+**Propuesta lista para aprobación e implementación del MVP (online-only).**
+
+---
+
+## Prompt sobre Criterios de Re-entrenamiento del Modelo
+
+No me queda claro como se decide cuando re-entrenar el modelo. Como se haria y como sabe el usuario administrador (los operadores no deben tener acceso a esta funcionalidad) cuando es necesario actualizar el modelo? Que coste en tiempo y computacional podria tener esta operacion cada vez con los volumenes especificados?
+
+---
+
+### Respuesta del asistente - Análisis y Propuesta de Sistema de Scoring
+
+Se identificó que la propuesta no detallaba suficientemente los criterios de re-entrenamiento. Se propuso una solución completa:
+
+**Sistema de Scoring para Decidir Cuándo Re-entrenar:**
+
+| Criterio | Condición | Nivel de Alerta | Ejemplo |
+|----------|-----------|-----------------|---------|
+| Precisión baja | Top-3 accuracy <70% | 🔴 CRÍTICO | Operadores seleccionan fuera de top-3 |
+| Muchos productos nuevos | ≥20% productos añadidos | 🔴 CRÍTICO | 100 nuevos de 500 = 20% |
+| Productos moderados | ≥10% productos añadidos | 🟠 ALTA PRIORIDAD | 50 nuevos de 500 = 10% |
+| Muchos cambios de fotos | ≥20% fotos añadidas | 🟠 ALTA PRIORIDAD | 500 de 2,500 = 20% |
+| Fotos eliminadas | ≥10% fotos eliminadas | 🟠 ALTA PRIORIDAD | 250 de 2,500 = 10% |
+| Modelo antiguo + cambios | >30 días + cambios | 🟠 ALTA PRIORIDAD | 45 días + 30 productos nuevos |
+| Modelo muy antiguo | >60 días | 🟡 RECOMENDADO | Modelo de hace 2 meses |
+
+**Dashboard de Administrador Propuesto (/admin/ai-model):**
+- Estado del modelo (versión, fecha, precisión, alerta)
+- Métricas de catálogo (productos con/sin fotos, nuevos no en modelo)
+- Métricas de fotos (añadidas, eliminadas, cambio neto)
+- Métricas de precisión (Fase 2 opcional)
+- Botones: "Re-entrenar Modelo Ahora", "Ver Historial"
+
+**Notificaciones Propuestas:**
+- Toast en login admin si estado CRÍTICO o ALTA PRIORIDAD
+- Badge en menú lateral si ALTA PRIORIDAD
+- Email semanal con resumen (opcional)
+
+**Cálculo de Costes con Volúmenes del Proyecto:**
+
+Datos: ~500 productos, ~2,500 fotos, augmentation ×3 = ~7,500 imágenes
+
+| Fase | CPU (sin GPU) | GPU (T4) | GPU (A100) |
+|------|---------------|----------|------------|
+| Descarga fotos | 2-3 min | 2-3 min | 2-3 min |
+| Data augmentation | 3-5 min | 1-2 min | 1-2 min |
+| Fine-tuning (10-20 epochs) | 20-40 min | 5-10 min | 2-4 min |
+| Export TF.js | 1-2 min | 1-2 min | 1-2 min |
+| Upload modelo | 1-2 min | 1-2 min | 1-2 min |
+| **TOTAL** | **27-52 min** | **10-19 min** | **7-13 min** |
+
+**Opciones de Infraestructura:**
+1. **CPU en backend existente:** $0, 30-45 min (recomendado MVP)
+2. **Lambda/Functions CPU:** $0.10-0.50/ejecución (timeout corto)
+3. **Spot Instance GPU:** $0.05-0.15/ejecución, 15 min (recomendado producción)
+4. **SageMaker/Azure ML:** $0.15-0.50/ejecución (costoso para free-tier)
+
+**Recomendación MVP:** CPU en backend existente ($0 adicional, ejecutar de noche)
+
+---
+
+## Prompt sobre Aprobación de Propuesta con Cambios
+
+Propuesta aprobada pero con los siguientes cambios:
+- Notificacion Toast para estado critico y tambien para alta prioridad. Elimina la notificacion con badge y el email semanal
+- Utiliza la Opción 1: CPU en backend existente. No se utilizarán servicios externos.
+
+---
+
+### Respuesta del asistente - Actualización Final de Propuesta
+
+Se aplicaron los cambios solicitados a la propuesta:
+
+**Añadido a design.md - Decision 8: Model Retraining Triggers and Admin Notifications:**
+
+**Infraestructura de Training:**
+- ✅ CPU en backend existente (BackgroundService)
+- ❌ Sin servicios externos (Lambda, Spot, SageMaker)
+- **Coste:** $0 adicional
+- **Duración:** 30-45 minutos promedio
+- **Ejecución:** Asíncrona, no bloquea API
+- **Recomendación:** Ejecutar fuera de horario (noche)
+
+**Estrategia de Notificaciones:**
+- ✅ Toast en login admin para CRÍTICO y ALTA PRIORIDAD
+- ❌ Badge eliminado (simplificación UX)
+- ❌ Email eliminado (admin revisa dashboard cuando necesita)
+
+**Añadido a specs/image-recognition/spec.md - Nuevo Requirement:**
+
+**Admin Dashboard for Model Health Monitoring** con 8 escenarios:
+1. Display model health dashboard (métricas completas)
+2. Calculate retraining alert level (lógica de scoring)
+3. Show toast on admin login (CRÍTICO y ALTA)
+4. Critical alert for low precision (<70%)
+5. High priority alert for catalog changes
+6. OK status when model current
+7. Precision metrics unavailable MVP (Fase 2)
+8. Hide dashboard from operators (solo admin)
+
+**Añadido a tasks.md:**
+- Nueva sección 8A: Backend Model Health Service (11 tareas)
+- Sección 8: +2 tareas (endpoint /model/health, /retrain/status)
+- Sección 15: +6 tareas (dashboard cards, toast, scoring)
+- Sección 6: Detalles de duración por fase del training
+
+**Total tareas actualizado:** 234 tareas (antes: 223)
+
+**Validación:** ✅ `openspec validate add-sales-and-image-recognition --strict` pasado
+
+**Propuesta final lista para implementación con:**
+- Dashboard completo con métricas automatizadas
+- Sistema de scoring con criterios claros
+- Toast notifications para CRÍTICO y ALTA PRIORIDAD
+- Training en CPU backend ($0 adicional, 30-45 min)
+- Sin servicios externos
+
+---

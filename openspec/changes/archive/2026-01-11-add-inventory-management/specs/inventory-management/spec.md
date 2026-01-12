@@ -261,3 +261,70 @@ The system SHALL enforce non-negative stock validation at application level, pre
 - **AND** validates result >= 0 before applying change
 - **AND** returns error if validation fails
 
+### Requirement: Automatic Inventory Movement Creation on Sale
+
+The system SHALL automatically create InventoryMovement records when sales are registered, updating stock quantities and maintaining full audit trail. This operation must occur within the same database transaction as the sale creation to ensure data consistency.
+
+#### Scenario: Create movement on successful sale
+
+- **WHEN** a sale is successfully registered via sales-management capability
+- **AND** the sale reduces product stock by specified quantity
+- **THEN** system creates InventoryMovement record with type "Sale"
+- **AND** sets QuantityBefore to current stock
+- **AND** sets QuantityChange to negative quantity sold (e.g., -2 for selling 2 units)
+- **AND** sets QuantityAfter to new stock quantity
+- **AND** links movement to Sale via SaleId
+- **AND** records User who performed the sale
+- **AND** sets MovementDate to sale timestamp
+- **AND** updates Inventory.Quantity atomically in same transaction
+
+#### Scenario: Rollback on transaction failure
+
+- **WHEN** sale creation or inventory movement creation fails
+- **THEN** system rolls back entire transaction
+- **AND** ensures sale record is not created if inventory update fails
+- **AND** ensures inventory is not updated if sale creation fails
+- **AND** returns error to calling service
+
+### Requirement: Stock Availability Validation Service
+
+The system SHALL provide a shared service (IStockValidationService) for validating product stock availability before sales, ensuring products are assigned to the point of sale and have sufficient quantity.
+
+#### Scenario: Validate sufficient stock and assignment
+
+- **WHEN** sales-management capability validates stock before creating sale
+- **AND** product has Inventory record at point of sale with IsActive = true
+- **AND** current Quantity >= requested quantity
+- **THEN** validation service returns success
+- **AND** includes current available quantity in response
+
+#### Scenario: Reject sale for unassigned product
+
+- **WHEN** sales-management attempts to validate stock for product
+- **AND** product has no Inventory record at point of sale
+- **OR** Inventory record has IsActive = false
+- **THEN** validation service returns error: "El producto no está asignado a este punto de venta"
+- **AND** prevents sale from proceeding
+
+#### Scenario: Reject sale for insufficient stock
+
+- **WHEN** sales-management validates stock for product
+- **AND** product is assigned (IsActive = true)
+- **AND** current Quantity < requested quantity
+- **THEN** validation service returns error: "Stock insuficiente. Disponible: X, Solicitado: Y"
+- **AND** includes available quantity in error message
+- **AND** prevents sale from proceeding
+
+#### Scenario: Low stock warning after sale
+
+- **WHEN** validation service is called with checkThreshold = true
+- **AND** stock after sale would be <= MinimumThreshold (if configured)
+- **THEN** validation returns success with lowStockWarning flag
+- **AND** includes remaining stock quantity
+- **NOTE**: Warning does not block sale, only informs
+
+#### Scenario: Validate stock for multiple units
+
+- **WHEN** sale includes quantity > 1
+- **THEN** validation service checks current stock >= total quantity requested
+- **AND** applies same validation rules as single unit sales

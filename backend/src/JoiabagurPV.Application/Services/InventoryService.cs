@@ -488,6 +488,106 @@ public class InventoryService : IInventoryService
 
     #endregion
 
+    #region Sales Integration Operations
+
+    /// <inheritdoc/>
+    public async Task<SaleMovementResult> CreateSaleMovementAsync(
+        Guid productId,
+        Guid pointOfSaleId,
+        Guid saleId,
+        int quantity,
+        Guid userId)
+    {
+        // Validate quantity
+        if (quantity <= 0)
+        {
+            return new SaleMovementResult
+            {
+                Success = false,
+                ErrorMessage = "La cantidad debe ser mayor que cero."
+            };
+        }
+
+        // Find inventory
+        var inventory = await _inventoryRepository.FindByProductAndPointOfSaleAsync(productId, pointOfSaleId);
+
+        if (inventory == null || !inventory.IsActive)
+        {
+            return new SaleMovementResult
+            {
+                Success = false,
+                ErrorMessage = "El producto no está asignado a este punto de venta."
+            };
+        }
+
+        // Validate sufficient stock
+        if (inventory.Quantity < quantity)
+        {
+            return new SaleMovementResult
+            {
+                Success = false,
+                ErrorMessage = $"Stock insuficiente. Disponible: {inventory.Quantity}, Solicitado: {quantity}."
+            };
+        }
+
+        var quantityBefore = inventory.Quantity;
+        var quantityAfter = quantityBefore - quantity;
+
+        await _unitOfWork.BeginTransactionAsync();
+
+        try
+        {
+            // Update inventory (atomic operation)
+            inventory.Quantity = quantityAfter;
+            inventory.LastUpdatedAt = DateTime.UtcNow;
+            await _inventoryRepository.UpdateAsync(inventory);
+
+            // Create movement record
+            var movement = new InventoryMovement
+            {
+                InventoryId = inventory.Id,
+                SaleId = saleId,
+                UserId = userId,
+                MovementType = MovementType.Sale,
+                QuantityChange = -quantity, // Negative for sales
+                QuantityBefore = quantityBefore,
+                QuantityAfter = quantityAfter,
+                Reason = null, // Sales don't need a reason
+                MovementDate = DateTime.UtcNow
+            };
+
+            await _movementRepository.AddAsync(movement);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation(
+                "Sale movement created for product {ProductId} at POS {PointOfSaleId} (Sale {SaleId}): {Before} -> {After} (-{Quantity})",
+                productId, pointOfSaleId, saleId, quantityBefore, quantityAfter, quantity);
+
+            return new SaleMovementResult
+            {
+                Success = true,
+                Inventory = MapToDto(inventory, inventory.Product, inventory.PointOfSale),
+                Movement = MapMovementToDto(movement, inventory),
+                QuantityBefore = quantityBefore,
+                QuantityAfter = quantityAfter
+            };
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Error during sale movement creation, transaction rolled back");
+            
+            return new SaleMovementResult
+            {
+                Success = false,
+                ErrorMessage = "Error al crear el movimiento de venta. La transacción ha sido revertida."
+            };
+        }
+    }
+
+    #endregion
+
     #region Private Methods
 
     private static InventoryDto MapToDto(Inventory inventory, Product? product, PointOfSale? pointOfSale)
@@ -504,6 +604,29 @@ public class InventoryService : IInventoryService
             IsActive = inventory.IsActive,
             LastUpdatedAt = inventory.LastUpdatedAt,
             CreatedAt = inventory.CreatedAt
+        };
+    }
+
+    private static InventoryMovementDto MapMovementToDto(InventoryMovement movement, Inventory inventory)
+    {
+        return new InventoryMovementDto
+        {
+            Id = movement.Id,
+            InventoryId = movement.InventoryId,
+            ProductId = inventory.ProductId,
+            ProductSku = inventory.Product?.SKU ?? string.Empty,
+            ProductName = inventory.Product?.Name ?? string.Empty,
+            PointOfSaleId = inventory.PointOfSaleId,
+            PointOfSaleName = inventory.PointOfSale?.Name ?? string.Empty,
+            MovementType = movement.MovementType,
+            QuantityChange = movement.QuantityChange,
+            QuantityBefore = movement.QuantityBefore,
+            QuantityAfter = movement.QuantityAfter,
+            Reason = movement.Reason,
+            UserId = movement.UserId,
+            UserName = movement.User?.FullName ?? string.Empty,
+            MovementDate = movement.MovementDate,
+            CreatedAt = movement.CreatedAt
         };
     }
 

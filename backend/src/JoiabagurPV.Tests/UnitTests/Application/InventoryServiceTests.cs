@@ -509,5 +509,183 @@ public class InventoryServiceTests
     }
 
     #endregion
+
+    #region CreateSaleMovement Tests
+
+    [Fact]
+    public async Task CreateSaleMovement_WithSufficientStock_ShouldSucceed()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var saleId = Guid.NewGuid();
+        var product = TestDataGenerator.CreateProduct();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var inventory = TestDataGenerator.CreateInventory(
+            productId: product.Id,
+            pointOfSaleId: pos.Id,
+            isActive: true,
+            quantity: 20);
+        inventory.Product = product;
+        inventory.PointOfSale = pos;
+
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync(inventory);
+        _inventoryRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Inventory>()))
+            .ReturnsAsync((Inventory i) => i);
+        _movementRepositoryMock.Setup(x => x.AddAsync(It.IsAny<InventoryMovement>()))
+            .ReturnsAsync((InventoryMovement m) => m);
+
+        // Act
+        var result = await _sut.CreateSaleMovementAsync(product.Id, pos.Id, saleId, 5, userId);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.QuantityBefore.Should().Be(20);
+        result.QuantityAfter.Should().Be(15);
+        inventory.Quantity.Should().Be(15);
+
+        _movementRepositoryMock.Verify(x => x.AddAsync(It.Is<InventoryMovement>(m =>
+            m.MovementType == MovementType.Sale &&
+            m.SaleId == saleId &&
+            m.QuantityChange == -5 &&
+            m.QuantityBefore == 20 &&
+            m.QuantityAfter == 15 &&
+            m.UserId == userId
+        )), Times.Once);
+
+        _unitOfWorkMock.Verify(x => x.BeginTransactionAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.CommitTransactionAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateSaleMovement_WithInsufficientStock_ShouldReturnError()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var saleId = Guid.NewGuid();
+        var product = TestDataGenerator.CreateProduct();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var inventory = TestDataGenerator.CreateInventory(
+            productId: product.Id,
+            pointOfSaleId: pos.Id,
+            isActive: true,
+            quantity: 3);
+        inventory.Product = product;
+        inventory.PointOfSale = pos;
+
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync(inventory);
+
+        // Act
+        var result = await _sut.CreateSaleMovementAsync(product.Id, pos.Id, saleId, 5, userId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Stock insuficiente");
+        result.ErrorMessage.Should().Contain("Disponible: 3");
+        result.ErrorMessage.Should().Contain("Solicitado: 5");
+
+        // Verify no changes were made
+        _inventoryRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Inventory>()), Times.Never);
+        _movementRepositoryMock.Verify(x => x.AddAsync(It.IsAny<InventoryMovement>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateSaleMovement_WithUnassignedProduct_ShouldReturnError()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var saleId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var posId = Guid.NewGuid();
+
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(productId, posId))
+            .ReturnsAsync((Inventory?)null);
+
+        // Act
+        var result = await _sut.CreateSaleMovementAsync(productId, posId, saleId, 5, userId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("no está asignado");
+    }
+
+    [Fact]
+    public async Task CreateSaleMovement_WithInactiveInventory_ShouldReturnError()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var saleId = Guid.NewGuid();
+        var product = TestDataGenerator.CreateProduct();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var inventory = TestDataGenerator.CreateInventory(
+            productId: product.Id,
+            pointOfSaleId: pos.Id,
+            isActive: false,
+            quantity: 20);
+        inventory.Product = product;
+        inventory.PointOfSale = pos;
+
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync(inventory);
+
+        // Act
+        var result = await _sut.CreateSaleMovementAsync(product.Id, pos.Id, saleId, 5, userId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("no está asignado");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public async Task CreateSaleMovement_WithInvalidQuantity_ShouldReturnError(int quantity)
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var saleId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var posId = Guid.NewGuid();
+
+        // Act
+        var result = await _sut.CreateSaleMovementAsync(productId, posId, saleId, quantity, userId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("debe ser mayor que cero");
+    }
+
+    [Fact]
+    public async Task CreateSaleMovement_TransactionRollback_OnException()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var saleId = Guid.NewGuid();
+        var product = TestDataGenerator.CreateProduct();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var inventory = TestDataGenerator.CreateInventory(
+            productId: product.Id,
+            pointOfSaleId: pos.Id,
+            isActive: true,
+            quantity: 20);
+        inventory.Product = product;
+        inventory.PointOfSale = pos;
+
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync(inventory);
+        _inventoryRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Inventory>()))
+            .ThrowsAsync(new Exception("Database error"));
+
+        // Act
+        var result = await _sut.CreateSaleMovementAsync(product.Id, pos.Id, saleId, 5, userId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Error al crear el movimiento de venta");
+        _unitOfWorkMock.Verify(x => x.RollbackTransactionAsync(), Times.Once);
+    }
+
+    #endregion
 }
 

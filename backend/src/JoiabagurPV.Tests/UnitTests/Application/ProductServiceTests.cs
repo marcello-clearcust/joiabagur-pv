@@ -5,6 +5,7 @@ using JoiabagurPV.Application.Services;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
+using JoiabagurPV.Domain.Interfaces.Services;
 using JoiabagurPV.Tests.TestHelpers;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -20,6 +21,7 @@ public class ProductServiceTests
     private readonly Mock<ICollectionRepository> _collectionRepositoryMock;
     private readonly Mock<IInventoryRepository> _inventoryRepositoryMock;
     private readonly Mock<IUserPointOfSaleService> _userPointOfSaleServiceMock;
+    private readonly Mock<IFileStorageService> _fileStorageServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<ProductService>> _loggerMock;
     private readonly ProductService _sut;
@@ -30,6 +32,7 @@ public class ProductServiceTests
         _collectionRepositoryMock = new Mock<ICollectionRepository>();
         _inventoryRepositoryMock = new Mock<IInventoryRepository>();
         _userPointOfSaleServiceMock = new Mock<IUserPointOfSaleService>();
+        _fileStorageServiceMock = new Mock<IFileStorageService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<ProductService>>();
 
@@ -38,6 +41,7 @@ public class ProductServiceTests
             _collectionRepositoryMock.Object,
             _inventoryRepositoryMock.Object,
             _userPointOfSaleServiceMock.Object,
+            _fileStorageServiceMock.Object,
             _unitOfWorkMock.Object,
             _loggerMock.Object);
     }

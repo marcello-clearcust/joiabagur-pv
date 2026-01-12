@@ -46,6 +46,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IStockImportService, StockImportService>();
         services.AddScoped<IInventoryMovementService, InventoryMovementService>();
+        services.AddScoped<IStockValidationService, StockValidationService>();
 
         return services;
     }

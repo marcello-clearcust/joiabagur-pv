@@ -80,5 +80,26 @@ public interface IInventoryService
     Task<StockAdjustmentResult> AdjustStockAsync(StockAdjustmentRequest request, Guid userId);
 
     #endregion
+
+    #region Sales Integration Operations
+
+    /// <summary>
+    /// Creates a sale movement and updates stock automatically.
+    /// Used by sales-management to record inventory movements during sale.
+    /// </summary>
+    /// <param name="productId">The ID of the product sold.</param>
+    /// <param name="pointOfSaleId">The ID of the point of sale.</param>
+    /// <param name="saleId">The ID of the sale.</param>
+    /// <param name="quantity">The quantity sold (positive number).</param>
+    /// <param name="userId">The ID of the user who made the sale.</param>
+    /// <returns>The movement creation result.</returns>
+    Task<SaleMovementResult> CreateSaleMovementAsync(
+        Guid productId, 
+        Guid pointOfSaleId, 
+        Guid saleId, 
+        int quantity, 
+        Guid userId);
+
+    #endregion
 }
 

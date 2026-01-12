@@ -74,9 +74,9 @@
 - [x] 7.4 Unit tests for duplicate SKU detection (T-EP1-001-009)
 - [x] 7.5 Unit tests for automatic collection creation (T-EP1-001-009)
 - [x] 7.6 Unit tests for transaction rollback scenarios (T-EP1-001-009)
-- [ ] 7.7 Integration tests for POST /api/products/import endpoint (T-EP1-001-010) - Deferred to integration test phase
-- [ ] 7.8 Integration tests for authentication/authorization (T-EP1-001-010) - Deferred to integration test phase
-- [ ] 7.9 Integration tests with real Excel files and Testcontainers (T-EP1-001-010) - Deferred to integration test phase
+- [x] 7.7 Integration tests for POST /api/products/import endpoint (T-EP1-001-010)
+- [x] 7.8 Integration tests for authentication/authorization (T-EP1-001-010)
+- [x] 7.9 Integration tests with real Excel files and Testcontainers (T-EP1-001-010)
 
 ## 8. Frontend - Import Page
 
@@ -89,7 +89,7 @@
 - [x] 8.7 Add progress indicator during import (T-EP1-001-011)
 - [x] 8.8 Add results summary display (created, updated, errors) (T-EP1-001-011)
 - [x] 8.9 Add route and navigation menu entry for import page (T-EP1-001-011)
-- [ ] 8.10 Add template download link to help/documentation pages
+- [x] 8.10 Add template download link to help/documentation pages
 
 ## 9. Frontend Testing
 
@@ -123,17 +123,17 @@
 
 ## 12. Product Update - Testing
 
-- [ ] 12.1 Integration tests for PUT /api/products/{id} endpoint (T-EP1-003-003)
-- [ ] 12.2 Test successful product update (T-EP1-003-003)
-- [ ] 12.3 Test SKU immutability enforcement (T-EP1-003-003)
-- [ ] 12.4 Test validation errors (invalid price, missing fields) (T-EP1-003-003)
-- [ ] 12.5 Test 404 for non-existent product (T-EP1-003-003)
-- [ ] 12.6 Test authentication and authorization (T-EP1-003-003)
-- [ ] 12.7 Component tests for ProductEditPage (T-EP1-003-004)
-- [ ] 12.8 Test form pre-population (T-EP1-003-004)
-- [ ] 12.9 Test SKU field disabled state (T-EP1-003-004)
-- [ ] 12.10 Test form validation and submission (T-EP1-003-004)
-- [ ] 12.11 MSW mocks for update endpoint (T-EP1-003-004)
+- [x] 12.1 Integration tests for PUT /api/products/{id} endpoint (T-EP1-003-003)
+- [x] 12.2 Test successful product update (T-EP1-003-003)
+- [x] 12.3 Test SKU immutability enforcement (T-EP1-003-003)
+- [x] 12.4 Test validation errors (invalid price, missing fields) (T-EP1-003-003)
+- [x] 12.5 Test 404 for non-existent product (T-EP1-003-003)
+- [x] 12.6 Test authentication and authorization (T-EP1-003-003)
+- [x] 12.7 Component tests for ProductEditPage (T-EP1-003-004)
+- [x] 12.8 Test form pre-population (T-EP1-003-004)
+- [x] 12.9 Test SKU field disabled state (T-EP1-003-004)
+- [x] 12.10 Test form validation and submission (T-EP1-003-004)
+- [x] 12.11 MSW mocks for update endpoint (T-EP1-003-004)
 
 ## 13. Photo Upload - Backend Service
 
@@ -171,14 +171,14 @@
 
 ## 16. Photo Upload - Testing
 
-- [ ] 16.1 Integration tests for POST /api/products/{id}/photos (deferred)
-- [ ] 16.2 Test successful photo upload (deferred)
-- [ ] 16.3 Test format validation (reject non-JPG/PNG) (deferred)
-- [ ] 16.4 Test size validation (reject > 5MB) (deferred)
-- [ ] 16.5 Test automatic primary designation (deferred)
-- [ ] 16.6 Test 404 for non-existent product (deferred)
-- [ ] 16.7 Component tests for ProductPhotoUpload (deferred)
-- [ ] 16.8 Test drag-and-drop interactions (deferred)
-- [ ] 16.9 Test file validation feedback (deferred)
-- [ ] 16.10 MSW mocks for photo upload endpoint (deferred)
+- [x] 16.1 Integration tests for POST /api/products/{id}/photos
+- [x] 16.2 Test successful photo upload
+- [x] 16.3 Test format validation (reject non-JPG/PNG)
+- [x] 16.4 Test size validation (reject > 5MB)
+- [x] 16.5 Test automatic primary designation
+- [x] 16.6 Test 404 for non-existent product
+- [x] 16.7 Component tests for ProductPhotoUpload
+- [x] 16.8 Test drag-and-drop interactions
+- [x] 16.9 Test file validation feedback
+- [x] 16.10 MSW mocks for photo upload endpoint
 

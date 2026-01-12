@@ -172,6 +172,16 @@ public class ProductService : IProductService
 
         _logger.LogInformation("Product updated: {SKU} - {Name}", product.SKU, product.Name);
 
+        // Load the Collection navigation property if CollectionId is set
+        if (product.CollectionId.HasValue)
+        {
+            product.Collection = await _collectionRepository.GetByIdAsync(product.CollectionId.Value);
+        }
+        else
+        {
+            product.Collection = null;
+        }
+
         return await MapToDtoAsync(product);
     }
 

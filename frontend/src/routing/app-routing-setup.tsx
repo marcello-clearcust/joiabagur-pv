@@ -19,7 +19,11 @@ const InventoryAdjustPage = lazy(() => import('@/pages/inventory/adjust'));
 const InventoryMovementsPage = lazy(() => import('@/pages/inventory/movements'));
 const InventoryCentralizedPage = lazy(() => import('@/pages/inventory/centralized'));
 const SalesPage = lazy(() => import('@/pages/sales'));
+const ManualSalesPage = lazy(() => import('@/pages/sales/new'));
+const ImageRecognitionSalesPage = lazy(() => import('@/pages/sales/new-image'));
+const SalesHistoryPage = lazy(() => import('@/pages/sales/history'));
 const ReturnsPage = lazy(() => import('@/pages/returns'));
+const AIModelPage = lazy(() => import('@/pages/admin/ai-model'));
 const PaymentMethodsPage = lazy(() => import('@/pages/payment-methods'));
 const UsersPage = lazy(() => import('@/pages/users'));
 const PointsOfSalePage = lazy(() => import('@/pages/points-of-sale'));
@@ -59,7 +63,10 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.INVENTORY.ROOT} element={<InventoryPage />} />
             <Route path={ROUTES.INVENTORY.STOCK} element={<InventoryPage />} />
             <Route path={ROUTES.INVENTORY.MOVEMENTS} element={<InventoryMovementsPage />} />
-            <Route path={ROUTES.SALES} element={<SalesPage />} />
+            <Route path={ROUTES.SALES.ROOT} element={<SalesPage />} />
+            <Route path={ROUTES.SALES.NEW} element={<ManualSalesPage />} />
+            <Route path={ROUTES.SALES.NEW_IMAGE} element={<ImageRecognitionSalesPage />} />
+            <Route path={ROUTES.SALES.HISTORY} element={<SalesHistoryPage />} />
             <Route path={ROUTES.RETURNS} element={<ReturnsPage />} />
           </Route>
         </Route>
@@ -81,6 +88,7 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.USERS} element={<UsersPage />} />
             <Route path={ROUTES.POINTS_OF_SALE} element={<PointsOfSalePage />} />
             <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
+            <Route path={ROUTES.AI_MODEL} element={<AIModelPage />} />
           </Route>
         </Route>
 

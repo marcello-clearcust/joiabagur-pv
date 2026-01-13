@@ -667,3 +667,29 @@ Esta arquitectura monolítica simple con contenedores es ideal para el MVP del s
 
 La arquitectura puede evolucionar fácilmente a microservicios o serverless si el proyecto crece significativamente en el futuro.
 
+---
+
+## Documentación Relacionada
+
+### Deploy en Producción
+
+Para instrucciones detalladas sobre el deploy en AWS, consultar:
+
+- **[Guía de Deploy AWS](Guias/deploy-aws-production.md)**: Instrucciones paso a paso para configurar y desplegar la aplicación en AWS (App Runner, RDS, S3, CloudFront).
+
+- **[Comparación AWS vs Azure](Propuestas/comparacion-aws-azure-deploy.md)**: Análisis detallado de pros y contras de ambas plataformas, costos estimados, y justificación de la elección de AWS.
+
+- **[OpenSpec Proposal](../openspec/changes/add-aws-production-deployment/proposal.md)**: Propuesta técnica formal para la implementación del deploy en AWS.
+
+### Decisiones de Arquitectura
+
+| Decisión | Opción Elegida | Justificación |
+|----------|----------------|---------------|
+| **Cloud Provider** | AWS | Experiencia del equipo, free-tier generoso |
+| **Backend Hosting** | App Runner | Simplicidad, auto-scaling, sin gestión de infra |
+| **Database** | RDS PostgreSQL | Managed service, backups automáticos 7 días |
+| **File Storage** | S3 | Madurez, SDK .NET excelente, pre-signed URLs |
+| **Frontend Hosting** | CloudFront + S3 | CDN global, cache eficiente, bajo costo |
+| **Secrets** | Secrets Manager | Seguridad, integración nativa con .NET |
+| **CI/CD** | GitHub Actions | Ya en uso, free-tier generoso, actions oficiales AWS |
+

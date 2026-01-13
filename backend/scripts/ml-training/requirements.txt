@@ -1,0 +1,10 @@
+# Python dependencies for ML model training
+# MobileNetV2 fine-tuning for jewelry product classification
+
+tensorflow==2.15.0
+tensorflowjs==4.16.0
+pillow==10.2.0
+numpy==1.26.3
+scikit-learn==1.4.0
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1

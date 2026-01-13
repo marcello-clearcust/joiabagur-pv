@@ -5,8 +5,14 @@
 
 import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
-import { afterEach, beforeAll, afterAll } from 'vitest';
+import { afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { server } from './mocks/server';
+import { createTensorFlowMock } from './tensorflow-mock';
+
+// Mock TensorFlow.js globally for all tests
+beforeAll(() => {
+  vi.mock('@tensorflow/tfjs', () => createTensorFlowMock());
+});
 
 // Start MSW server before all tests
 // Configure to warn on unhandled requests (fail fast for integration tests)

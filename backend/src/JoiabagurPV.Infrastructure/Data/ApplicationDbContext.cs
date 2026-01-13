@@ -73,6 +73,26 @@ public class ApplicationDbContext : DbContext
     public DbSet<InventoryMovement> InventoryMovements { get; set; }
 
     /// <summary>
+    /// Gets or sets the Sales DbSet.
+    /// </summary>
+    public DbSet<Sale> Sales { get; set; }
+
+    /// <summary>
+    /// Gets or sets the SalePhotos DbSet.
+    /// </summary>
+    public DbSet<SalePhoto> SalePhotos { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ModelMetadata DbSet.
+    /// </summary>
+    public DbSet<ModelMetadata> ModelMetadata { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ModelTrainingJobs DbSet.
+    /// </summary>
+    public DbSet<ModelTrainingJob> ModelTrainingJobs { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>

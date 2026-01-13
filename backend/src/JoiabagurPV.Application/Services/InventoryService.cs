@@ -533,7 +533,9 @@ public class InventoryService : IInventoryService
         var quantityBefore = inventory.Quantity;
         var quantityAfter = quantityBefore - quantity;
 
-        await _unitOfWork.BeginTransactionAsync();
+        // NOTE: This method is designed to be called within an existing transaction
+        // (e.g., from SalesService), so it does NOT manage its own transaction.
+        // The caller is responsible for transaction management and commit/rollback.
 
         try
         {
@@ -558,7 +560,6 @@ public class InventoryService : IInventoryService
 
             await _movementRepository.AddAsync(movement);
             await _unitOfWork.SaveChangesAsync();
-            await _unitOfWork.CommitTransactionAsync();
 
             _logger.LogInformation(
                 "Sale movement created for product {ProductId} at POS {PointOfSaleId} (Sale {SaleId}): {Before} -> {After} (-{Quantity})",
@@ -575,13 +576,12 @@ public class InventoryService : IInventoryService
         }
         catch (Exception ex)
         {
-            await _unitOfWork.RollbackTransactionAsync();
-            _logger.LogError(ex, "Error during sale movement creation, transaction rolled back");
+            _logger.LogError(ex, "Error during sale movement creation");
             
             return new SaleMovementResult
             {
                 Success = false,
-                ErrorMessage = "Error al crear el movimiento de venta. La transacción ha sido revertida."
+                ErrorMessage = "Error al crear el movimiento de venta."
             };
         }
     }

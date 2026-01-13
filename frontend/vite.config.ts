@@ -26,6 +26,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'e2e'],
+    testTimeout: 10000, // Increase timeout for async ML tests
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

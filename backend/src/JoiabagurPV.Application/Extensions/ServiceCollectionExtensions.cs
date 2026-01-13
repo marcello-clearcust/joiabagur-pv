@@ -48,6 +48,18 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInventoryMovementService, InventoryMovementService>();
         services.AddScoped<IStockValidationService, StockValidationService>();
 
+        // Register sales management services
+        services.AddScoped<ISalesService, SalesService>();
+        services.AddScoped<IPaymentMethodValidationService, PaymentMethodValidationService>();
+        services.AddScoped<IImageCompressionService, ImageCompressionService>();
+
+        // Register image recognition services
+        services.AddScoped<IImageRecognitionService, ImageRecognitionService>();
+        services.AddScoped<IModelHealthService, ModelHealthService>();
+
+        // Register background services
+        services.AddHostedService<ModelTrainingBackgroundService>();
+
         return services;
     }
 }

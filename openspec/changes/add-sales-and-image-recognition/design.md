@@ -238,48 +238,79 @@ Use model   Download new model
 - Automatic background download during idle time
 - A/B testing with version pinning per user
 
-### Decision 7: Model Retraining Implementation
+### Decision 7: Browser-Based Model Training (TensorFlow.js)
 
-**What:** Provide admin endpoint to trigger model retraining; manual process in MVP, track last retrain date
+**What:** Model training executes in admin's browser using TensorFlow.js with WebGL GPU acceleration. Trained model is uploaded to server automatically after training completes.
 
 **Why:**
-- **MVP simplicity:** Automated retraining adds complexity (monitoring, failure handling)
-- **Product catalog stability:** ~500 products, photos don't change frequently
-- **Cost control:** Retraining on-demand prevents unnecessary compute costs
+- **Zero dependencies:** No Python, no CLI tools - just a modern browser
+- **Free-tier compatibility:** Keeps AWS App Runner at 0.5GB RAM (no Python/TensorFlow in backend)
+- **GPU acceleration:** Uses admin's GPU via WebGL (faster than server CPU)
+- **Better UX:** One-click training from dashboard, real-time progress updates
+- **Cost control:** $0 additional AWS infrastructure for training
+- **Infrequent operation:** Training only needed when catalog changes significantly (1-2x/month)
 
-**Retraining Workflow (MVP):**
-1. Admin triggers `POST /api/image-recognition/retrain-model`
-2. Backend validates: at least 1 product has ≥1 photo
-3. Backend queues training job (async, returns 202 Accepted)
-4. Training service:
-   - Fetches all ProductPhoto records
-   - Downloads photos from storage
-   - Augments dataset (rotation, brightness, crop)
-   - Fine-tunes MobileNetV2 (10-50 epochs, ~5-30 minutes)
-   - Exports TensorFlow.js model files
-   - Uploads model to storage (versioned path: `/models/v{timestamp}/`)
-   - Updates ModelMetadata table (version, last_trained_at, accuracy_metrics)
-5. Admin receives notification (email/toast) on completion
-6. Frontend automatically uses latest model version on next load
+**Browser Training Workflow (MVP):**
+1. Admin sees retraining alert in dashboard (🔴 CRITICAL or 🟠 HIGH)
+2. Admin clicks "Train Model" button in `/admin/ai-model` dashboard
+3. Browser checks device capabilities (WebGL, memory, battery)
+4. Browser downloads product photos from server (~5-10MB)
+5. Browser loads pre-trained MobileNetV2 from TensorFlow Hub
+6. Browser trains model with transfer learning (15 epochs)
+7. Browser uploads trained model to server automatically
+8. Backend stores model in S3 and updates ModelMetadata
+9. Frontend downloads new model on next access
 
-**Alternative for Continuous Updates (Phase 2):**
-- **Incremental learning:** Add new products to existing model without full retrain
-- **Scheduled retraining:** Trigger nightly if photos changed in last 24h
-- **A/B testing:** Deploy new model to subset of users, measure accuracy before rollout
+**Training UX:**
+```
+╔════════════════════════════════════════════════════════════╗
+║  🧠 Train AI Model                                          ║
+╠════════════════════════════════════════════════════════════╣
+║                                                            ║
+║  Device Check:                                             ║
+║  ✅ GPU detected (WebGL 2.0)                               ║
+║  ✅ Memory: 16GB available                                 ║
+║  ⚠️ On battery - connect to power recommended              ║
+║                                                            ║
+║  Estimated duration: 15-20 minutes                         ║
+║                                                            ║
+║  ⚠️ Keep this browser tab open during training             ║
+║                                                            ║
+║  [Start Training]                                          ║
+╚════════════════════════════════════════════════════════════╝
+```
+
+**Browser Requirements:**
+- Modern browser: Chrome/Edge 90+, Safari 14+, Firefox 88+
+- WebGL 2.0 support (GPU acceleration)
+- 8GB+ RAM recommended (2GB minimum)
+- Stable internet connection
+- **No Python required!** ✅
+
+**Training Duration:**
+- With GPU (WebGL): 10-20 minutes
+- Without GPU (WASM fallback): 30-60 minutes
+
+**Server-Side Training: DISABLED**
+- Server-side training is explicitly disabled
+- No Python runtime on server
+- No BackgroundService for ML training
+- All training happens client-side in browser
 
 **Alternatives Considered:**
-- **Automatic retraining on photo upload:** Rejected (too frequent, costly, complex)
-- **Manual model upload:** Rejected (requires ML expertise from admin)
+- **Python local scripts:** Rejected (requires Python installation, poor UX)
+- **Server-side training (BackgroundService):** Rejected and DISABLED (requires 2-4GB RAM, exceeds free-tier)
+- **AWS Lambda:** Rejected (15-min timeout insufficient)
+- **ECS Fargate Spot:** Rejected (not in free-tier)
 
-### Decision 8: Model Retraining Triggers and Admin Notifications
+### Decision 8: Model Health Dashboard and Alerts
 
-**What:** Provide admin dashboard with model health metrics and automated alerts to determine when to retrain; execute training on backend CPU (no external services)
+**What:** Provide admin dashboard with model health metrics and automated alerts to determine when local retraining is needed.
 
 **Why:**
 - **Clear criteria:** Admin needs objective metrics to decide when retraining is necessary
 - **Visibility:** Dashboard shows model staleness, catalog changes, and precision metrics
-- **Cost control:** CPU training in existing backend = $0 additional infrastructure cost
-- **Simplicity:** No external services (Lambda, Spot Instances) reduces operational complexity
+- **Proactive alerts:** Toast notifications ensure admin doesn't miss critical retraining needs
 
 **Retraining Decision Criteria (Scoring System):**
 
@@ -309,6 +340,7 @@ Use model   Download new model
    - Last trained date (e.g., "12 days ago")
    - Current accuracy (e.g., "78% top-3")
    - Alert level with icon and recommendation
+   - "Download Training Guide" button
 
 2. Catalog Metrics:
    - Total products: 500
@@ -329,7 +361,8 @@ Use model   Download new model
    - Average inference time: 320ms
 
 5. Action Buttons:
-   - "Re-train Model Now" (triggers POST /api/image-recognition/retrain)
+   - "Download Photos for Training" (triggers photo export)
+   - "Upload Trained Model" (file upload to S3)
    - "View Training History" (shows past versions and metrics)
 ```
 
@@ -338,63 +371,24 @@ Use model   Download new model
 - ❌ **Badge removed:** No persistent badge in sidebar (simplified UX)
 - ❌ **Email removed:** No email notifications (admin checks dashboard when needed)
 
-**Training Infrastructure (MVP):**
-- **Execution:** CPU in existing backend container (ASP.NET Core background service)
-- **No external services:** No Lambda, Spot Instances, SageMaker, etc.
-- **Cost:** $0 additional (uses existing backend resources)
-- **Duration:** 30-45 minutes with CPU
-- **Async execution:** Training runs in background, doesn't block API requests
-- **CPU throttling:** No CPU limits (faster training)
-- **Admin warning:** Display recommendation to train during off-hours (night) in confirmation dialog
-- **Performance impact:** Training may temporarily slow down other API operations (mitigate by scheduling at night)
-
-**Training Job Flow:**
-```
-1. Admin sees 🟠 HIGH alert toast on login
-2. Admin navigates to /admin/ai-model dashboard
-3. Admin reviews metrics (45 new products, 127 new photos)
-4. Admin clicks "Re-train Model Now"
-5. Confirmation modal: "Re-training will take ~30-45 minutes. Continue?"
-6. Backend creates async job (BackgroundService)
-7. Frontend polls /api/image-recognition/retrain/status/{jobId} every 10s
-8. Progress shown: "Re-training... 35% (Epoch 7/20) - ~12 min remaining"
-9. Completion: "✅ Model updated to v4_20260111. Precision: 82% (+4%)"
-10. Operators receive new model automatically on next access
-```
-
-**Training Performance (CPU - Existing Backend):**
+**Training Performance (Local Machine):**
 
 With project volumes (~500 products, ~2,500 photos):
 
-| Phase | Duration (CPU) |
-|-------|----------------|
-| Fetch photos from storage | 2-3 min |
-| Data augmentation (×3) | 3-5 min |
-| Fine-tune MobileNetV2 (10-20 epochs) | 20-40 min |
-| Export to TensorFlow.js | 1-2 min |
-| Upload to storage | 1-2 min |
-| **Total** | **27-52 min** |
-
-**Expected average:** 35-40 minutes
-
-**Resource Considerations:**
-- CPU usage spike during training (mitigate by scheduling at night)
-- Memory: ~2-4GB for model + dataset (within typical backend allocation)
-- Disk: ~5GB temporary storage for photos (cleaned after training)
-- Network: ~5GB download from S3/Storage (internal transfer = fast + free)
+| Phase | Duration (GPU Laptop) | Duration (CPU Only) |
+|-------|----------------------|---------------------|
+| Download photos from S3 | 2-3 min | 2-3 min |
+| Data augmentation (×3) | 1-2 min | 3-5 min |
+| Fine-tune MobileNetV2 (20 epochs) | 5-10 min | 20-40 min |
+| Export to TensorFlow.js | 1-2 min | 1-2 min |
+| Upload to S3 | 1-2 min | 1-2 min |
+| **Total** | **10-20 min** | **30-50 min** |
 
 **Precision Tracking (Optional - Phase 2):**
 - Track when operator selects product from AI suggestions
 - Log: suggested products (top-3) vs. selected product
 - Calculate accuracy: % of times selected product was in top-3
 - Store in `AIInferenceLog` table (deferred to Phase 2)
-
-**Alternatives Considered:**
-- **GPU Spot Instances:** Rejected (requires external service, adds complexity, violates constraint)
-- **Scheduled automatic retraining:** Rejected for MVP (manual trigger simpler, better cost control)
-- **Email notifications:** Rejected (toast on login sufficient, reduces noise)
-- **Persistent badge:** Rejected (toast is less intrusive, dashboard shows status)
-- **CPU throttling:** Rejected (slower training, complexity; admin warning preferred)
 
 ### Decision 9: Variable Number of Suggestions Based on Confidence
 
@@ -621,6 +615,86 @@ GET /api/products/{id}/photos/{photoId}/file
 - **Persistent badge:** Rejected (toast is less intrusive, dashboard shows status)
 - **CPU throttling:** Rejected (slower training, complexity; admin warning preferred)
 - **Progressive model download:** Deferred to Phase 2 (simplifies MVP UX, adds state complexity)
+
+### Decision 16: Browser-Based Training Only (TensorFlow.js) - MVP Feature
+
+**What:** ML model training is executed in admin's browser using TensorFlow.js; server-side training is DISABLED; Python scripts are NOT provided.
+
+**Why:**
+- **Zero dependencies:** No Python installation required - just a modern browser
+- **Free-tier compatibility:** Keeps AWS App Runner at 0.5GB RAM (no Python/TensorFlow on server)
+- **GPU acceleration:** Uses admin's GPU via WebGL (often faster than server CPU)
+- **Better UX:** One-click training from dashboard, real-time progress
+- **Cost control:** $0 additional AWS infrastructure
+- **Simpler deployment:** Docker image ~200MB (.NET only), no multi-runtime complexity
+- **Infrequent operation:** Training only needed when catalog changes significantly (1-2x/month)
+
+**Browser Training Workflow (MVP):**
+1. Admin sees retraining alert in dashboard (🔴 CRITICAL or 🟠 HIGH)
+2. Admin clicks "Train Model" button
+3. Browser checks device capabilities (WebGL, memory, battery)
+4. Browser downloads product photos from server
+5. Browser trains model with TensorFlow.js (15 epochs, transfer learning)
+6. Browser uploads trained model automatically
+7. Backend stores model in S3, updates ModelMetadata
+8. Frontend downloads new model on next access
+
+**Admin Dashboard UI (MVP):**
+```
+Model Status Card:
+- Current version: v3_20260105
+- Last trained: 12 days ago
+- Accuracy: 78% top-3
+- Alert level: 🟠 HIGH (45 new products)
+
+Device Capabilities:
+- GPU: ✅ Detected (WebGL 2.0)
+- Memory: ✅ 16GB available
+- Estimated time: 15-20 minutes
+
+[Train Model] - Train directly in browser
+
+⚠️ Keep this tab open during training
+```
+
+**Browser Requirements:**
+- Modern browser: Chrome/Edge 90+, Safari 14+, Firefox 88+
+- WebGL 2.0 support
+- 8GB+ RAM recommended (2GB minimum)
+- **No Python required!** ✅
+
+**Training Duration:**
+- With GPU (WebGL): 10-20 minutes
+- Without GPU (WASM): 30-60 minutes
+
+**Server-Side Training: DISABLED**
+- No server-side training option in UI
+- No BackgroundService for ML training
+- No Python runtime on server
+- Retrain endpoint removed or returns 501 Not Implemented
+
+**Python Scripts: NOT PROVIDED**
+- No `scripts/ml/` directory
+- No Python dependencies
+- All training is browser-based
+
+**Limitations:**
+- Admin must keep browser tab open during training
+- Training performance depends on admin's hardware
+- Not suitable for automated/scheduled training
+
+**Alternatives Considered and Rejected:**
+- **Python local scripts:** Rejected (requires Python installation, poor UX)
+- **Server-side training:** Rejected and DISABLED (exceeds free-tier)
+- **Hybrid (both options):** Rejected (unnecessary complexity, browser is sufficient)
+- **ML.NET training:** Rejected (no TensorFlow.js export)
+
+**Trade-offs:**
+- ✅ Zero dependencies (just browser)
+- ✅ Better UX (one-click training)
+- ✅ GPU acceleration (faster on modern hardware)
+- ⚠️ Must keep tab open (10-60 minutes)
+- ⚠️ No automated/scheduled training (acceptable for MVP, infrequent operation)
 
 ## Risks / Trade-offs
 

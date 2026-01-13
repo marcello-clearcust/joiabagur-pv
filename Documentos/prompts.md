@@ -2735,3 +2735,168 @@ Se aplicaron los cambios solicitados a la propuesta:
 - Sin servicios externos
 
 ---
+
+## Prompt about Despliegue en producción, análisis y decisión de entrenamiento ML
+
+### Prompt 1: Comparación AWS vs Azure
+
+Eres experto en AWS, Azure y deploy de aplicaciones en esas plataformas. Crea una comparacion con pros y contras de ambas plataformas para efectuar el deploy de backen y frontend de este proyecto. Ten en cuenta:
+- Facilidad de configuracion e implementacion de la infraestructura
+- Capa free-tier para las primeras fase del proyecto (MVP)
+- Implementaciones no realizadas especificas para la plataforma que se eligirá. Por ejemplo File Storage actualmente utiliza el filesystem de la maquina; valorar como cambia segun la plataforma y averiguar si hace falta hacer implementaciones especificas.
+
+Hazme al menos 5 preguntas para aclarar dudas antes de hacer el analisis.
+
+---
+
+**Respuesta:** Se realizaron 7 preguntas de clarificación sobre experiencia previa, presupuesto, ubicación de inferencia ML, regiones, DevOps, escalabilidad y tolerancia a downtime.
+
+---
+
+### Prompt 2: Respuestas a preguntas de clarificación
+
+1. Experiencia en AWS pero dispuesto a aprender Azure si es la mejor opcion por otros factores.
+2. No hay presupuesto definido pero la idea es gastar lo menos posible.
+3. El reconocimeinto se hará client side. El modelo se creará en la misma instancia donde corre el backend.
+4. No
+5. Realmente las DevOps son opcionales y no hay una eleccion clara. Puedes proponer la que mejor se adapte (siempre teniendo en cuenta los costos). Github se eligió por ser gratis, si no me equivoco.
+6. La aplicacion nose preveé que escale en usuarios.
+7. Es aceptable un downtime planificado para mantenimiento
+
+Además ten en cuenta que se necesita tener un backup diario al menos de la base de datos, manteniendo al menos los ultimos 7 dias.
+
+---
+
+**Respuesta:** Análisis completo AWS vs Azure creado en `Documentos/Propuestas/comparacion-aws-azure-deploy.md`:
+- **Recomendación:** AWS (experiencia del equipo, menor curva de aprendizaje)
+- **Servicios AWS:** App Runner, RDS PostgreSQL, S3, CloudFront, Secrets Manager
+- **Costos estimados:** $0-5/mes free-tier, ~$25-45/mes post free-tier
+- **Backup:** RDS con retención 7 días incluido
+
+---
+
+### Prompt 3: Crear propuesta OpenSpec para AWS
+
+Perfecto. Elegimos AWS.
+- Crea openspec proposal para implementar el File Storage en AWS S3 para produccion.
+- Añade al analisis tambien el deploy de la base de datos en produccion, teniendo en cuenta como y donde definir credenciales de acceso (igual que las de AWS no pueden estar en claro en Github).
+- Crea una guia detallada para el deploy en Documentos y actualiza la documentacion y sus referencias. Añade tambien la referencia de este analisis a la documentacion donde sea necesario.
+
+---
+
+**Respuesta:** Creada propuesta OpenSpec `add-aws-production-deployment`:
+- **proposal.md:** S3FileStorageService, Secrets Manager, RDS PostgreSQL con backups
+- **design.md:** 5 decisiones técnicas (S3, Secrets Manager, RDS, App Runner, GitHub Actions)
+- **tasks.md:** 52 tareas de implementación
+- **specs/backend/spec.md:** Delta de requisitos
+
+Documentación creada:
+- `Documentos/Guias/deploy-aws-production.md` - Guía completa de despliegue
+- Actualizado `README.md` con referencias a nueva documentación
+
+---
+
+### Prompt 4: Consideración de Python para ML
+
+Has considerado que el backend necesita ejecutar codigo Pyton para la cracion del modelo para el reconocimiento de fotos? Esto está contemplado en la propuesta actual de arquitectura?
+
+---
+
+**Respuesta:** Identificado gap en la propuesta. El entrenamiento ML requiere:
+- Python + TensorFlow (2-4GB RAM)
+- App Runner original: 0.5GB RAM (insuficiente)
+
+**Dos opciones propuestas:**
+- **Opción A:** Multi-runtime Docker (Python + .NET en mismo contenedor, 2GB RAM)
+- **Opción B:** Servicio separado ECS Fargate Spot (solo para training)
+
+---
+
+### Prompt 5: Elegir opción A
+
+Ok, la opcion A es la mejor solucion. Actualiza la propuesta.
+
+---
+
+**Respuesta:** Propuesta actualizada con:
+- Multi-runtime Dockerfile (Python 3.11 + .NET 10 + TensorFlow)
+- App Runner: 2GB RAM (vs 0.5GB original)
+- Tamaño imagen: ~2-3GB
+- Costo estimado: $10-15/mes (excede parcialmente free-tier)
+- BackgroundService para invocar Python training via Process.Start
+
+---
+
+### Prompt 6: Análisis de burst mode para mantener free-tier
+
+Teniendo en cuenta que el modelo de ML se ejecuta con poca frecuencia, seria posible dejar las especificaciones de AWS como antes, sin salirse de la capa de free-tier? Las instancias de App Runner tienen un burst mode para picos de trabajo, como las de EC2? De ese modo podemos mantener la instancia pequeña y aprovechar el Burst mode solo para esos picos de trabajo que coinciden con la creacion del modelo. Analiza todos los aspectos y dame un verdicto. Segun tu respuesta decidiremos como abordar el tema.
+
+---
+
+**Respuesta:** Análisis exhaustivo de opciones:
+
+**App Runner NO tiene burst mode.** A diferencia de EC2 (T3 con CPU credits), App Runner escala horizontalmente (más instancias), no verticalmente.
+
+**Alternativas analizadas:**
+| Opción | Costo | Complejidad | Free-tier |
+|--------|-------|-------------|-----------|
+| A. Multi-runtime 2GB RAM | ~$15-25/mes | Baja | ❌ No |
+| B. Lambda + Layer | $0.50-1/training | Media | ❌ Timeout 15min |
+| C. ECS Fargate Spot | $0.50-1/training | Alta | ❌ No |
+| D. EC2 Spot manual | ~$0.10-0.20/training | Muy alta | ⚠️ Parcial |
+| **E. Training Local** | **$0** | **Mínima** | **✅ Sí** |
+
+**Veredicto: Opción E - Entrenamiento Local**
+- Admin ejecuta Python en su laptop (8-16GB RAM típico)
+- App Runner se mantiene en 0.5GB RAM (free-tier)
+- Scripts proporcionados: download_photos.py, train_model.py, upload_model.py
+- Dashboard para upload de modelo entrenado
+- Duración training: 10-20 min GPU, 30-50 min CPU
+
+---
+
+### Prompt 7: Sincronizar propuestas OpenSpec
+
+Elegimos entrenamiento local. EL desarrollo ya está definido en la propuesta openspec "add-sales-and-image-recognition". Actualiza esta propuesta para sincronizar especificaciones y evitar incongruencias.
+
+---
+
+**Respuesta:** Sincronización completa de ambas propuestas:
+
+**Propuesta `add-sales-and-image-recognition`:**
+- `proposal.md`: Actualizado a entrenamiento local, eliminado dual-mode
+- `design.md`: Decision 7 → Local training workflow, Decision 8 → Dashboard métricas, Decision 16 → Local-only
+- `specs/image-recognition/spec.md`: Requisitos actualizados para upload modelo
+- `tasks.md`: Nota explicativa añadida, secciones 17B, 19, 20, 21 actualizadas
+- Eliminados: `CLIENT_SIDE_TRAINING_NOW_IN_MVP.md`, `PHASE2_CLIENT_SIDE_TRAINING.md`
+
+**Propuesta `add-aws-production-deployment`:**
+- `proposal.md`: Revertido a .NET only, 0.5GB RAM, Docker ~200MB
+- `design.md`: Decision 6 → Local training, Decision 7 → Free-tier App Runner
+- `specs/backend/spec.md`: Eliminados requisitos multi-runtime
+- `tasks.md`: Secciones reescritas para .NET-only
+
+**Documentación actualizada:**
+- `deploy-aws-production.md`: App Runner 0.5GB, costos $1-6/mes
+- `comparacion-aws-azure-deploy.md`: Tabla costos actualizada
+
+**Arquitectura final MVP:**
+```
+PRODUCCIÓN (AWS):
+  App Runner (.NET only, 0.5GB) ← CloudFront
+         ↓
+  RDS PostgreSQL ←→ S3 (photos, models)
+                     ↑ Upload model
+LOCAL (Admin Laptop):
+  scripts/ml/*.py → Training → Upload S3
+```
+
+**Beneficios:**
+- ✅ AWS 100% free-tier
+- ✅ Docker ~200MB (deploy rápido)
+- ✅ Training en hardware potente del admin
+- ✅ $0 adicional por training
+
+**Validación:** ✅ Ambas propuestas OpenSpec válidas
+
+---

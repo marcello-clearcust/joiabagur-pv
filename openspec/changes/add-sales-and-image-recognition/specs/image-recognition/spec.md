@@ -191,71 +191,62 @@ The system SHALL preprocess captured photos to optimize ML inference quality and
 - **AND** system redirects to manual entry if all confidences < 40%
 - **AND** operator can retake photo with better lighting/focus
 
-### Requirement: Model Retraining Capability
+### Requirement: Browser-Based Model Training Capability
 
-The system SHALL provide administrators with the ability to retrain the ML model when product catalog changes (products added/removed, photos updated), ensuring model accuracy remains high.
+The system SHALL support model training executed in administrator's browser using TensorFlow.js, with automatic upload of trained models to storage. No Python installation required.
 
-#### Scenario: Trigger model retraining
+#### Scenario: Check device capabilities before training
 
-- **WHEN** authenticated administrator sends POST /api/image-recognition/retrain
-- **THEN** system validates at least one product has >= 1 photo in ProductPhoto table
-- **AND** returns 400 Bad Request if no photos exist
-- **AND** if photos exist, system queues async training job
-- **AND** returns 202 Accepted with status URL: /api/image-recognition/retrain/status/{jobId}
+- **WHEN** administrator clicks "Train Model" button
+- **THEN** browser checks WebGL 2.0 support (GPU acceleration)
+- **AND** browser checks available memory (recommend 8GB+, minimum 2GB)
+- **AND** browser checks battery status (warn if on battery)
+- **AND** displays estimated training duration (GPU: 15-20min, CPU: 45-60min)
+- **AND** shows device capability summary (GPU detected: Yes/No, Memory: XGB)
 
-#### Scenario: Monitor retraining progress
+#### Scenario: Download photos for browser training
 
-- **WHEN** administrator requests GET /api/image-recognition/retrain/status/{jobId}
-- **THEN** system returns job status: "queued", "in_progress", "completed", "failed"
-- **AND** includes progress percentage if in_progress (e.g., "Training epoch 5/10")
-- **AND** includes estimated time remaining
-- **AND** returns completion timestamp if completed
+- **WHEN** administrator confirms training start
+- **THEN** browser fetches product photos from GET /api/products/photos/training-dataset
+- **AND** downloads photos in parallel batches (10 photos per batch)
+- **AND** displays download progress (X/Y photos - Z MB downloaded)
+- **AND** photos are held in memory (not saved to disk)
 
-#### Scenario: Execute model training
+#### Scenario: Execute browser training
 
-- **WHEN** training job starts
-- **THEN** backend fetches all ProductPhoto records from database
-- **AND** downloads photo files from storage (IFileStorageService)
-- **AND** applies data augmentation (rotation ±15°, brightness ±20%, random crop)
-- **AND** fine-tunes MobileNetV2 model on jewelry dataset (transfer learning)
-- **AND** trains for 10-50 epochs (early stopping based on validation loss)
-- **AND** exports trained model to TensorFlow.js format (.json + .bin files)
-- **AND** uploads model to storage with versioned path: /models/v{timestamp}/
-- **AND** updates ModelMetadata table (version, last_trained_at, accuracy_metrics)
-- **AND** training completes in 5-30 minutes (depending on dataset size)
+- **WHEN** photos are downloaded successfully
+- **THEN** browser loads pre-trained MobileNetV2 from TensorFlow Hub
+- **AND** applies data augmentation (rotation ±15°, brightness ±20%, flip, zoom ±10%)
+- **AND** adds custom classification head for product classes
+- **AND** trains for 15 epochs with validation split 0.2
+- **AND** displays training progress (Epoch X/15, Accuracy: Y%, Loss: Z)
+- **AND** training uses WebGL GPU acceleration if available (WASM fallback)
 
-#### Scenario: Prevent concurrent retraining
+#### Scenario: Upload trained model automatically
 
-- **WHEN** training job is in progress
-- **AND** administrator triggers another retrain request
-- **THEN** system returns 409 Conflict with error: "Ya hay un entrenamiento en progreso"
-- **AND** provides link to existing job status
+- **WHEN** browser training completes successfully
+- **THEN** browser saves checkpoint to IndexedDB (backup)
+- **AND** browser uploads trained model to POST /api/image-recognition/upload-trained-model
+- **AND** displays upload progress (X MB / Y MB uploaded)
+- **AND** server validates model format and stores in /ml-models/v{version}/
+- **AND** server updates ModelMetadata table (version, uploaded_at, accuracy_metrics)
+- **AND** displays success message with model version and accuracy
 
-#### Scenario: Notify on training completion
+#### Scenario: Validate uploaded model
 
-- **WHEN** training job completes successfully
-- **THEN** system sends notification to administrator (email or system notification)
-- **AND** includes new model version, accuracy metrics (top-1, top-3 accuracy)
-- **AND** frontend automatically detects new version on next model load
-- **AND** downloads and caches new model for operators
+- **WHEN** model files are uploaded to server
+- **THEN** system validates model.json exists and is valid TensorFlow.js format
+- **AND** validates weight data is complete and correct size
+- **AND** validates total model size is within limits (<20MB)
+- **AND** rejects upload if validation fails with descriptive error
 
-#### Scenario: Handle training failure
+#### Scenario: Keep browser tab open during training
 
-- **WHEN** training job fails (insufficient data, training errors, storage errors)
-- **THEN** system sets job status to "failed"
-- **AND** logs error details for debugging
-- **AND** sends error notification to administrator
-- **AND** preserves previous model version (no deployment of failed model)
-- **AND** frontend continues serving previous valid model
-- **AND** application never becomes model-less if valid model exists
-
-#### Scenario: Rollback to previous model on failure
-
-- **WHEN** training completes but model validation fails (corrupted export, upload error)
-- **THEN** system does not update ModelMetadata table
-- **AND** does not delete or overwrite previous model files in storage
-- **AND** GET /api/image-recognition/model continues serving previous version
-- **AND** dashboard shows previous model as "active" with warning "Last training failed"
+- **WHEN** training is in progress
+- **THEN** browser displays prominent warning: "⚠️ Keep this tab open during training"
+- **AND** browser shows beforeunload warning if user tries to close tab
+- **AND** training progress updates in real-time (no polling)
+- **AND** admin cannot navigate away without warning
 
 #### Scenario: Initial deployment without model
 
@@ -264,18 +255,33 @@ The system SHALL provide administrators with the ability to retrain the ML model
 - **THEN** GET /api/image-recognition/model returns 404 Not Found
 - **AND** GET /api/image-recognition/model/metadata returns empty or null
 - **AND** frontend detects no model available
-- **AND** image recognition option is hidden or shows "No disponible (entrenar modelo primero)"
+- **AND** image recognition option shows "No disponible (entrenar modelo primero)"
+- **AND** admin dashboard shows "Train First Model" button
 - **AND** only manual sales entry is available
 
 #### Scenario: First model training after deployment
 
 - **WHEN** administrator uploads product photos (via EP1)
-- **AND** navigates to /admin/ai-model dashboard
-- **AND** dashboard shows "No hay modelo entrenado aún"
-- **AND** triggers first training
-- **THEN** system trains initial model
-- **AND** deploys model to storage
+- **AND** trains first model via browser dashboard
+- **THEN** browser trains model using TensorFlow.js
+- **AND** browser uploads trained model to server
+- **AND** server stores model and updates ModelMetadata
 - **AND** image recognition becomes available for operators
+
+#### Scenario: Preserve previous model on new training
+
+- **WHEN** administrator trains new model version
+- **THEN** system does not delete previous model files
+- **AND** previous model remains accessible via versioned path
+- **AND** ModelMetadata history preserves all versions
+- **AND** admin can rollback by updating metadata to point to previous version (Phase 2)
+
+#### Scenario: Server-side training disabled
+
+- **WHEN** POST /api/image-recognition/retrain is called
+- **THEN** system returns 501 Not Implemented
+- **AND** response message: "Server-side training is disabled. Use browser-based training."
+- **AND** no BackgroundService or Python scripts are executed
 
 ### Requirement: Model Metadata and Versioning
 

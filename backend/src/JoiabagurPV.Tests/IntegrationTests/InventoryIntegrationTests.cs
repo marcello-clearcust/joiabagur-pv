@@ -4,6 +4,7 @@ using JoiabagurPV.Application.DTOs.Inventory;
 using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Enums;
+using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -650,13 +651,18 @@ public class InventoryIntegrationTests : IAsyncLifetime
             .FirstAsync(i => i.ProductId == _testProduct1!.Id && i.PointOfSaleId == _testPos1!.Id);
         var initialQuantity = initialInventory.Quantity;
 
-        // Act - Create sale movement
+        // Act - Create sale movement (must be within transaction per design change)
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        await unitOfWork.BeginTransactionAsync();
+        
         var result = await inventoryService.CreateSaleMovementAsync(
             _testProduct1!.Id,
             _testPos1!.Id,
             saleId,
             3,
             userId);
+
+        await unitOfWork.CommitTransactionAsync();
 
         // Assert
         result.Should().NotBeNull();

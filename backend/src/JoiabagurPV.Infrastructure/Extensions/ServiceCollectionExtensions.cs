@@ -67,6 +67,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICollectionRepository, CollectionRepository>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IInventoryMovementRepository, InventoryMovementRepository>();
+        services.AddScoped<ISaleRepository, SaleRepository>();
+        services.AddScoped<ISalePhotoRepository, SalePhotoRepository>();
+        services.AddScoped<IModelMetadataRepository, ModelMetadataRepository>();
+        services.AddScoped<IModelTrainingJobRepository, ModelTrainingJobRepository>();
 
         // Register unit of work
         services.AddScoped<IUnitOfWork, UnitOfWork>();

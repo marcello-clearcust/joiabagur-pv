@@ -76,4 +76,12 @@ public interface IImageRecognitionService
     /// </summary>
     /// <returns>Training dataset with photo metadata.</returns>
     Task<TrainingDatasetResponse> GetTrainingDatasetAsync();
+
+    /// <summary>
+    /// Gets the product IDs that a user can access based on their role and assigned points of sale.
+    /// </summary>
+    /// <param name="userId">The user ID (null for anonymous).</param>
+    /// <param name="isAdmin">Whether the user is an administrator.</param>
+    /// <returns>Set of accessible product IDs, or null if admin (has access to all).</returns>
+    Task<HashSet<Guid>?> GetAccessibleProductIdsAsync(Guid? userId, bool isAdmin);
 }

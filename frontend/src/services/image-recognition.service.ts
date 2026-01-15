@@ -1,15 +1,38 @@
 /**
  * Image Recognition Inference Service (EP4 - Section 13A)
  * Client-side TensorFlow.js inference for product identification.
+ * 
+ * Uses MobileNetV2 as feature extractor + trained classification head.
  */
 
 import * as tf from '@tensorflow/tfjs';
 import { imageRecognitionService } from './sales.service';
 import type { ProductSuggestion } from '@/types/sales.types';
 
-const CONFIDENCE_THRESHOLD = 0.4; // 40% confidence threshold
+const CONFIDENCE_THRESHOLD = 0.4; // 40% confidence threshold for individual suggestions
+const MIN_TOP_CONFIDENCE = 0.5; // 50% minimum for top prediction to be valid
+const DOMINANCE_RATIO = 1.5; // Top prediction must be 1.5x higher than second
+const MAX_ENTROPY_THRESHOLD = 2.0; // Maximum entropy for valid predictions
 const IMAGE_SIZE = 224; // MobileNetV2 input size
 const MAX_SUGGESTIONS = 5;
+
+// MobileNetV2 feature extractor URL (same as training)
+const MOBILENET_URL = 'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/feature_vector/3/default/1';
+
+// Cache for loaded models to avoid reloading
+let cachedFeatureExtractor: tf.GraphModel | null = null;
+let cachedClassificationHead: tf.LayersModel | null = null;
+let cachedModelVersion: string | null = null;
+let cachedClassLabels: string[] | null = null;
+
+/**
+ * Stored class labels from training (saved in class_labels.json).
+ */
+interface StoredClassLabels {
+  labels: string[];
+  trainedAt: string;
+  version: string;
+}
 
 export interface DeviceCapabilities {
   hasWebGL: boolean;
@@ -108,11 +131,13 @@ export async function validateImageDimensions(
 
   const avgBrightness = sumBrightness / (data.length / 4);
 
-  // Reject if too dark (avg < 20) or too bright (avg > 235)
-  if (avgBrightness < 20) {
+  // Reject if too dark/bright.
+  // Note: many product photos are shot on white backgrounds, so be permissive on the bright side.
+  // Keep only extreme cases to avoid blocking normal catalog photos.
+  if (avgBrightness < 5) {
     return { isValid: false, error: 'La imagen es demasiado oscura' };
   }
-  if (avgBrightness > 235) {
+  if (avgBrightness > 250) {
     return { isValid: false, error: 'La imagen es demasiado clara' };
   }
 
@@ -138,36 +163,258 @@ export async function preprocessImage(imageElement: HTMLImageElement): Promise<t
 }
 
 /**
- * Load model from server.
+ * Load MobileNetV2 feature extractor from TensorFlow Hub.
+ * Cached to avoid reloading on every inference.
  */
-export async function loadModel(version: string): Promise<tf.GraphModel> {
+async function loadFeatureExtractor(): Promise<tf.GraphModel> {
+  if (cachedFeatureExtractor) {
+    return cachedFeatureExtractor;
+  }
+  
+  try {
+    console.log('Loading MobileNetV2 feature extractor...');
+    cachedFeatureExtractor = await tf.loadGraphModel(MOBILENET_URL, { fromTFHub: true });
+    console.log('MobileNetV2 loaded successfully');
+    return cachedFeatureExtractor;
+  } catch (error) {
+    console.error('Failed to load MobileNetV2:', error);
+    throw new Error('Error al cargar el extractor de características');
+  }
+}
+
+/**
+ * Load class labels from the model's class_labels.json file.
+ * These are the labels used during training and must match the model output indices.
+ */
+async function loadClassLabels(version: string): Promise<string[]> {
+  // Return cached if same version
+  if (cachedClassLabels && cachedModelVersion === version) {
+    return cachedClassLabels;
+  }
+  
+  try {
+    const classLabelsUrl = imageRecognitionService.getModelUrl(version, 'class_labels.json');
+    const cacheBustedUrl = `${classLabelsUrl}${classLabelsUrl.includes('?') ? '&' : '?'}cb=${Date.now()}`;
+    
+    const response = await fetch(cacheBustedUrl, { credentials: 'include' });
+    
+    if (!response.ok) {
+      console.warn('class_labels.json not found, falling back to API class labels');
+      // Fallback to API for older models that don't have class_labels.json
+      const apiLabels = await imageRecognitionService.getClassLabels();
+      cachedClassLabels = apiLabels.classLabels;
+      return cachedClassLabels;
+    }
+    
+    const data: StoredClassLabels = await response.json();
+    console.log(`Loaded ${data.labels.length} class labels from model ${version}`);
+    cachedClassLabels = data.labels;
+    return cachedClassLabels;
+  } catch (error) {
+    console.warn('Failed to load class_labels.json, falling back to API:', error);
+    // Fallback to API
+    const apiLabels = await imageRecognitionService.getClassLabels();
+    cachedClassLabels = apiLabels.classLabels;
+    return cachedClassLabels;
+  }
+}
+
+/**
+ * Load classification head model from server.
+ */
+export async function loadModel(version: string): Promise<tf.LayersModel> {
+  // Return cached model if same version
+  if (cachedClassificationHead && cachedModelVersion === version) {
+    return cachedClassificationHead;
+  }
+  
   try {
     const modelUrl = imageRecognitionService.getModelUrl(version, 'model.json');
-    const model = await tf.loadGraphModel(modelUrl);
-    return model;
+    const cacheBustedUrl = `${modelUrl}${modelUrl.includes('?') ? '&' : '?'}cb=${Date.now()}`;
+    
+    // Browser-trained models are LayersModel format (classification head)
+    try {
+      cachedClassificationHead = await tf.loadLayersModel(cacheBustedUrl, {
+        requestInit: { credentials: 'include' },
+      });
+    } catch (layersError) {
+      // Backward-compat fallback: if a GraphModel is served, try graph loader
+      const graph = await tf.loadGraphModel(cacheBustedUrl, {
+        requestInit: { credentials: 'include' },
+      });
+      cachedClassificationHead = graph as unknown as tf.LayersModel;
+    }
+    
+    cachedModelVersion = version;
+    return cachedClassificationHead;
   } catch (error) {
-    console.error('Failed to load model:', error);
+    console.error('Failed to load classification model:', error);
     throw new Error('Error al cargar el modelo de IA');
   }
 }
 
 /**
- * Run inference on preprocessed image.
+ * Extract features from preprocessed image using MobileNetV2.
  */
-export async function runInference(
-  model: tf.GraphModel,
-  preprocessedImage: tf.Tensor3D
-): Promise<tf.Tensor> {
+async function extractImageFeatures(preprocessedImage: tf.Tensor3D): Promise<tf.Tensor2D> {
+  const featureExtractor = await loadFeatureExtractor();
+  
   return tf.tidy(() => {
-    // Add batch dimension
+    // Add batch dimension [1, 224, 224, 3]
     const batched = preprocessedImage.expandDims(0);
     
-    // Run inference
-    const predictions = model.predict(batched) as tf.Tensor;
+    // Extract features using MobileNetV2
+    const features = featureExtractor.predict(batched) as tf.Tensor;
     
-    // Remove batch dimension
-    return predictions.squeeze();
+    // MobileNetV2 outputs [1, 1, 1, 1280], reshape to [1, 1280]
+    return features.reshape([1, -1]) as tf.Tensor2D;
   });
+}
+
+/**
+ * Run inference on preprocessed image.
+ * Uses MobileNetV2 for feature extraction, then classification head.
+ */
+export async function runInference(
+  model: tf.LayersModel,
+  preprocessedImage: tf.Tensor3D
+): Promise<tf.Tensor> {
+  // Step 1: Extract features using MobileNetV2
+  const features = await extractImageFeatures(preprocessedImage);
+  
+  try {
+    // Step 2: Run classification head on features
+    const predictions = tf.tidy(() => {
+      const result = (model as any).predict(features) as tf.Tensor;
+      // Remove batch dimension
+      return result.squeeze();
+    });
+    
+    return predictions;
+  } finally {
+    // Clean up features tensor
+    features.dispose();
+  }
+}
+
+/**
+ * Validate if predictions indicate a known product (not out-of-distribution).
+ * Uses multiple heuristics to detect when the model is uncertain or the image
+ * doesn't match any known product category.
+ */
+export interface PredictionValidation {
+  isValid: boolean;
+  reason?: string;
+  topConfidence: number;
+  entropy: number;
+  dominanceRatio: number;
+  numClasses: number;
+}
+
+export async function validatePredictions(predictions: tf.Tensor): Promise<PredictionValidation> {
+  const confidences = await predictions.data();
+  const confidenceArray = Array.from(confidences);
+  const numClasses = confidenceArray.length;
+  
+  // Sort confidences descending
+  const sortedConfidences = [...confidenceArray].sort((a, b) => b - a);
+  const topConfidence = sortedConfidences[0];
+  const secondConfidence = sortedConfidences[1] || 0;
+  
+  // Calculate entropy: H = -sum(p * log2(p)) for non-zero probabilities
+  // Higher entropy = more uncertainty = less confident prediction
+  let entropy = 0;
+  for (const p of confidenceArray) {
+    if (p > 1e-10) { // Avoid log(0)
+      entropy -= p * Math.log2(p);
+    }
+  }
+  
+  // Normalize entropy by maximum possible entropy for this number of classes
+  // Max entropy = log2(numClasses) when all classes have equal probability
+  const maxEntropy = Math.log2(numClasses);
+  const normalizedEntropy = maxEntropy > 0 ? entropy / maxEntropy : 0;
+  
+  // Calculate dominance ratio (how much the top prediction dominates)
+  const dominanceRatio = secondConfidence > 0 ? topConfidence / secondConfidence : Infinity;
+  
+  // Adjust thresholds based on number of classes
+  // With fewer classes, we need different validation strategies
+  let requiredConfidence = MIN_TOP_CONFIDENCE;
+  let requiredDominance = DOMINANCE_RATIO;
+  let maxNormalizedEntropy = 0.85; // Default: allow up to 85% of max entropy
+  
+  if (numClasses <= 2) {
+    // For 2 classes with limited training data:
+    // - Even 55% is meaningful (vs 50% random chance)
+    // - We accept lower confidence but log a warning
+    requiredConfidence = 0.55;
+    requiredDominance = 1.2; // 0.55/0.45 ≈ 1.22
+    maxNormalizedEntropy = 0.98; // Almost any distribution
+  } else if (numClasses <= 5) {
+    requiredConfidence = 0.50;
+    requiredDominance = 1.4;
+    maxNormalizedEntropy = 0.90;
+  } else {
+    // For many classes, lower thresholds since probability is spread more
+    requiredConfidence = 0.40;
+    requiredDominance = 1.3;
+    maxNormalizedEntropy = 0.85;
+  }
+  
+  // Validation checks:
+  
+  // 1. Top confidence must meet threshold (adjusted for number of classes)
+  if (topConfidence < requiredConfidence) {
+    return {
+      isValid: false,
+      reason: `Confianza insuficiente (${(topConfidence * 100).toFixed(1)}% < ${requiredConfidence * 100}% mínimo para ${numClasses} clases)`,
+      topConfidence,
+      entropy,
+      dominanceRatio,
+      numClasses,
+    };
+  }
+  
+  // 2. Normalized entropy check - reject if predictions are too spread out
+  // Skip this check for 2-class models since it's too restrictive
+  if (numClasses > 2 && normalizedEntropy > maxNormalizedEntropy) {
+    return {
+      isValid: false,
+      reason: `Alta incertidumbre (entropía normalizada: ${normalizedEntropy.toFixed(2)} > ${maxNormalizedEntropy})`,
+      topConfidence,
+      entropy,
+      dominanceRatio,
+      numClasses,
+    };
+  }
+  
+  // 3. Dominance check - top prediction should be significantly higher than second
+  // For 2-class models, confidence check is sufficient; dominance is implied
+  if (numClasses > 2 && dominanceRatio < requiredDominance && topConfidence < 0.80) {
+    return {
+      isValid: false,
+      reason: `Predicción no dominante (ratio: ${dominanceRatio.toFixed(2)} < ${requiredDominance} requerido)`,
+      topConfidence,
+      entropy,
+      dominanceRatio,
+      numClasses,
+    };
+  }
+  
+  // Log warning if confidence is low (model may need more training data)
+  if (topConfidence < 0.70) {
+    console.warn(`⚠️ Confianza baja (${(topConfidence * 100).toFixed(1)}%). ` +
+      `Considere agregar más fotos de entrenamiento para mejorar la precisión.`);
+  }
+  
+  return {
+    isValid: true,
+    topConfidence,
+    entropy,
+    dominanceRatio,
+    numClasses,
+  };
 }
 
 /**
@@ -177,6 +424,22 @@ export async function generateSuggestions(
   predictions: tf.Tensor,
   classLabels: string[]
 ): Promise<ProductSuggestion[]> {
+  // First, validate if the predictions indicate a known product
+  const validation = await validatePredictions(predictions);
+  
+  console.log('=== OOD VALIDATION ===');
+  console.log('Validation result:', validation);
+  console.log('Class labels available:', classLabels);
+  console.log('======================');
+  
+  if (!validation.isValid) {
+    console.warn('❌ OOD Detection REJECTED image:', validation.reason);
+    // Return empty array - the image doesn't match any known product
+    return [];
+  }
+  
+  console.log('✅ OOD Detection PASSED - generating suggestions');
+  
   const confidences = await predictions.data();
   
   // Get top predictions with confidence >= threshold
@@ -241,14 +504,44 @@ export async function recognizeProduct(imageFile: File): Promise<ProductSuggesti
     // Step 7: Run inference
     const predictions = await runInference(model, preprocessed);
 
-    // Step 8: Get training dataset to map predictions to products
-    const dataset = await imageRecognitionService.getTrainingDataset();
+    // Step 8: Load class labels FROM THE MODEL (not from current API)
+    // This ensures we use the exact labels the model was trained with
+    const trainedClassLabels = await loadClassLabels(metadata.version);
+    
+    // DEBUG: Log predictions and class labels
+    const predictionData = await predictions.data();
+    const numPredictions = predictionData.length;
+    const numLabels = trainedClassLabels.length;
+    
+    console.log('=== IMAGE RECOGNITION DEBUG ===');
+    console.log('Model version:', metadata.version);
+    console.log('Number of model outputs:', numPredictions);
+    console.log('Number of class labels:', numLabels);
+    
+    // CRITICAL: Check for mismatch between model outputs and labels
+    if (numPredictions !== numLabels) {
+      console.error('⚠️ MISMATCH: Model outputs', numPredictions, 'classes but we have', numLabels, 'labels!');
+      console.error('This usually means the model was trained with different products than currently exist.');
+      console.error('Please retrain the model to fix this issue.');
+    }
+    
+    console.log('Class labels:', trainedClassLabels);
+    console.log('Raw predictions:');
+    Array.from(predictionData).forEach((p, i) => {
+      const label = trainedClassLabels[i] || `Unknown-${i}`;
+      const bar = '█'.repeat(Math.round(p * 20));
+      console.log(`  [${i}] ${label}: ${(p * 100).toFixed(1)}% ${bar}`);
+    });
+    console.log('================================');
+    
+    // Step 9: Generate suggestions using the trained class labels
+    const suggestions = await generateSuggestions(predictions, trainedClassLabels);
 
-    // Step 9: Generate suggestions
-    const suggestions = await generateSuggestions(predictions, dataset.classLabels);
-
-    // Step 10: Enrich with product details
-    const enrichedSuggestions = await enrichSuggestionsWithProductDetails(suggestions, dataset);
+    // Step 10: Get current product mappings from API for enrichment (IDs, URLs, etc.)
+    const classLabelsData = await imageRecognitionService.getClassLabels();
+    
+    // Step 11: Enrich with product details from mappings
+    const enrichedSuggestions = enrichSuggestionsFromMappings(suggestions, classLabelsData.productMappings);
 
     // Clean up tensors
     preprocessed.dispose();
@@ -283,15 +576,15 @@ function loadImageElement(imageFile: File): Promise<HTMLImageElement> {
 }
 
 /**
- * Enrich suggestions with full product details from training dataset.
+ * Enrich suggestions with product details from class label mappings.
  */
-async function enrichSuggestionsWithProductDetails(
+function enrichSuggestionsFromMappings(
   suggestions: ProductSuggestion[],
-  dataset: { photos: Array<{ productId: string; productSku: string; productName: string; photoUrl: string }> }
-): Promise<ProductSuggestion[]> {
+  productMappings: Record<string, { productId: string; productSku: string; productName: string; photoUrl: string }>
+): ProductSuggestion[] {
   return suggestions.map((suggestion) => {
-    // Find product in dataset by name (class label)
-    const product = dataset.photos.find((p) => p.productName === suggestion.productName);
+    // Find product in mappings by name (class label)
+    const product = productMappings[suggestion.productName];
     
     if (product) {
       return {
@@ -306,9 +599,26 @@ async function enrichSuggestionsWithProductDetails(
   });
 }
 
+/**
+ * Clear cached models (useful for testing or forcing reload).
+ */
+export function clearModelCache(): void {
+  if (cachedFeatureExtractor) {
+    cachedFeatureExtractor.dispose();
+    cachedFeatureExtractor = null;
+  }
+  if (cachedClassificationHead) {
+    cachedClassificationHead.dispose();
+    cachedClassificationHead = null;
+  }
+  cachedModelVersion = null;
+  cachedClassLabels = null;
+}
+
 export const imageRecognitionInferenceService = {
   checkDeviceCompatibility,
   validateImage,
   validateImageDimensions,
   recognizeProduct,
+  clearModelCache,
 };

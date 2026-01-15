@@ -12,6 +12,7 @@ import {
   loadModel,
   runInference,
   generateSuggestions,
+  validatePredictions,
   recognizeProduct,
   imageRecognitionInferenceService,
 } from '../image-recognition.service';
@@ -264,33 +265,113 @@ describe('Image Recognition Inference Service', () => {
   });
 
   describe('loadModel', () => {
-    it('should load model from correct URL', async () => {
+    beforeEach(() => {
+      // Clear model cache before each test
+      imageRecognitionInferenceService.clearModelCache();
+    });
+
+    it('should try loadLayersModel first', async () => {
       // Arrange
       const version = 'v1_20260112';
 
       // Act
       await loadModel(version);
 
-      // Assert
-      expect(tf.loadGraphModel).toHaveBeenCalledWith(
-        '/api/image-recognition/model/files/v1_20260112/model.json'
-      );
+      // Assert - should try loadLayersModel first
+      expect(tf.loadLayersModel).toHaveBeenCalled();
     });
 
-    it('should throw error if model loading fails', async () => {
+    it('should fall back to loadGraphModel if loadLayersModel fails', async () => {
       // Arrange
+      vi.mocked(tf.loadLayersModel).mockRejectedValue(new Error('Not a layers model'));
+      const version = 'v1_20260112';
+
+      // Act
+      await loadModel(version);
+
+      // Assert - should fall back to loadGraphModel
+      expect(tf.loadGraphModel).toHaveBeenCalled();
+    });
+
+    it('should throw error if both model loaders fail', async () => {
+      // Arrange
+      vi.mocked(tf.loadLayersModel).mockRejectedValue(new Error('Not a layers model'));
       vi.mocked(tf.loadGraphModel).mockRejectedValue(new Error('Network error'));
 
       // Act & Assert
       await expect(loadModel('v1_20260112')).rejects.toThrow('Error al cargar el modelo de IA');
     });
+
+    it('should cache loaded model and reuse it', async () => {
+      // Arrange - ensure fresh state
+      imageRecognitionInferenceService.clearModelCache();
+      vi.clearAllMocks(); // Reset mock call counts
+      const version = 'v1_20260112';
+
+      // Act - load twice with same version
+      await loadModel(version);
+      await loadModel(version);
+
+      // Assert - should only load once due to caching
+      expect(tf.loadLayersModel).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('validatePredictions (OOD detection)', () => {
+    it('should reject when top confidence is too low', async () => {
+      // Arrange - top confidence 35% < 50% minimum
+      const predictions = new MockTensor([0.35, 0.30, 0.20, 0.15], [4]);
+
+      // Act
+      const result = await validatePredictions(predictions as unknown as tf.Tensor);
+
+      // Assert
+      expect(result.isValid).toBe(false);
+      expect(result.reason).toContain('Confianza insuficiente');
+    });
+
+    it('should reject when entropy is too high (uncertain prediction)', async () => {
+      // Arrange - all classes have similar probability (high entropy)
+      const predictions = new MockTensor([0.25, 0.25, 0.25, 0.25], [4]);
+
+      // Act
+      const result = await validatePredictions(predictions as unknown as tf.Tensor);
+
+      // Assert
+      expect(result.isValid).toBe(false);
+      // Will fail on either confidence or entropy
+    });
+
+    it('should accept when prediction is dominant and confident', async () => {
+      // Arrange - clear dominant prediction: 85% vs 10%
+      const predictions = new MockTensor([0.85, 0.10, 0.03, 0.02], [4]);
+
+      // Act
+      const result = await validatePredictions(predictions as unknown as tf.Tensor);
+
+      // Assert
+      expect(result.isValid).toBe(true);
+      expect(result.topConfidence).toBeCloseTo(0.85);
+      expect(result.dominanceRatio).toBeGreaterThan(1.5);
+    });
+
+    it('should accept high confidence even without dominance', async () => {
+      // Arrange - 75% confidence is high enough to skip dominance check
+      const predictions = new MockTensor([0.75, 0.15, 0.10], [3]);
+
+      // Act
+      const result = await validatePredictions(predictions as unknown as tf.Tensor);
+
+      // Assert
+      expect(result.isValid).toBe(true);
+    });
   });
 
   describe('generateSuggestions', () => {
-    it('should return only suggestions above 40% confidence threshold', async () => {
-      // Arrange
+    it('should return suggestions when prediction is valid and dominant', async () => {
+      // Arrange - clear dominant prediction that passes OOD validation
       const predictions = new MockTensor(
-        [0.65, 0.50, 0.45, 0.35, 0.10], // 3 above threshold, 2 below
+        [0.80, 0.10, 0.05, 0.03, 0.02], // Dominant prediction
         [5]
       );
       const classLabels = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'];
@@ -299,17 +380,16 @@ describe('Image Recognition Inference Service', () => {
       const suggestions = await generateSuggestions(predictions as unknown as tf.Tensor, classLabels);
 
       // Assert
-      expect(suggestions).toHaveLength(3); // Only 3 above 40%
-      expect(suggestions[0].confidence).toBe(65); // Highest first
+      expect(suggestions.length).toBeGreaterThan(0);
+      expect(suggestions[0].confidence).toBeCloseTo(80, 0); // Use toBeCloseTo for float precision
       expect(suggestions[0].productName).toBe('Product A');
-      expect(suggestions[1].confidence).toBe(50);
-      expect(suggestions[2].confidence).toBe(45);
     });
 
     it('should limit suggestions to maximum 5', async () => {
-      // Arrange
+      // Arrange - single dominant class with enough confidence to pass OOD
+      // Rest are spread out but above threshold
       const predictions = new MockTensor(
-        [0.90, 0.80, 0.70, 0.60, 0.50, 0.45, 0.42], // 7 above threshold
+        [0.85, 0.50, 0.45, 0.42, 0.41, 0.01, 0.01], // P1 dominant (85%), 4 more above 40%
         [7]
       );
       const classLabels = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'];
@@ -317,29 +397,29 @@ describe('Image Recognition Inference Service', () => {
       // Act
       const suggestions = await generateSuggestions(predictions as unknown as tf.Tensor, classLabels);
 
-      // Assert
+      // Assert - should return up to 5 (P1=85%, P2=50%, P3=45%, P4=42%, P5=41%)
       expect(suggestions).toHaveLength(5); // Capped at 5
     });
 
-    it('should return empty array when all below threshold', async () => {
-      // Arrange
+    it('should return empty array when all below threshold (OOD detected)', async () => {
+      // Arrange - all below minimum confidence threshold
       const predictions = new MockTensor(
-        [0.35, 0.30, 0.20, 0.15, 0.10], // All below 40%
-        [5]
+        [0.35, 0.30, 0.20, 0.15], // All below 40%, top below 50%
+        [4]
       );
-      const classLabels = ['P1', 'P2', 'P3', 'P4', 'P5'];
+      const classLabels = ['P1', 'P2', 'P3', 'P4'];
 
       // Act
       const suggestions = await generateSuggestions(predictions as unknown as tf.Tensor, classLabels);
 
       // Assert
-      expect(suggestions).toHaveLength(0); // No suggestions
+      expect(suggestions).toHaveLength(0); // OOD detected, no suggestions
     });
 
     it('should sort suggestions by confidence descending', async () => {
-      // Arrange
+      // Arrange - valid prediction with dominant class + multiple above threshold
       const predictions = new MockTensor(
-        [0.45, 0.65, 0.50, 0.42, 0.55], // Out of order
+        [0.45, 0.85, 0.50, 0.02, 0.55], // P2 dominant (85%), others above threshold
         [5]
       );
       const classLabels = ['P1', 'P2', 'P3', 'P4', 'P5'];
@@ -347,24 +427,23 @@ describe('Image Recognition Inference Service', () => {
       // Act
       const suggestions = await generateSuggestions(predictions as unknown as tf.Tensor, classLabels);
 
-      // Assert
-      expect(suggestions[0].confidence).toBe(65); // P2
-      expect(suggestions[1].confidence).toBe(55); // P5
-      expect(suggestions[2].confidence).toBe(50); // P3
-      expect(suggestions[3].confidence).toBe(45); // P1
-      expect(suggestions[4].confidence).toBe(42); // P4
+      // Assert - should be sorted by confidence descending
+      expect(suggestions[0].confidence).toBeCloseTo(85, 0); // P2 (highest)
+      expect(suggestions[1].confidence).toBeCloseTo(55, 0); // P5
+      expect(suggestions[2].confidence).toBeCloseTo(50, 0); // P3
+      expect(suggestions[3].confidence).toBeCloseTo(45, 0); // P1
     });
 
     it('should convert confidence to percentage', async () => {
-      // Arrange
-      const predictions = new MockTensor([0.75], [1]); // 75% as decimal
+      // Arrange - single class, high confidence
+      const predictions = new MockTensor([0.92], [1]); // 92% as decimal
       const classLabels = ['Product'];
 
       // Act
       const suggestions = await generateSuggestions(predictions as unknown as tf.Tensor, classLabels);
 
       // Assert
-      expect(suggestions[0].confidence).toBe(75); // Converted to percentage
+      expect(suggestions[0].confidence).toBeCloseTo(92, 0); // Converted to percentage
     });
   });
 
@@ -521,42 +600,51 @@ describe('Image Recognition Inference Service', () => {
   });
 
   describe('runInference', () => {
-    it('should add and remove batch dimension', async () => {
-      // Arrange - Use mock from TF.js
-      const mockModel = {
+    beforeEach(() => {
+      // Clear model cache before each test
+      imageRecognitionInferenceService.clearModelCache();
+    });
+
+    it('should extract features and run classification', async () => {
+      // Arrange - Mock classification head
+      const mockClassificationHead = {
         predict: vi.fn().mockReturnValue({
-          squeeze: vi.fn().mockReturnValue({ data: async () => new Float32Array([0.5]) }),
+          squeeze: vi.fn().mockReturnValue({ 
+            data: async () => new Float32Array([0.85, 0.10, 0.05]),
+            dispose: vi.fn(),
+          }),
         }),
-      } as unknown as tf.GraphModel;
+        dispose: vi.fn(),
+      } as unknown as tf.LayersModel;
       
-      const mockTensor = {
-        expandDims: vi.fn().mockReturnValue({ /* mock batched tensor */ }),
-      } as unknown as tf.Tensor3D;
+      // Mock input tensor
+      const mockTensor = new MockTensor([1, 2, 3], [224, 224, 3]) as unknown as tf.Tensor3D;
 
       // Act
-      const result = await runInference(mockModel, mockTensor);
+      const result = await runInference(mockClassificationHead, mockTensor);
 
-      // Assert
-      expect(mockTensor.expandDims).toHaveBeenCalledWith(0);
+      // Assert - should return predictions
       expect(result).toBeDefined();
     });
 
-    it('should use tidy to prevent memory leaks', async () => {
+    it('should use tidy to prevent memory leaks during feature extraction', async () => {
       // Arrange
       const mockModel = {
         predict: vi.fn().mockReturnValue({
-          squeeze: vi.fn().mockReturnValue({ data: async () => new Float32Array([0.5]) }),
+          squeeze: vi.fn().mockReturnValue({ 
+            data: async () => new Float32Array([0.9, 0.1]),
+            dispose: vi.fn(),
+          }),
         }),
-      } as unknown as tf.GraphModel;
+        dispose: vi.fn(),
+      } as unknown as tf.LayersModel;
       
-      const mockTensor = {
-        expandDims: vi.fn().mockReturnThis(),
-      } as unknown as tf.Tensor3D;
+      const mockTensor = new MockTensor([1, 2, 3], [224, 224, 3]) as unknown as tf.Tensor3D;
 
       // Act
       await runInference(mockModel, mockTensor);
 
-      // Assert
+      // Assert - tidy should be called for memory management
       expect(tf.tidy).toHaveBeenCalled();
     });
   });

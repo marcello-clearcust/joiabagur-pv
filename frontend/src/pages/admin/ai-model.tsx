@@ -249,11 +249,11 @@ export function AIModelPage() {
             <Brain className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {modelHealth?.currentModel ? (
+            {modelHealth?.currentVersion && modelHealth?.lastTrainedAt ? (
               <>
-                <div className="text-2xl font-bold">{modelHealth.currentModel.version}</div>
+                <div className="text-2xl font-bold">{modelHealth.currentVersion}</div>
                 <p className="text-xs text-muted-foreground">
-                  Entrenado {formatDate(modelHealth.currentModel.trainedAt)}
+                  Entrenado {formatDate(modelHealth.lastTrainedAt)}
                 </p>
                 <div className="mt-2">
                   {getAlertBadge(modelHealth.alertLevel)}
@@ -323,15 +323,15 @@ export function AIModelPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {modelHealth?.modelAge ? (
+            {modelHealth?.daysSinceTraining !== null && modelHealth?.daysSinceTraining !== undefined ? (
               <>
                 <div className="text-2xl font-bold">
-                  {modelHealth.modelAge.days} días
+                  {modelHealth.daysSinceTraining} días
                 </div>
                 <p className="text-xs text-muted-foreground">
                   desde último entrenamiento
                 </p>
-                {modelHealth.modelAge.isStale && (
+                {modelHealth.daysSinceTraining > 60 && (
                   <Badge variant="destructive" className="mt-2">
                     Modelo desactualizado
                   </Badge>

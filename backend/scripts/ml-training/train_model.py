@@ -359,11 +359,87 @@ class ModelTrainer:
             if len(photos) < 10:
                 raise ValueError(f"Insufficient photos for training. Found: {len(photos)}, Required: 10+")
             
+            # Ensure each class has at least a minimal number of samples so stratified splits won't fail.
+            # Heuristically attempt to guarantee at least 2 samples per class, and retry with higher counts if needed.
+            def _extract_pid(p):
+                pid = None
+                try:
+                    if isinstance(p, dict):
+                        for key in ('product_id', 'productId', 'ProductId', 'productid'):
+                            if key in p:
+                                pid = p[key]
+                                break
+                        if pid is None:
+                            for k in p.keys():
+                                if 'product' in k.lower() and 'id' in k.lower():
+                                    pid = p[k]
+                                    break
+                    elif isinstance(p, (list, tuple)):
+                        if len(p) > 0:
+                            pid = p[0]
+                    else:
+                        pid = getattr(p, 'product_id', None)
+                        if pid is None:
+                            pid = getattr(p, 'productId', None)
+                except Exception:
+                    pid = None
+                return pid if pid is not None else id(p)
+            
+            # Build mapping of product id -> list of photo entries
+            pid_to_items = {}
+            for item in photos:
+                pid = _extract_pid(item)
+                pid_to_items.setdefault(pid, []).append(item)
+            
+            # Duplicate entries for classes that are under-represented.
+            # We'll attempt multiple rounds with increasing minimum requirements if needed.
+            max_attempts = 3
+            min_required = 2
+            attempt = 0
+            while attempt < max_attempts:
+                attempt += 1
+                # Ensure current photos list reflects pid_to_items
+                photos = []
+                for pid, items in pid_to_items.items():
+                    photos.extend(items)
+                # Check counts and duplicate where necessary to reach min_required
+                need_more = False
+                for pid, items in list(pid_to_items.items()):
+                    count = len(items)
+                    if count < min_required:
+                        need_more = True
+                        # Duplicate the first available item until count meets min_required
+                        if len(items) == 0:
+                            continue
+                        sample = items[0]
+                        while len(pid_to_items[pid]) < min_required:
+                            pid_to_items[pid].append(sample)
+                # If no need to increase, break and proceed
+                if not need_more:
+                    break
+                # If we did need more and this is not the last attempt, raise min_required and retry
+                min_required += 1
+            
             # 2. Prepare dataset
             product_photos = self.download_and_prepare_dataset(photos)
             
             # 3. Load and augment data
-            X_train, X_val, y_train, y_val, product_ids = self.augment_and_load_data(product_photos)
+            try:
+                X_train, X_val, y_train, y_val, product_ids = self.augment_and_load_data(product_photos)
+            except ValueError as ve:
+                # As a robust fallback, attempt one more time after increasing minimum per-class samples.
+                # This retries download_and_prepare_dataset with more duplicated samples to avoid stratify errors.
+                logger.warning("augment_and_load_data failed with ValueError, attempting to increase per-class samples and retry.", exc_info=True)
+                # Increase per-class minimum and rebuild photos
+                for pid, items in list(pid_to_items.items()):
+                    # ensure at least 3 samples per class for retry
+                    while len(pid_to_items[pid]) < 3:
+                        pid_to_items[pid].append(items[0])
+                photos = []
+                for pid, items in pid_to_items.items():
+                    photos.extend(items)
+                product_photos = self.download_and_prepare_dataset(photos)
+                X_train, X_val, y_train, y_val, product_ids = self.augment_and_load_data(product_photos)
             
             # 4. Create model
             num_classes = len(product_ids)

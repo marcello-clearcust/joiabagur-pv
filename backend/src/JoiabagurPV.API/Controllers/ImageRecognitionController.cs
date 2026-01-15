@@ -2,6 +2,7 @@ using JoiabagurPV.Application.DTOs.ImageRecognition;
 using JoiabagurPV.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Nodes;
 
 namespace JoiabagurPV.API.Controllers;
 
@@ -229,10 +230,72 @@ public class ImageRecognitionController : ControllerBase
         // Determine content type
         var contentType = fileName.EndsWith(".json") ? "application/json" : "application/octet-stream";
 
-        // Return file with caching headers
+        // NOTE: Do not cache model files aggressively.
+        // The model may be retrained under the same version during development, and browsers can otherwise keep stale copies.
+        Response.Headers["Cache-Control"] = "no-store";
+
+        // Backward compatibility:
+        // Earlier browser-training uploads stored ONLY the model topology in model.json (no modelTopology/weightsManifest wrapper),
+        // which TensorFlow.js cannot load. If detected, wrap it on-the-fly using weights_manifest.json + weights.bin.
+        if (string.Equals(fileName, "model.json", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var text = await System.IO.File.ReadAllTextAsync(filePath);
+                var node = JsonNode.Parse(text);
+
+                var hasModelTopology = node?["modelTopology"] != null;
+                var hasWeightsManifest = node?["weightsManifest"] != null;
+
+                if (!hasModelTopology || !hasWeightsManifest)
+                {
+                    var weightsManifestPath = Path.Combine(modelsBasePath, version, "weights_manifest.json");
+                    if (!System.IO.File.Exists(weightsManifestPath))
+                    {
+                        _logger.LogWarning("Legacy model.json detected but weights_manifest.json missing for version {Version}", version);
+                    }
+                    else
+                    {
+                        var weightsText = await System.IO.File.ReadAllTextAsync(weightsManifestPath);
+                        var weightsNode = JsonNode.Parse(weightsText);
+
+                        // weights_manifest.json is stored as a raw weightSpecs array (TFJS artifacts.weightSpecs).
+                        var weightsArray = weightsNode as JsonArray;
+
+                        if (weightsArray != null)
+                        {
+                            var wrapped = new JsonObject
+                            {
+                                ["format"] = "layers-model",
+                                ["generatedBy"] = "joiabagur-pv",
+                                ["convertedBy"] = null,
+                                ["modelTopology"] = node,
+                                ["weightsManifest"] = new JsonArray
+                                {
+                                    new JsonObject
+                                    {
+                                        ["paths"] = new JsonArray("weights.bin"),
+                                        ["weights"] = weightsArray
+                                    }
+                                }
+                            };
+
+                            var wrappedJson = wrapped.ToJsonString();
+                            return Content(wrappedJson, "application/json");
+                        }
+
+                        _logger.LogWarning("weights_manifest.json was not a JSON array for version {Version}", version);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to apply legacy model.json wrapper for version {Version}", version);
+                // fall back to returning original file below
+            }
+        }
+
         var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
-        Response.Headers.Append("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
-        
         return File(fileBytes, contentType, fileName);
     }
 
@@ -304,6 +367,53 @@ public class ImageRecognitionController : ControllerBase
             result.Version, _currentUserService.UserId.Value);
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Gets the class labels and product mappings for inference.
+    /// Returns only the minimal data needed to map predictions to products.
+    /// Accessible to all authenticated users (operators can use image recognition).
+    /// For operators, filters to only show products available at their assigned points of sale.
+    /// </summary>
+    /// <returns>Class labels with product ID, SKU, and name mappings.</returns>
+    [HttpGet("model/class-labels")]
+    [ProducesResponseType(typeof(ClassLabelsResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ClassLabelsResponse>> GetClassLabels()
+    {
+        var dataset = await _imageRecognitionService.GetTrainingDatasetAsync();
+        
+        // Get accessible product IDs for the current user (operators see filtered products)
+        var accessibleProductIds = await _imageRecognitionService.GetAccessibleProductIdsAsync(
+            _currentUserService.UserId,
+            _currentUserService.IsAdmin);
+        
+        // Build unique product list from photos (for inference mapping)
+        // Filter by accessible products for operators
+        var filteredPhotos = accessibleProductIds == null 
+            ? dataset.Photos 
+            : dataset.Photos.Where(p => accessibleProductIds.Contains(p.ProductId)).ToList();
+        
+        var productMap = filteredPhotos
+            .GroupBy(p => p.ProductId)
+            .Select(g => g.First())
+            .ToDictionary(p => p.ProductName, p => new ProductLabelMapping
+            {
+                ProductId = p.ProductId,
+                ProductSku = p.ProductSku,
+                ProductName = p.ProductName,
+                PhotoUrl = p.PhotoUrl
+            });
+        
+        // Filter class labels to only include products the user can access
+        var filteredClassLabels = accessibleProductIds == null
+            ? dataset.ClassLabels
+            : dataset.ClassLabels.Where(label => productMap.ContainsKey(label)).ToList();
+        
+        return Ok(new ClassLabelsResponse
+        {
+            ClassLabels = filteredClassLabels,
+            ProductMappings = productMap
+        });
     }
 
     /// <summary>

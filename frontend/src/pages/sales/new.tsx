@@ -3,7 +3,7 @@
  * Allows operators to register sales by searching for products
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Search, ShoppingCart, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -42,9 +42,19 @@ import type { Product } from '@/types/product.types';
 import type { PointOfSale } from '@/types/point-of-sale.types';
 import type { PaymentMethod } from '@/types/payment-method.types';
 
+// State passed from image recognition page
+interface LocationState {
+  productId?: string;
+  photoDataUrl?: string;
+}
+
 export function ManualSalesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  
+  // Get pre-selected product from image recognition
+  const locationState = location.state as LocationState | null;
 
   // State
   const [loading, setLoading] = useState(true);
@@ -73,13 +83,29 @@ export function ManualSalesPage() {
     const loadData = async () => {
       try {
         const [posData, productsData] = await Promise.all([
-          pointOfSaleService.getPointsOfSale(false),
+          pointOfSaleService.getPointsOfSale(),
           productService.getProducts(),
         ]);
         setPointsOfSale(posData);
-        setProducts(productsData.products || []);
+        setProducts(productsData || []);
         if (posData.length > 0) {
           setSelectedPosId(posData[0].id);
+        }
+        
+        // If a productId was passed from image recognition, pre-select that product
+        if (locationState?.productId && productsData) {
+          const preSelectedProduct = productsData.find(
+            (p) => p.id === locationState.productId
+          );
+          
+          if (preSelectedProduct) {
+            setSelectedProduct(preSelectedProduct);
+            setProductSearch(preSelectedProduct.sku);
+            toast.success(`Producto "${preSelectedProduct.name}" seleccionado automáticamente`);
+          } else {
+            // Product not found - might not be in operator's accessible products
+            toast.warning('El producto seleccionado no está disponible en tus puntos de venta');
+          }
         }
       } catch (error) {
         toast.error('Error al cargar datos');
@@ -89,21 +115,41 @@ export function ManualSalesPage() {
       }
     };
     loadData();
-  }, []);
+  }, [locationState?.productId]);
 
   // Load payment methods when POS changes
   useEffect(() => {
     const loadPaymentMethods = async () => {
       if (!selectedPosId) return;
+      
+      let methods: PaymentMethod[] = [];
+      
       try {
-        const methods = await paymentMethodService.getPaymentMethods();
-        // Filter to active methods (in a real app, would also filter by POS assignment)
-        setPaymentMethods(methods.filter(m => m.isActive));
-        if (methods.length > 0) {
-          setSelectedPaymentMethodId(methods[0].id);
-        }
+        // First try to get payment methods assigned to this point of sale
+        const posPaymentMethods = await paymentMethodService.getPointOfSalePaymentMethods(selectedPosId);
+        // Filter to active assignments only and extract the payment method
+        methods = posPaymentMethods
+          .filter(pm => pm.isActive && pm.paymentMethod)
+          .map(pm => pm.paymentMethod);
       } catch (error) {
-        console.error('Error loading payment methods:', error);
+        console.error('Error loading payment methods for POS:', error);
+      }
+      
+      // If no POS-specific methods, fall back to all payment methods
+      if (methods.length === 0) {
+        try {
+          const allMethods = await paymentMethodService.getPaymentMethods();
+          methods = allMethods.filter(m => m.isActive);
+        } catch (fallbackError) {
+          console.error('Error loading fallback payment methods:', fallbackError);
+        }
+      }
+      
+      setPaymentMethods(methods);
+      if (methods.length > 0) {
+        setSelectedPaymentMethodId(methods[0].id);
+      } else {
+        setSelectedPaymentMethodId('');
       }
     };
     loadPaymentMethods();
@@ -286,7 +332,7 @@ export function ManualSalesPage() {
                       ${selectedProduct.price.toFixed(2)}
                     </p>
                   </div>
-                  <Badge variant={selectedProduct.isActive ? 'default' : 'secondary'}>
+                  <Badge variant={selectedProduct.isActive ? 'primary' : 'secondary'}>
                     {selectedProduct.isActive ? 'Activo' : 'Inactivo'}
                   </Badge>
                 </div>
@@ -300,7 +346,7 @@ export function ManualSalesPage() {
                       <span className="text-sm text-muted-foreground">
                         Stock disponible:
                       </span>
-                      <Badge variant={availableStock > 0 ? 'default' : 'destructive'}>
+                      <Badge variant={availableStock > 0 ? 'primary' : 'destructive'}>
                         {availableStock} unidades
                       </Badge>
                     </>

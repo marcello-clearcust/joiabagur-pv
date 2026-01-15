@@ -94,7 +94,9 @@ export interface ModelMetadata {
 export interface ModelHealth {
   alertLevel: 'OK' | 'RECOMMENDED' | 'HIGH' | 'CRITICAL';
   alertMessage: string;
-  currentModel?: ModelMetadata;
+  currentVersion?: string;
+  lastTrainedAt?: string;
+  daysSinceTraining?: number;
   catalogMetrics: {
     totalProducts: number;
     productsWithPhotos: number;
@@ -108,9 +110,11 @@ export interface ModelHealth {
     photosDeletedSinceTraining: number;
     netChangePercentage: number;
   };
-  modelAge?: {
-    days: number;
-    isStale: boolean;
+  precisionMetrics?: {
+    top1Accuracy?: number;
+    top3Accuracy?: number;
+    averageInferenceTimeMs?: number;
+    fallbackRate?: number;
   };
 }
 
@@ -133,6 +137,24 @@ export interface TrainingPhoto {
   productName: string;
   photoId: string;
   photoUrl: string;
+}
+
+/**
+ * Product label mapping for inference (maps class label to product details).
+ */
+export interface ProductLabelMapping {
+  productId: string;
+  productSku: string;
+  productName: string;
+  photoUrl: string;
+}
+
+/**
+ * Class labels response for inference (accessible to all authenticated users).
+ */
+export interface ClassLabelsResponse {
+  classLabels: string[];
+  productMappings: Record<string, ProductLabelMapping>;
 }
 
 /**

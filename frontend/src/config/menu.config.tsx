@@ -36,7 +36,7 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
   {
     title: 'Ventas',
     icon: ShoppingCart,
-    path: ROUTES.SALES,
+    path: ROUTES.SALES.ROOT,
   },
   {
     title: 'Devoluciones',
@@ -56,6 +56,11 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
         title: 'Gestión de Productos',
         icon: Package,
         path: ROUTES.PRODUCTS.ROOT,
+      },
+      {
+        title: 'Modelo de IA',
+        icon: ShoppingCart,
+        path: ROUTES.AI_MODEL,
       },
       {
         title: 'Métodos de Pago',
@@ -94,7 +99,7 @@ export const MENU_OPERATOR: MenuConfig = [
   {
     title: 'Ventas',
     icon: ShoppingCart,
-    path: ROUTES.SALES,
+    path: ROUTES.SALES.ROOT,
   },
   {
     title: 'Devoluciones',

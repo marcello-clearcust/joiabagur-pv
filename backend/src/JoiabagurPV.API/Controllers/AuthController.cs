@@ -20,6 +20,7 @@ public class AuthController : ControllerBase
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IWebHostEnvironment _environment;
 
     // Cookie names
     private const string AccessTokenCookieName = "access_token";
@@ -29,12 +30,14 @@ public class AuthController : ControllerBase
         IAuthenticationService authenticationService,
         IValidator<LoginRequest> loginValidator,
         ILogger<AuthController> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
     {
         _authenticationService = authenticationService;
         _loginValidator = loginValidator;
         _logger = logger;
         _configuration = configuration;
+        _environment = environment;
     }
 
     /// <summary>
@@ -161,20 +164,17 @@ public class AuthController : ControllerBase
         var accessTokenExpiration = int.Parse(_configuration["Jwt:AccessTokenExpirationMinutes"] ?? "60");
         var refreshTokenExpiration = int.Parse(_configuration["Jwt:RefreshTokenExpirationHours"] ?? "8");
 
-        var cookieOptions = new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/"
-        };
+        // In Development we commonly run over plain HTTP (e.g. http://localhost:5056),
+        // so Secure cookies would never be set/sent and everything becomes 401.
+        var secure = !_environment.IsDevelopment() && Request.IsHttps;
+        var sameSite = _environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.Strict;
 
         // Access token cookie
         Response.Cookies.Append(AccessTokenCookieName, accessToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
+            Secure = secure,
+            SameSite = sameSite,
             Path = "/",
             Expires = DateTimeOffset.UtcNow.AddMinutes(accessTokenExpiration)
         });
@@ -183,8 +183,8 @@ public class AuthController : ControllerBase
         Response.Cookies.Append(RefreshTokenCookieName, refreshToken, new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
+            Secure = secure,
+            SameSite = sameSite,
             Path = "/api/auth", // Only send to auth endpoints
             Expires = DateTimeOffset.UtcNow.AddHours(refreshTokenExpiration)
         });

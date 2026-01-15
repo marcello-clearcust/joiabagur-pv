@@ -13,6 +13,7 @@ import type {
   ModelMetadata,
   ModelHealth,
   TrainingDataset,
+  ClassLabelsResponse,
   UploadTrainedModelResult,
 } from '@/types/sales.types';
 
@@ -102,10 +103,18 @@ export const imageRecognitionService = {
   },
 
   /**
-   * Gets the training dataset for browser-based training.
+   * Gets the training dataset for browser-based training (admin only).
    */
   getTrainingDataset: async (): Promise<TrainingDataset> => {
     const response = await apiClient.get<TrainingDataset>(`${IMAGE_RECOGNITION_ENDPOINT}/training-dataset`);
+    return response.data;
+  },
+
+  /**
+   * Gets class labels and product mappings for inference (accessible to all users).
+   */
+  getClassLabels: async (): Promise<ClassLabelsResponse> => {
+    const response = await apiClient.get<ClassLabelsResponse>(`${IMAGE_RECOGNITION_ENDPOINT}/model/class-labels`);
     return response.data;
   },
 

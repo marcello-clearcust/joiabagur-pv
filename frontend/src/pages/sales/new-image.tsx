@@ -21,10 +21,11 @@ import type { ProductSuggestion } from '@/types/sales.types';
 
 export function ImageRecognitionSalesPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const capturedImageObjectUrlRef = useRef<string | null>(null);
 
   // State
   const [loading, setLoading] = useState(true);
@@ -34,7 +35,6 @@ export function ImageRecognitionSalesPage() {
   const [processing, setProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<ProductSuggestion | null>(null);
 
   // Check device compatibility
   useEffect(() => {
@@ -115,7 +115,7 @@ export function ImageRecognitionSalesPage() {
     canvas.toBlob((blob) => {
       if (blob) {
         const file = new File([blob], 'captured-photo.jpg', { type: 'image/jpeg' });
-        processImage(file);
+        processImage(file, imageDataUrl);
       }
     }, 'image/jpeg', 0.9);
   }, [stopCamera]);
@@ -129,36 +129,43 @@ export function ImageRecognitionSalesPage() {
     const validation = imageRecognitionInferenceService.validateImage(file);
     if (!validation.isValid) {
       toast.error(validation.error);
+      // Allow selecting the same file again
+      event.target.value = '';
       return;
     }
 
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setCapturedImage(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Show preview immediately (FileReader can be slow / fail silently on some devices)
+    // Revoke previous object URL if any
+    if (capturedImageObjectUrlRef.current) {
+      URL.revokeObjectURL(capturedImageObjectUrlRef.current);
+      capturedImageObjectUrlRef.current = null;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    capturedImageObjectUrlRef.current = objectUrl;
+    setCapturedImage(objectUrl);
 
     // Process image
-    processImage(file);
+    processImage(file, objectUrl);
+
+    // Allow selecting the same file again
+    event.target.value = '';
   }, []);
 
   // Process image with AI
-  const processImage = async (file: File) => {
+  const processImage = async (file: File, previewUrl?: string | null) => {
     setProcessing(true);
     setProcessingProgress(0);
     setSuggestions([]);
 
+    let progressInterval: number | undefined;
     try {
       // Simulate progress updates
-      const progressInterval = setInterval(() => {
+      progressInterval = window.setInterval(() => {
         setProcessingProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
       // Run inference
       const productSuggestions = await imageRecognitionInferenceService.recognizeProduct(file);
-
-      clearInterval(progressInterval);
       setProcessingProgress(100);
 
       if (productSuggestions.length === 0) {
@@ -166,7 +173,7 @@ export function ImageRecognitionSalesPage() {
         toast.warning('No se encontraron coincidencias fiables. Redirigiendo a registro manual...');
         setTimeout(() => {
           navigate(ROUTES.SALES.NEW, { 
-            state: { photoDataUrl: capturedImage } 
+            state: { photoDataUrl: previewUrl ?? capturedImage } 
           });
         }, 2000);
         return;
@@ -177,24 +184,23 @@ export function ImageRecognitionSalesPage() {
     } catch (error: unknown) {
       console.error('Image processing error:', error);
       const errorMessage = (error as { message?: string }).message || 'Error al procesar la imagen';
-      toast.error(errorMessage);
-      
-      // Offer manual entry as fallback
-      toast.info('Puede registrar la venta manualmente', {
+      // Single toast with action to avoid overlapping notifications
+      toast.error(errorMessage, {
         action: {
           label: 'Registrar Manual',
           onClick: () => navigate(ROUTES.SALES.NEW),
         },
       });
     } finally {
+      if (progressInterval) {
+        window.clearInterval(progressInterval);
+      }
       setProcessing(false);
     }
   };
 
   // Handle suggestion selection
   const handleSelectSuggestion = (suggestion: ProductSuggestion) => {
-    setSelectedSuggestion(suggestion);
-    
     // Navigate to manual entry with pre-selected product
     navigate(ROUTES.SALES.NEW, {
       state: {
@@ -206,9 +212,12 @@ export function ImageRecognitionSalesPage() {
 
   // Reset flow
   const resetFlow = () => {
+    if (capturedImageObjectUrlRef.current) {
+      URL.revokeObjectURL(capturedImageObjectUrlRef.current);
+      capturedImageObjectUrlRef.current = null;
+    }
     setCapturedImage(null);
     setSuggestions([]);
-    setSelectedSuggestion(null);
     setProcessing(false);
     setProcessingProgress(0);
   };
@@ -297,48 +306,32 @@ export function ImageRecognitionSalesPage() {
               Capturar Foto
             </CardTitle>
             <CardDescription>
-              Toma una foto clara del producto desde diferentes ángulos
+              Usa la cámara o sube una foto del producto
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Camera View */}
-            {cameraActive ? (
-              <div className="relative aspect-video overflow-hidden rounded-lg bg-black">
-                <video 
-                  ref={videoRef}
-                  className="h-full w-full object-cover"
-                  autoPlay
-                  playsInline
-                />
-                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2">
-                  <Button size="lg" onClick={capturePhoto}>
-                    <Camera className="mr-2 h-5 w-5" />
-                    Capturar
-                  </Button>
-                  <Button size="lg" variant="outline" onClick={stopCamera}>
-                    <X className="mr-2 h-5 w-5" />
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Button className="w-full" size="lg" onClick={startCamera}>
+            {!cameraActive ? (
+              <div className="flex flex-col gap-3">
+                <Button onClick={startCamera} size="lg" className="w-full">
                   <Camera className="mr-2 h-5 w-5" />
-                  Activar Cámara
+                  Abrir Cámara
                 </Button>
-                
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      O subir foto
-                    </span>
+                    <span className="bg-background px-2 text-muted-foreground">O</span>
                   </div>
                 </div>
-
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Subir Foto
+                </Button>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -346,18 +339,29 @@ export function ImageRecognitionSalesPage() {
                   className="hidden"
                   onChange={handleFileUpload}
                 />
-                <Button 
-                  className="w-full" 
-                  size="lg" 
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  Subir Foto
-                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <video
+                  ref={videoRef}
+                  className="w-full rounded-lg bg-black"
+                  autoPlay
+                  playsInline
+                />
+                <div className="flex gap-2">
+                  <Button onClick={capturePhoto} size="lg" className="flex-1">
+                    <Camera className="mr-2 h-5 w-5" />
+                    Capturar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={stopCamera}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             )}
-
-            {/* Hidden canvas for photo capture */}
             <canvas ref={canvasRef} className="hidden" />
           </CardContent>
         </Card>
@@ -366,29 +370,6 @@ export function ImageRecognitionSalesPage() {
       {/* Processing / Results */}
       {capturedImage && (
         <>
-          {/* Captured Photo Preview */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  Foto Capturada
-                </CardTitle>
-                <Button variant="ghost" size="sm" onClick={resetFlow}>
-                  <X className="mr-2 h-4 w-4" />
-                  Tomar Otra
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <img 
-                src={capturedImage} 
-                alt="Captured product" 
-                className="w-full rounded-lg"
-              />
-            </CardContent>
-          </Card>
-
           {/* Processing Indicator */}
           {processing && (
             <Card>
@@ -410,52 +391,43 @@ export function ImageRecognitionSalesPage() {
             </Card>
           )}
 
-          {/* Suggestions */}
+          {/* Suggestions - shown before the image */}
           {!processing && suggestions.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  Sugerencias ({suggestions.length})
-                </CardTitle>
+                <CardTitle>Sugerencias de Productos</CardTitle>
                 <CardDescription>
-                  Selecciona el producto correcto
+                  Selecciona el producto correcto o registra manualmente
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {suggestions.map((suggestion, index) => (
+                {suggestions.map((suggestion) => (
                   <button
-                    key={index}
+                    key={suggestion.productId}
                     type="button"
-                    className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-muted"
+                    className="flex w-full items-center justify-between rounded-lg border p-4 text-left transition-colors hover:bg-muted"
                     onClick={() => handleSelectSuggestion(suggestion)}
                   >
-                    <div className="flex items-start gap-4">
-                      {suggestion.photoUrl && (
-                        <img
-                          src={suggestion.photoUrl}
-                          alt={suggestion.productName}
-                          className="h-16 w-16 rounded-md object-cover"
-                        />
-                      )}
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-semibold">{suggestion.productName}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              SKU: {suggestion.productSku}
-                            </p>
-                          </div>
-                          <Badge 
-                            variant={suggestion.confidence >= 70 ? 'default' : 'secondary'}
-                            className="ml-2"
-                          >
-                            {suggestion.confidence.toFixed(0)}% confianza
-                          </Badge>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                        <ShoppingCart className="h-6 w-6 text-primary" />
                       </div>
-                      <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{suggestion.productName}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            SKU: {suggestion.productSku}
+                          </p>
+                        </div>
+                        <Badge 
+                          variant={suggestion.confidence >= 70 ? 'primary' : 'secondary'}
+                          className="mt-1"
+                        >
+                          {suggestion.confidence.toFixed(0)}% confianza
+                        </Badge>
+                      </div>
                     </div>
+                    <ShoppingCart className="h-5 w-5 text-muted-foreground" />
                   </button>
                 ))}
 
@@ -469,6 +441,29 @@ export function ImageRecognitionSalesPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Captured Photo Preview - reduced size and centered */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  Foto Capturada
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={resetFlow}>
+                  <X className="mr-2 h-4 w-4" />
+                  Tomar Otra
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <img 
+                src={capturedImage} 
+                alt="Captured product" 
+                className="w-1/3 rounded-lg"
+              />
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

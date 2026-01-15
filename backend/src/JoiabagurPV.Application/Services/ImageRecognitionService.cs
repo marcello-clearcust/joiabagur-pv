@@ -17,6 +17,8 @@ public class ImageRecognitionService : IImageRecognitionService
     private readonly IModelTrainingJobRepository _trainingJobRepository;
     private readonly IProductRepository _productRepository;
     private readonly IProductPhotoRepository _productPhotoRepository;
+    private readonly IInventoryRepository _inventoryRepository;
+    private readonly IUserPointOfSaleService _userPointOfSaleService;
     private readonly IFileStorageService _fileStorageService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ImageRecognitionService> _logger;
@@ -26,6 +28,8 @@ public class ImageRecognitionService : IImageRecognitionService
         IModelTrainingJobRepository trainingJobRepository,
         IProductRepository productRepository,
         IProductPhotoRepository productPhotoRepository,
+        IInventoryRepository inventoryRepository,
+        IUserPointOfSaleService userPointOfSaleService,
         IFileStorageService fileStorageService,
         IUnitOfWork unitOfWork,
         ILogger<ImageRecognitionService> logger)
@@ -34,6 +38,8 @@ public class ImageRecognitionService : IImageRecognitionService
         _trainingJobRepository = trainingJobRepository ?? throw new ArgumentNullException(nameof(trainingJobRepository));
         _productRepository = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
         _productPhotoRepository = productPhotoRepository ?? throw new ArgumentNullException(nameof(productPhotoRepository));
+        _inventoryRepository = inventoryRepository ?? throw new ArgumentNullException(nameof(inventoryRepository));
+        _userPointOfSaleService = userPointOfSaleService ?? throw new ArgumentNullException(nameof(userPointOfSaleService));
         _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -320,13 +326,16 @@ public class ImageRecognitionService : IImageRecognitionService
 
             foreach (var photo in product.Photos)
             {
+                // Use the file storage service to get the correct URL for the photo file
+                var photoUrl = await _fileStorageService.GetUrlAsync(photo.FileName, "products");
+                
                 photos.Add(new TrainingPhotoDto
                 {
                     ProductId = product.Id,
                     ProductSku = product.SKU,
                     ProductName = product.Name,
                     PhotoId = photo.Id,
-                    PhotoUrl = $"/api/products/{product.Id}/photos/{photo.Id}/file"
+                    PhotoUrl = photoUrl
                 });
             }
         }
@@ -338,6 +347,40 @@ public class ImageRecognitionService : IImageRecognitionService
             TotalProducts = productsWithPhotos.Count,
             ClassLabels = classLabels.OrderBy(l => l).ToList()
         };
+    }
+
+    /// <inheritdoc/>
+    public async Task<HashSet<Guid>?> GetAccessibleProductIdsAsync(Guid? userId, bool isAdmin)
+    {
+        // Admins can access all products
+        if (isAdmin)
+        {
+            return null;
+        }
+
+        // Anonymous users or users without ID cannot access any products
+        if (!userId.HasValue)
+        {
+            return new HashSet<Guid>();
+        }
+
+        // Get operator's assigned points of sale
+        var assignedPosIds = await _userPointOfSaleService.GetAssignedPointOfSaleIdsAsync(userId.Value);
+        
+        if (assignedPosIds.Count == 0)
+        {
+            _logger.LogDebug("User {UserId} has no assigned points of sale", userId.Value);
+            return new HashSet<Guid>();
+        }
+
+        // Get products that have inventory at the assigned points of sale
+        var accessibleProductIds = await _inventoryRepository.GetProductIdsWithInventoryAtPointsOfSaleAsync(assignedPosIds);
+        
+        _logger.LogDebug(
+            "User {UserId} can access {ProductCount} products from {PosCount} points of sale",
+            userId.Value, accessibleProductIds.Count, assignedPosIds.Count);
+        
+        return accessibleProductIds;
     }
 
     private static ModelMetadataDto MapToDto(ModelMetadata model)

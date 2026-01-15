@@ -76,7 +76,7 @@ export function SalesHistoryPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const posData = await pointOfSaleService.getPointsOfSale(false);
+        const posData = await pointOfSaleService.getPointsOfSale();
         setPointsOfSale(posData);
         
         // Set default date range
@@ -275,40 +275,32 @@ export function SalesHistoryPage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <span className="font-medium">{sale.productName}</span>
-                          <br />
-                          <span className="text-sm text-muted-foreground">
-                            {sale.productSku}
-                          </span>
+                          <div className="font-medium">{sale.productName}</div>
+                          <div className="text-sm text-muted-foreground">
+                            SKU: {sale.productSku}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>{sale.pointOfSaleName}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">{sale.quantity}</Badge>
-                      </TableCell>
+                      <TableCell className="text-center">{sale.quantity}</TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(sale.total)}
                       </TableCell>
                       <TableCell>{sale.paymentMethodName}</TableCell>
                       {isAdmin && <TableCell>{sale.userName}</TableCell>}
                       <TableCell className="text-center">
-                        {sale.hasPhoto ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewSale(sale)}
-                          >
-                            <Image className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
+                        {sale.hasPhoto && (
+                          <Badge variant="secondary" className="gap-1">
+                            <Image className="h-3 w-3" />
+                            Sí
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedSale(sale)}
+                          size="sm"
+                          onClick={() => handleViewSale(sale)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>

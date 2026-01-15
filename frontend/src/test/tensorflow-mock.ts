@@ -30,7 +30,18 @@ export class MockTensor {
 
   squeeze(axis?: number[]): MockTensor {
     const newShape = this.shape.filter((dim, i) => !axis || !axis.includes(i));
-    return new MockTensor(this.data, newShape);
+    return new MockTensor(this._data, newShape);
+  }
+
+  reshape(newShape: number[]): MockTensor {
+    return new MockTensor(this._data, newShape);
+  }
+
+  slice(begin: number[], size: number[]): MockTensor {
+    // Simplified slice - just return a tensor with the expected shape
+    const newShape = size.map((s, i) => (s === -1 ? this.shape[i] - begin[i] : s));
+    const newSize = newShape.reduce((a, b) => a * b, 1);
+    return new MockTensor(new Float32Array(newSize), newShape);
   }
 
   toFloat(): MockTensor {
@@ -54,18 +65,19 @@ export class MockTensor {
   }
 }
 
-// Mock model class
+// Mock model class (used as feature extractor - MobileNetV2)
 export class MockGraphModel {
   public predict(input: MockTensor): MockTensor {
-    // Return mock predictions (5 classes with varying confidence)
-    const predictions = new Float32Array([
-      0.65, // 65% confidence for class 0
-      0.50, // 50% confidence for class 1
-      0.45, // 45% confidence for class 2
-      0.30, // 30% confidence for class 3
-      0.10, // 10% confidence for class 4
-    ]);
-    return new MockTensor(predictions, [5]);
+    // Return mock feature vectors (1280-dimensional for MobileNetV2)
+    // Shape is [batch, 1, 1, 1280] for TF Hub MobileNetV2
+    const batchSize = input.shape[0] || 1;
+    const featureSize = 1280;
+    const features = new Float32Array(batchSize * featureSize);
+    // Fill with mock feature values
+    for (let i = 0; i < features.length; i++) {
+      features[i] = Math.random() * 0.5 + 0.25; // Random values between 0.25 and 0.75
+    }
+    return new MockTensor(features, [batchSize, 1, 1, featureSize]);
   }
 
   dispose(): void {
@@ -75,6 +87,19 @@ export class MockGraphModel {
 
 // Mock layers model
 export class MockLayersModel {
+  public layers: unknown[] = [];
+
+  public predict(input: MockTensor): MockTensor {
+    // Return mock predictions with a dominant class (passes OOD validation)
+    const predictions = new Float32Array([
+      0.85, // 85% confidence for class 0 (dominant)
+      0.10, // 10% confidence for class 1
+      0.03, // 3% confidence for class 2
+      0.02, // 2% confidence for class 3
+    ]);
+    return new MockTensor(predictions, [4]);
+  }
+
   public async fit(
     x: MockTensor,
     y: MockTensor,
@@ -142,6 +167,7 @@ export function createTensorFlowMock() {
 
     // Model loading
     loadGraphModel: vi.fn().mockResolvedValue(new MockGraphModel()),
+    loadLayersModel: vi.fn().mockResolvedValue(new MockLayersModel()),
     
     // Tensor operations
     tidy: vi.fn((fn) => fn()),
@@ -160,7 +186,9 @@ export function createTensorFlowMock() {
     // Image operations
     image: {
       resizeBilinear: vi.fn((tensor: MockTensor, size: [number, number]) => {
-        return new MockTensor(tensor.data.slice(0, size[0] * size[1] * 3), [...size, 3]);
+        const length = size[0] * size[1] * 3;
+        const data = new Float32Array(length).fill(128);
+        return new MockTensor(data, [...size, 3]);
       }),
     },
 
@@ -195,6 +223,25 @@ export function createTensorFlowMock() {
         data[i * depth + idx] = 1;
       });
       return new MockTensor(data, [indices.length, depth]);
+    }),
+
+    concat: vi.fn((tensors: MockTensor[], axis: number) => {
+      // Simplified concat - just combine the data
+      const totalSize = tensors.reduce((sum, t) => {
+        const tData = (t as any)._data as Float32Array;
+        return sum + tData.length;
+      }, 0);
+      const combinedData = new Float32Array(totalSize);
+      let offset = 0;
+      for (const t of tensors) {
+        const tData = (t as any)._data as Float32Array;
+        combinedData.set(tData, offset);
+        offset += tData.length;
+      }
+      // Calculate new shape
+      const newShape = [...tensors[0].shape];
+      newShape[axis] = tensors.reduce((sum, t) => sum + t.shape[axis], 0);
+      return new MockTensor(combinedData, newShape);
     }),
 
     // IO operations

@@ -267,6 +267,23 @@ The system SHALL allow operators to add optional notes to sales for annotations 
 - **THEN** system returns 400 Bad Request with validation error
 - **AND** does not create sale
 
+### Requirement: Price Display Format
+
+The system SHALL display all monetary values using Euro (EUR) currency format with Spanish locale conventions throughout the sales interface.
+
+#### Scenario: Display prices in Euro format
+
+- **WHEN** displaying product prices, subtotals, or sale totals
+- **THEN** the € symbol is shown before the numeric value
+- **AND** prices are formatted with 2 decimal places
+- **AND** Spanish locale (es-ES) formatting is used for Intl.NumberFormat
+
+#### Scenario: Sales history currency display
+
+- **WHEN** displaying sale amounts in history or reports
+- **THEN** formatCurrency uses Intl.NumberFormat with locale 'es-ES' and currency 'EUR'
+- **AND** amounts are displayed consistently across all views
+
 ### Requirement: Payment Method Selector Filtering
 
 The system SHALL display only active and assigned payment methods in the sales form, preventing selection of unavailable methods.

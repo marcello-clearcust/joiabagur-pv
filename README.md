@@ -65,6 +65,7 @@ Sistema de gestión integral para una joyería que opera en múltiples puntos de
 - **Optimizado para móviles** - Cámara, gestos táctiles, inferencia local
 - **Responsive** para administradores en cualquier dispositivo
 - **Testing**: xUnit + Testcontainers (backend), Vitest + React Testing Library (frontend)
+- **Moneda**: Euro (EUR, €) con formato español (es-ES)
 
 ---
 

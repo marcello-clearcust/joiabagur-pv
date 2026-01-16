@@ -351,7 +351,7 @@ export function ProductImportPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {typeof row.price === 'number' 
-                          ? `$${row.price.toFixed(2)}`
+                          ? `€${row.price.toFixed(2)}`
                           : row.price || '-'}
                       </TableCell>
                       <TableCell>{row.collection || '-'}</TableCell>

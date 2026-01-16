@@ -312,7 +312,7 @@ export function ManualSalesPage() {
                       <div className="flex-1">
                         <div className="font-medium">{product.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          SKU: {product.sku} | ${product.price.toFixed(2)}
+                          SKU: {product.sku} | €{product.price.toFixed(2)}
                         </div>
                       </div>
                     </button>
@@ -329,7 +329,7 @@ export function ManualSalesPage() {
                     <h3 className="font-semibold">{selectedProduct.name}</h3>
                     <p className="text-sm text-muted-foreground">SKU: {selectedProduct.sku}</p>
                     <p className="mt-1 text-lg font-bold text-primary">
-                      ${selectedProduct.price.toFixed(2)}
+                      €{selectedProduct.price.toFixed(2)}
                     </p>
                   </div>
                   <Badge variant={selectedProduct.isActive ? 'primary' : 'secondary'}>
@@ -438,7 +438,7 @@ export function ManualSalesPage() {
             <div className="rounded-lg bg-muted p-4">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>${(selectedProduct?.price || 0).toFixed(2)}</span>
+                <span>€{(selectedProduct?.price || 0).toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Cantidad</span>
@@ -447,7 +447,7 @@ export function ManualSalesPage() {
               <div className="mt-2 flex items-center justify-between border-t pt-2">
                 <span className="font-semibold">Total</span>
                 <span className="text-xl font-bold text-primary">
-                  ${total.toFixed(2)}
+                  €{total.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -486,7 +486,7 @@ export function ManualSalesPage() {
                     <p><strong>Producto:</strong> {selectedProduct.name}</p>
                     <p><strong>SKU:</strong> {selectedProduct.sku}</p>
                     <p><strong>Cantidad:</strong> {quantity}</p>
-                    <p><strong>Total:</strong> ${total.toFixed(2)}</p>
+                    <p><strong>Total:</strong> €{total.toFixed(2)}</p>
                   </div>
                 </AlertDescription>
               </Alert>

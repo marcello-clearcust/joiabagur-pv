@@ -298,7 +298,7 @@ export function InventoryAssignPage() {
                       {product.sku}
                     </TableCell>
                     <TableCell>{product.name}</TableCell>
-                    <TableCell>${product.price.toFixed(2)}</TableCell>
+                    <TableCell>€{product.price.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

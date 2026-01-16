@@ -110,7 +110,7 @@ function ProductCard({ product, isAdmin }: ProductCardProps) {
         
         <div className="mt-3 flex items-center justify-between">
           <span className="text-lg font-semibold">
-            ${product.price.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+            €{product.price.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
           </span>
           <span className={cn(
             "text-sm font-mono",

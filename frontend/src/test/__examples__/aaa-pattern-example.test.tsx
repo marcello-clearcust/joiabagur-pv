@@ -213,7 +213,7 @@ describe('AAA Pattern Example - Test Data Factories', () => {
       <article>
         <h2>{product.name}</h2>
         <p>SKU: {product.sku}</p>
-        <p>Price: ${product.price}</p>
+        <p>Price: €{product.price}</p>
       </article>
     );
 
@@ -224,7 +224,7 @@ describe('AAA Pattern Example - Test Data Factories', () => {
     // ASSERT
     expect(screen.getByRole('heading', { name: 'Luxury Watch' })).toBeInTheDocument();
     expect(screen.getByText('SKU: WATCH-001')).toBeInTheDocument();
-    expect(screen.getByText('Price: $1299.99')).toBeInTheDocument();
+    expect(screen.getByText('Price: €1299.99')).toBeInTheDocument();
   });
 
   it('should build complex product using builder pattern', () => {

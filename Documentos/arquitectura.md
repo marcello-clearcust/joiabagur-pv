@@ -692,4 +692,29 @@ Para instrucciones detalladas sobre el deploy en AWS, consultar:
 | **Frontend Hosting** | CloudFront + S3 | CDN global, cache eficiente, bajo costo |
 | **Secrets** | Secrets Manager | Seguridad, integración nativa con .NET |
 | **CI/CD** | GitHub Actions | Ya en uso, free-tier generoso, actions oficiales AWS |
+| **Moneda** | Euro (EUR, €) | Mercado objetivo español/europeo |
+| **Locale** | es-ES | Formato español para números y fechas |
+
+### Localización y Formato de Moneda
+
+El sistema está configurado para el mercado español/europeo:
+
+| Configuración | Valor | Descripción |
+|---------------|-------|-------------|
+| **Moneda** | EUR (€) | Euro como moneda principal |
+| **Locale** | es-ES | Español de España |
+| **Formato de Precios** | €X.XX | Símbolo € antes del valor, 2 decimales |
+| **Intl.NumberFormat** | `es-ES`, `EUR` | Para formateo automático de moneda |
+
+**Implementación Frontend:**
+```typescript
+// Formato simple
+€{price.toFixed(2)}
+
+// Formato con Intl.NumberFormat
+new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+}).format(amount);
+```
 

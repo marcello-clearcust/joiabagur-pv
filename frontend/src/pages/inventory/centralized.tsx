@@ -26,11 +26,6 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 
 import { inventoryService } from '@/services/inventory.service';
 import {
@@ -43,18 +38,21 @@ function ProductRow({ stock }: { stock: CentralizedStock }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <>
       <TableRow className="cursor-pointer hover:bg-muted/50">
         <TableCell>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              {isOpen ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
         </TableCell>
         <TableCell className="font-mono text-sm">{stock.productSku}</TableCell>
         <TableCell>{stock.productName}</TableCell>
@@ -67,7 +65,7 @@ function ProductRow({ stock }: { stock: CentralizedStock }) {
           {stock.breakdown.length} punto(s)
         </TableCell>
       </TableRow>
-      <CollapsibleContent asChild>
+      {isOpen && (
         <TableRow>
           <TableCell colSpan={5} className="p-0">
             <div className="bg-muted/30 px-8 py-2">
@@ -96,8 +94,8 @@ function ProductRow({ stock }: { stock: CentralizedStock }) {
             </div>
           </TableCell>
         </TableRow>
-      </CollapsibleContent>
-    </Collapsible>
+      )}
+    </>
   );
 }
 

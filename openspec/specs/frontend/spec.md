@@ -125,3 +125,23 @@ The frontend SHALL maintain a consistent folder structure separating concerns: p
 - **THEN** pages are placed in `pages/[module]/` directory
 - **AND** main page is named `page.tsx` or `index.tsx`
 
+### Requirement: Currency and Localization
+
+The frontend SHALL display all monetary values using Euro (EUR) currency format with Spanish (Spain) locale formatting conventions.
+
+#### Scenario: Price Display Format
+- **WHEN** displaying product prices, sale totals, or any monetary value
+- **THEN** the currency symbol € (Euro) is shown
+- **AND** numbers are formatted using Spanish locale (es-ES) with comma as decimal separator
+- **AND** minimum 2 decimal places are displayed
+
+#### Scenario: Currency Formatting with Intl API
+- **WHEN** using Intl.NumberFormat for currency display
+- **THEN** locale is set to 'es-ES'
+- **AND** currency is set to 'EUR'
+- **AND** style is set to 'currency'
+
+#### Scenario: Simple Price Display
+- **WHEN** displaying prices without full Intl formatting
+- **THEN** the € symbol precedes the numeric value
+- **AND** two decimal places are shown (e.g., €299.99)

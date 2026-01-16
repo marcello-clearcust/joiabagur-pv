@@ -123,9 +123,9 @@ export function SalesHistoryPage() {
 
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    return new Intl.NumberFormat('es-ES', {
       style: 'currency',
-      currency: 'MXN',
+      currency: 'EUR',
     }).format(amount);
   };
 

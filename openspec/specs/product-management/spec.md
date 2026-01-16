@@ -627,3 +627,12 @@ The system SHALL provide a user interface for uploading product photos with drag
 - **THEN** a progress indicator is shown
 - **AND** the upload can be cancelled if needed
 
+### Requirement: Price Display Format
+
+The system SHALL display all product prices using Euro (EUR) currency format with Spanish locale conventions throughout the product interfaces.
+
+#### Scenario: Display product prices in Euro format
+- **WHEN** displaying product prices in catalog, search results, or import preview
+- **THEN** the € symbol is shown before the numeric value
+- **AND** prices are formatted with 2 decimal places (e.g., €299.99)
+- **AND** Spanish locale (es-ES) formatting is used when using toLocaleString

@@ -30,6 +30,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Install Latest AWS CLI v2
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          sudo ./aws/install --update
+          aws --version
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -51,12 +58,20 @@ jobs:
         run: |
           status=$(aws apprunner describe-service --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} --query 'Service.Status' --output text)
           echo "Current service status: $status"
-          if [ "$status" != "RUNNING" ]; then
+          if [ "$status" != "RUNNING" ] && [ "$status" != "OPERATION_IN_PROGRESS" ]; then
             echo "Service not running. Attempting to resume..."
             aws apprunner resume-service --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} || true
-            echo "Waiting for service to be running..."
-            aws apprunner wait service-running --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} || true
           fi
+          # Wait for service to be in a deployable state
+          for i in {1..30}; do
+            status=$(aws apprunner describe-service --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} --query 'Service.Status' --output text)
+            echo "Attempt $i: Service status is $status"
+            if [ "$status" == "RUNNING" ]; then
+              echo "Service is ready for deployment"
+              break
+            fi
+            sleep 10
+          done
 
       - name: Deploy to App Runner
         run: |
@@ -66,6 +81,17 @@ jobs:
       - name: Wait for deployment to complete
         run: |
           echo "Waiting for deployment to complete..."
-          aws apprunner wait service-running \
-            --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }}
-          echo "Deployment completed successfully!"
+          for i in {1..60}; do
+            status=$(aws apprunner describe-service --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} --query 'Service.Status' --output text)
+            echo "Attempt $i: Service status is $status"
+            if [ "$status" == "RUNNING" ]; then
+              echo "Deployment completed successfully!"
+              exit 0
+            elif [ "$status" == "CREATE_FAILED" ] || [ "$status" == "DELETE_FAILED" ]; then
+              echo "Deployment failed with status: $status"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Timeout waiting for deployment"
+          exit 1

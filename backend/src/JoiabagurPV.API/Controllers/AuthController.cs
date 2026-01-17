@@ -167,7 +167,9 @@ public class AuthController : ControllerBase
         // In Development we commonly run over plain HTTP (e.g. http://localhost:5056),
         // so Secure cookies would never be set/sent and everything becomes 401.
         var secure = !_environment.IsDevelopment() && Request.IsHttps;
-        var sameSite = _environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.Strict;
+        // Use SameSite=None for cross-origin requests (CloudFront -> App Runner)
+        // This requires Secure=true, which we have in production
+        var sameSite = _environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None;
 
         // Access token cookie
         Response.Cookies.Append(AccessTokenCookieName, accessToken, new CookieOptions

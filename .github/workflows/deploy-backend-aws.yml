@@ -47,6 +47,17 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+      - name: Ensure App Runner Service is Running
+        run: |
+          status=$(aws apprunner describe-service --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} --query 'Service.Status' --output text)
+          echo "Current service status: $status"
+          if [ "$status" != "RUNNING" ]; then
+            echo "Service not running. Attempting to resume..."
+            aws apprunner resume-service --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} || true
+            echo "Waiting for service to be running..."
+            aws apprunner wait service-running --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} || true
+          fi
+
       - name: Deploy to App Runner
         run: |
           aws apprunner start-deployment \

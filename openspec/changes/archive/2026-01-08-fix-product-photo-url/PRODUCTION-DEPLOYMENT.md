@@ -81,7 +81,7 @@ public Task<string> GetUrlAsync(string storedFileName, string? folder = null)
   "FileStorage": {
     "Provider": "AwsS3",  // or "AzureBlob", "GoogleCloud"
     "AwsS3": {
-      "BucketName": "joiabagur-pv-photos",
+      "BucketName": "jpv-photos",
       "Region": "us-east-1",
       "AccessKey": "${AWS_ACCESS_KEY}",
       "SecretKey": "${AWS_SECRET_KEY}"
@@ -169,16 +169,16 @@ Then frontend can use URLs directly without conversion.
 
 ## Production Checklist
 
-When deploying to production:
+When deploying to production (covered by add-aws-production-deployment spec):
 
-- [ ] Implement cloud storage in `CloudFileStorageService`
-- [ ] Configure cloud credentials in environment variables
-- [ ] Update `appsettings.Production.json` with cloud config
-- [ ] Update DI registration in `Program.cs` to use cloud service
-- [ ] Test photo upload and display with cloud storage
-- [ ] Configure CDN (optional) for better performance
-- [ ] Set appropriate CORS policies for cloud URLs
-- [ ] Configure cache headers for photos
+- [x] ⏭️ Implement cloud storage in `CloudFileStorageService` - see add-aws-production-deployment
+- [x] ⏭️ Configure cloud credentials in environment variables - see add-aws-production-deployment
+- [x] ⏭️ Update `appsettings.Production.json` with cloud config - see add-aws-production-deployment
+- [x] ⏭️ Update DI registration in `Program.cs` to use cloud service - see add-aws-production-deployment
+- [x] ⏭️ Test photo upload and display with cloud storage - see add-aws-production-deployment
+- [x] ⏭️ Configure CDN (optional) for better performance - see add-aws-production-deployment
+- [x] ⏭️ Set appropriate CORS policies for cloud URLs - see add-aws-production-deployment
+- [x] ⏭️ Configure cache headers for photos - see add-aws-production-deployment
 
 ## Security Considerations for Production
 

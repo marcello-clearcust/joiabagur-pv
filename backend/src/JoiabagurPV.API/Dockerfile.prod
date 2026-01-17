@@ -1,0 +1,47 @@
+# ============================================
+# Stage 1: Build .NET application
+# ============================================
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy csproj files and restore (layer caching)
+COPY src/JoiabagurPV.Domain/*.csproj JoiabagurPV.Domain/
+COPY src/JoiabagurPV.Infrastructure/*.csproj JoiabagurPV.Infrastructure/
+COPY src/JoiabagurPV.Application/*.csproj JoiabagurPV.Application/
+COPY src/JoiabagurPV.API/*.csproj JoiabagurPV.API/
+
+RUN dotnet restore JoiabagurPV.API/JoiabagurPV.API.csproj
+
+# Copy everything and build
+COPY src/ .
+RUN dotnet publish JoiabagurPV.API/JoiabagurPV.API.csproj -c Release -o /app/publish --no-restore
+
+# ============================================
+# Stage 2: Runtime (.NET only - no Python)
+# ============================================
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+
+# Install curl for health checks only
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy .NET application
+COPY --from=build /app/publish .
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+EXPOSE 8080
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/api/health || exit 1
+
+ENTRYPOINT ["dotnet", "JoiabagurPV.API.dll"]

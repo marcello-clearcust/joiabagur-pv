@@ -267,7 +267,7 @@ public class ImageRecognitionController : ControllerBase
                             var wrapped = new JsonObject
                             {
                                 ["format"] = "layers-model",
-                                ["generatedBy"] = "joiabagur-pv",
+                                ["generatedBy"] = "jpv",
                                 ["convertedBy"] = null,
                                 ["modelTopology"] = node,
                                 ["weightsManifest"] = new JsonArray
@@ -393,10 +393,11 @@ public class ImageRecognitionController : ControllerBase
             ? dataset.Photos 
             : dataset.Photos.Where(p => accessibleProductIds.Contains(p.ProductId)).ToList();
         
+        // Use ProductSku as dictionary key (immutable, unique) for stable model-to-product mapping
         var productMap = filteredPhotos
             .GroupBy(p => p.ProductId)
             .Select(g => g.First())
-            .ToDictionary(p => p.ProductName, p => new ProductLabelMapping
+            .ToDictionary(p => p.ProductSku, p => new ProductLabelMapping
             {
                 ProductId = p.ProductId,
                 ProductSku = p.ProductSku,
@@ -404,10 +405,10 @@ public class ImageRecognitionController : ControllerBase
                 PhotoUrl = p.PhotoUrl
             });
         
-        // Filter class labels to only include products the user can access
+        // Filter class labels (SKUs) to only include products the user can access
         var filteredClassLabels = accessibleProductIds == null
             ? dataset.ClassLabels
-            : dataset.ClassLabels.Where(label => productMap.ContainsKey(label)).ToList();
+            : dataset.ClassLabels.Where(sku => productMap.ContainsKey(sku)).ToList();
         
         return Ok(new ClassLabelsResponse
         {

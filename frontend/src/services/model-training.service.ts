@@ -165,15 +165,17 @@ async function downloadAndPreprocessPhotos(
   // Remove '/api' suffix if present since photo URLs already include it
   const backendBaseUrl = apiBaseUrl.replace('/api', '');
 
-  // Create class label to index mapping
+  // Create class label (SKU) to index mapping
+  // Class labels are now SKUs (immutable, unique) instead of product names
   const classToIndex = new Map(classLabels.map((label, index) => [label, index]));
 
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i];
-    const labelIndex = classToIndex.get(photo.productName);
+    // Use productSku for mapping (matches class labels from backend)
+    const labelIndex = classToIndex.get(photo.productSku);
     
     if (labelIndex === undefined) {
-      console.warn(`Unknown class label: ${photo.productName}`);
+      console.warn(`Unknown class label for SKU: ${photo.productSku} (${photo.productName})`);
       continue;
     }
 

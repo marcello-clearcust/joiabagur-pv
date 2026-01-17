@@ -322,7 +322,8 @@ public class ImageRecognitionService : IImageRecognitionService
 
         foreach (var product in productsWithPhotos)
         {
-            classLabels.Add(product.Name);
+            // Use SKU as class label (immutable, unique) instead of Name (mutable, may have duplicates)
+            classLabels.Add(product.SKU);
 
             foreach (var photo in product.Photos)
             {

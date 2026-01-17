@@ -54,10 +54,18 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(); // Available at: /scalar/v1
 }
 
-app.UseHttpsRedirection();
-
-// Add CORS
+// Add CORS BEFORE HTTPS redirection to handle preflight requests correctly
 app.UseCors(app.Environment.IsDevelopment() ? "Development" : "Production");
+
+// HTTPS redirection - skip OPTIONS requests (preflight) and HTTP requests in development to avoid CORS issues
+// In development, allow HTTP connections from frontend without redirecting
+app.UseWhen(context => 
+    context.Request.Method != "OPTIONS" && 
+    (app.Environment.IsProduction() || context.Request.IsHttps), 
+    appBuilder =>
+{
+    appBuilder.UseHttpsRedirection();
+});
 
 // Add rate limiting
 app.UseRateLimiter();

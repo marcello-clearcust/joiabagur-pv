@@ -108,4 +108,4 @@ The system currently operates only in local development mode with local filesyst
   - App Runner instance: 0.25 vCPU, 0.5GB RAM (free-tier eligible)
   - Docker image size: ~200MB (.NET only, no Python)
   - Estimated cost: $0/month (free-tier first 12 months), ~$25-45/month after
-  - Region: eu-west-1 (Ireland) or us-east-1 (configurable)
+  - Region: eu-west-3 (Paris)

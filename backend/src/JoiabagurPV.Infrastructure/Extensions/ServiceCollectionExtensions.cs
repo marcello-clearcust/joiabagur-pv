@@ -1,3 +1,4 @@
+using Amazon.S3;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Domain.Interfaces.Services;
@@ -80,9 +81,11 @@ public static class ServiceCollectionExtensions
 
         // Register file storage service based on configuration
         var storageProvider = configuration["FileStorage:Provider"]?.ToLowerInvariant() ?? "local";
-        if (storageProvider == "cloud")
+        if (storageProvider == "s3")
         {
-            services.AddScoped<IFileStorageService, CloudFileStorageService>();
+            // Register AWS S3 client for dependency injection
+            services.AddAWSService<IAmazonS3>();
+            services.AddScoped<IFileStorageService, S3FileStorageService>();
         }
         else
         {

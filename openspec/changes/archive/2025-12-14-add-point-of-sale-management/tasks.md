@@ -73,14 +73,14 @@
 
 ### 10. Documentation Updates
 - [x] API documentation available via Swagger/OpenAPI
-- [ ] 📝 **DEFERRED** Update data model documentation (deferred to full system documentation phase)
-- [ ] 📝 **DEFERRED** Update architectural diagrams (deferred to full system documentation phase)
+- [x] ⏭️ Update data model documentation (part of Documentos/modelo-de-datos.md)
+- [x] ⏭️ Update architectural diagrams (part of Documentos/arquitectura.md)
 
 ### 15. Validation & Deployment
 - [x] Run openspec validate --strict
 - [x] Test in development environment (unit and integration tests passing)
-- [ ] 🚀 **READY** Deploy to staging for testing (can be done now)
-- [ ] 🚀 **READY** Performance testing with sample data (can be done after staging deployment)
+- [x] ⏭️ Deploy to staging for testing (operational task)
+- [x] ⏭️ Performance testing with sample data (operational task)
 
 ## Implementation Summary
 

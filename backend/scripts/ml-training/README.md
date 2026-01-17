@@ -56,3 +56,12 @@ python train_model.py \
 - **Insufficient photos**: At least 10 photos from 2+ products required
 - **Memory issues**: Reduce batch_size in train_model.py
 - **Low accuracy**: Add more photos per product (recommended: 5-10 per product)
+
+## Class Labels
+
+Class labels use **Product SKU** (not product name) as the identifier. This ensures:
+- **Stability**: SKUs are immutable; renaming a product won't break the model
+- **Uniqueness**: SKUs are guaranteed unique; no collisions between similar names
+
+> **Migration Note**: If upgrading from a version that used product names as class labels,
+> you must retrain the model after deployment. Existing models will be incompatible.

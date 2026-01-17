@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { getImageUrl } from '@/lib/image-url';
 
 import { useAuth } from '@/providers/auth-provider';
 import { imageRecognitionInferenceService } from '@/services/image-recognition.service';
@@ -409,9 +410,17 @@ export function ImageRecognitionSalesPage() {
                     onClick={() => handleSelectSuggestion(suggestion)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                        <ShoppingCart className="h-6 w-6 text-primary" />
-                      </div>
+                      {suggestion.photoUrl ? (
+                        <img 
+                          src={getImageUrl(suggestion.photoUrl)} 
+                          alt={suggestion.productName}
+                          className="h-12 w-12 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                          <ShoppingCart className="h-6 w-6 text-primary" />
+                        </div>
+                      )}
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold">{suggestion.productName}</h4>

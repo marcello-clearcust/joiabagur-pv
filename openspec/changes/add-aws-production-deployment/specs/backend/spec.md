@@ -32,7 +32,7 @@ The backend SHALL integrate with AWS Secrets Manager for secure credential manag
 
 #### Scenario: Production Secrets Loading
 - **WHEN** application starts in Production environment
-- **THEN** configuration is loaded from AWS Secrets Manager secret "joiabagur-prod"
+- **THEN** configuration is loaded from AWS Secrets Manager secret "jpv-prod"
 - **AND** secrets are merged with appsettings.json configuration
 
 #### Scenario: Development Environment Fallback

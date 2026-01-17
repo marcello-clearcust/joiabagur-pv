@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { useAuth } from '@/providers/auth-provider';
+import { getImageUrl } from '@/lib/image-url';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
@@ -93,17 +94,34 @@ export function ManualSalesPage() {
         }
         
         // If a productId was passed from image recognition, pre-select that product
-        if (locationState?.productId && productsData) {
-          const preSelectedProduct = productsData.find(
+        // Note: productId could be empty string if image recognition enrichment failed
+        if (locationState?.productId && locationState.productId.trim() !== '') {
+          // First try to find in already loaded products
+          let preSelectedProduct = productsData?.find(
             (p) => p.id === locationState.productId
           );
+          
+          // If not found in local list, fetch directly from API
+          // This handles cases where the product list loading is incomplete
+          // or the admin is accessing a product not in the initial page
+          if (!preSelectedProduct) {
+            try {
+              preSelectedProduct = await productService.getProduct(locationState.productId);
+              // Add to local list for future searches
+              if (preSelectedProduct) {
+                setProducts(prev => [...prev, preSelectedProduct!]);
+              }
+            } catch (fetchError) {
+              console.warn('Could not fetch product by ID:', fetchError);
+            }
+          }
           
           if (preSelectedProduct) {
             setSelectedProduct(preSelectedProduct);
             setProductSearch(preSelectedProduct.sku);
             toast.success(`Producto "${preSelectedProduct.name}" seleccionado automáticamente`);
           } else {
-            // Product not found - might not be in operator's accessible products
+            // Product truly not found or not accessible
             toast.warning('El producto seleccionado no está disponible en tus puntos de venta');
           }
         }
@@ -165,11 +183,20 @@ export function ManualSalesPage() {
       
       setStockLoading(true);
       try {
-        const stockData = await inventoryService.getStock(selectedPosId);
-        const productStock = stockData.items.find(
-          (item) => item.productId === selectedProduct.id
-        );
-        setAvailableStock(productStock?.quantity ?? 0);
+        // Use getProductStockBreakdown to get stock across all POSes for this product
+        // This is more reliable than getStock which returns paginated results
+        const stockBreakdown = await inventoryService.getProductStockBreakdown(selectedProduct.id);
+        
+        if (stockBreakdown) {
+          // Find stock for the selected POS
+          const posStock = stockBreakdown.breakdown.find(
+            (b) => b.pointOfSaleId === selectedPosId
+          );
+          setAvailableStock(posStock?.quantity ?? 0);
+        } else {
+          // Product has no inventory assignments
+          setAvailableStock(0);
+        }
       } catch (error) {
         console.error('Error checking stock:', error);
         setAvailableStock(null);
@@ -302,21 +329,36 @@ export function ManualSalesPage() {
               {/* Search Results Dropdown */}
               {searchResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full rounded-md border bg-background shadow-lg">
-                  {searchResults.map((product) => (
-                    <button
-                      key={product.id}
-                      type="button"
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted"
-                      onClick={() => handleSelectProduct(product)}
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          SKU: {product.sku} | €{product.price.toFixed(2)}
+                  {searchResults.map((product) => {
+                    const primaryPhoto = product.photos?.find((p) => p.isPrimary) || product.photos?.[0];
+                    const photoUrl = getImageUrl(primaryPhoto?.url);
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted"
+                        onClick={() => handleSelectProduct(product)}
+                      >
+                        {photoUrl ? (
+                          <img 
+                            src={photoUrl} 
+                            alt={product.name}
+                            className="h-10 w-10 rounded-md object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted flex-shrink-0">
+                            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{product.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            SKU: {product.sku} | €{product.price.toFixed(2)}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -324,17 +366,35 @@ export function ManualSalesPage() {
             {/* Selected Product */}
             {selectedProduct && (
               <div className="rounded-lg border p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold">{selectedProduct.name}</h3>
-                    <p className="text-sm text-muted-foreground">SKU: {selectedProduct.sku}</p>
-                    <p className="mt-1 text-lg font-bold text-primary">
-                      €{selectedProduct.price.toFixed(2)}
-                    </p>
+                <div className="flex items-start gap-4">
+                  {/* Product Photo */}
+                  {(() => {
+                    const primaryPhoto = selectedProduct.photos?.find((p) => p.isPrimary) || selectedProduct.photos?.[0];
+                    const photoUrl = getImageUrl(primaryPhoto?.url);
+                    return photoUrl ? (
+                      <img 
+                        src={photoUrl} 
+                        alt={selectedProduct.name}
+                        className="h-20 w-20 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-muted flex-shrink-0">
+                        <ShoppingCart className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    );
+                  })()}
+                  <div className="flex-1 flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold">{selectedProduct.name}</h3>
+                      <p className="text-sm text-muted-foreground">SKU: {selectedProduct.sku}</p>
+                      <p className="mt-1 text-lg font-bold text-primary">
+                        €{selectedProduct.price.toFixed(2)}
+                      </p>
+                    </div>
+                    <Badge variant={selectedProduct.isActive ? 'primary' : 'secondary'}>
+                      {selectedProduct.isActive ? 'Activo' : 'Inactivo'}
+                    </Badge>
                   </div>
-                  <Badge variant={selectedProduct.isActive ? 'primary' : 'secondary'}>
-                    {selectedProduct.isActive ? 'Activo' : 'Inactivo'}
-                  </Badge>
                 </div>
 
                 {/* Stock Info */}

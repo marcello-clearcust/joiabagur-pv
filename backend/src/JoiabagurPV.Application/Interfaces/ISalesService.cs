@@ -12,9 +12,10 @@ public interface ISalesService
     /// Validates stock, payment method, and operator access before creating the sale.
     /// </summary>
     /// <param name="request">The sale creation request.</param>
-    /// <param name="userId">The ID of the user (operator) creating the sale.</param>
+    /// <param name="userId">The ID of the user creating the sale.</param>
+    /// <param name="isAdmin">Whether the user is an administrator (admins can sell from any POS).</param>
     /// <returns>The result of the sale creation.</returns>
-    Task<CreateSaleResult> CreateSaleAsync(CreateSaleRequest request, Guid userId);
+    Task<CreateSaleResult> CreateSaleAsync(CreateSaleRequest request, Guid userId, bool isAdmin);
 
     /// <summary>
     /// Gets a sale by ID with full details.

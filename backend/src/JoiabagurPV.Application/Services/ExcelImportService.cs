@@ -152,6 +152,45 @@ public class ExcelImportService : IExcelImportService
             var validationErrors = ValidateRows(rowsData);
             result.Errors.AddRange(validationErrors);
 
+            // If validation passed, calculate created vs updated counts
+            if (!result.Errors.Any() && rowsData.Count > 0)
+            {
+                var skus = rowsData.Select(r => r.Sku).ToList();
+                var existingProducts = await _productRepository.GetBySkusAsync(skus);
+                
+                // Count how many SKUs already exist vs are new
+                var existingCount = 0;
+                var newCount = 0;
+                
+                foreach (var row in rowsData)
+                {
+                    if (existingProducts.ContainsKey(row.Sku))
+                    {
+                        existingCount++;
+                    }
+                    else
+                    {
+                        newCount++;
+                    }
+                }
+                
+                result.CreatedCount = newCount;
+                result.UpdatedCount = existingCount;
+                
+                // Also count collections that will be created
+                var collectionNames = rowsData
+                    .Where(r => !string.IsNullOrWhiteSpace(r.CollectionName))
+                    .Select(r => r.CollectionName!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                
+                if (collectionNames.Any())
+                {
+                    var existingCollections = await _collectionRepository.GetByNamesAsync(collectionNames);
+                    result.CollectionsCreatedCount = collectionNames.Count - existingCollections.Count;
+                }
+            }
+
             result.Success = !result.Errors.Any();
             result.Message = result.Success 
                 ? $"Validation passed for {result.TotalRows} rows." 

@@ -370,11 +370,12 @@ describe('Image Recognition Inference Service', () => {
   describe('generateSuggestions', () => {
     it('should return suggestions when prediction is valid and dominant', async () => {
       // Arrange - clear dominant prediction that passes OOD validation
+      // Class labels are now SKUs (immutable identifiers)
       const predictions = new MockTensor(
         [0.80, 0.10, 0.05, 0.03, 0.02], // Dominant prediction
         [5]
       );
-      const classLabels = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'];
+      const classLabels = ['SKU-001', 'SKU-002', 'SKU-003', 'SKU-004', 'SKU-005'];
 
       // Act
       const suggestions = await generateSuggestions(predictions as unknown as tf.Tensor, classLabels);
@@ -382,7 +383,7 @@ describe('Image Recognition Inference Service', () => {
       // Assert
       expect(suggestions.length).toBeGreaterThan(0);
       expect(suggestions[0].confidence).toBeCloseTo(80, 0); // Use toBeCloseTo for float precision
-      expect(suggestions[0].productName).toBe('Product A');
+      expect(suggestions[0].productSku).toBe('SKU-001'); // Now uses SKU instead of productName
     });
 
     it('should limit suggestions to maximum 5', async () => {
@@ -459,6 +460,7 @@ describe('Image Recognition Inference Service', () => {
         isActive: true,
       });
 
+      // Note: classLabels are now SKUs (immutable, unique) instead of product names
       vi.mocked(imageRecognitionService.getTrainingDataset).mockResolvedValue({
         photos: [
           {
@@ -478,7 +480,7 @@ describe('Image Recognition Inference Service', () => {
         ],
         totalPhotos: 2,
         totalProducts: 2,
-        classLabels: ['Product A', 'Product B'],
+        classLabels: ['SKU-001', 'SKU-002'], // SKUs instead of product names
       });
     });
 

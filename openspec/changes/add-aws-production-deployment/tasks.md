@@ -7,28 +7,28 @@
 - [ ] 1.3 Create IAM role for App Runner with S3, RDS, and Secrets Manager access
 - [ ] 1.4 Create VPC security group for RDS (restrict to App Runner only)
 - [ ] 1.5 Create RDS PostgreSQL instance (db.t3.micro, 20GB, 7-day backup retention)
-- [ ] 1.6 Create S3 bucket for file storage (joiabagur-files-prod)
+- [ ] 1.6 Create S3 bucket for file storage (jpv-files-prod)
 - [ ] 1.7 Configure S3 bucket CORS for frontend uploads
-- [ ] 1.8 Create S3 bucket for frontend hosting (joiabagur-frontend-prod)
+- [ ] 1.8 Create S3 bucket for frontend hosting (jpv-frontend-prod)
 - [ ] 1.9 Create CloudFront distribution for frontend
 - [ ] 1.10 Create ECR repository for backend Docker images
-- [ ] 1.11 Create secrets in AWS Secrets Manager (joiabagur-prod)
+- [ ] 1.11 Create secrets in AWS Secrets Manager (jpv-prod)
 
 ## 2. Backend Implementation - S3 & Secrets
 
-- [ ] 2.1 Add NuGet packages: AWSSDK.S3, AWSSDK.SecretsManager, Amazon.Extensions.Configuration.SecretsManager
-- [ ] 2.2 Implement `S3FileStorageService` in `JoiabagurPV.Infrastructure/Services/`
+- [x] 2.1 Add NuGet packages: AWSSDK.S3, AWSSDK.SecretsManager, Amazon.Extensions.Configuration.SecretsManager
+- [x] 2.2 Implement `S3FileStorageService` in `JoiabagurPV.Infrastructure/Services/`
 - [ ] 2.3 Add unit tests for `S3FileStorageService`
 - [ ] 2.4 Add AWS Secrets Manager configuration provider in `Program.cs`
-- [ ] 2.5 Update `ServiceCollectionExtensions.cs` to register S3 service based on configuration
-- [ ] 2.6 Add `appsettings.Production.json` with AWS-specific configuration
+- [x] 2.5 Update `ServiceCollectionExtensions.cs` to register S3 service based on configuration
+- [x] 2.6 Add `appsettings.Production.json` with AWS-specific configuration
 - [ ] 2.7 Test S3FileStorageService locally with AWS credentials
 
 ## 3. Production Dockerfile (.NET Only)
 
-- [ ] 3.1 Create `backend/src/JoiabagurPV.API/Dockerfile.prod` (multi-stage, .NET only)
-- [ ] 3.2 Configure health check endpoint in Dockerfile
-- [ ] 3.3 Configure non-root user for security
+- [x] 3.1 Create `backend/src/JoiabagurPV.API/Dockerfile.prod` (multi-stage, .NET only)
+- [x] 3.2 Configure health check endpoint in Dockerfile
+- [x] 3.3 Configure non-root user for security
 - [ ] 3.4 Test Docker build locally (verify image size ~200MB)
 - [ ] 3.5 Test container runs correctly with environment variables
 
@@ -46,8 +46,8 @@
 ## 5. CI/CD Pipeline
 
 - [ ] 5.1 Create GitHub Secrets for AWS credentials and configuration
-- [ ] 5.2 Create `.github/workflows/deploy-backend-aws.yml` for backend deployment
-- [ ] 5.3 Create `.github/workflows/deploy-frontend-aws.yml` for frontend deployment
+- [x] 5.2 Create `.github/workflows/deploy-backend-aws.yml` for backend deployment
+- [x] 5.3 Create `.github/workflows/deploy-frontend-aws.yml` for frontend deployment
 - [ ] 5.4 Create App Runner service configuration (0.25 vCPU, 0.5GB RAM)
 - [ ] 5.5 Test deployment pipeline with manual trigger
 - [ ] 5.6 Configure automatic deployment on push to main branch

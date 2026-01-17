@@ -91,8 +91,8 @@ public class SalesController : ControllerBase
             }
         }
 
-        // Create sale
-        var result = await _salesService.CreateSaleAsync(request, userId);
+        // Create sale (admins can sell from any POS)
+        var result = await _salesService.CreateSaleAsync(request, userId, _currentUserService.IsAdmin);
 
         if (!result.Success)
         {
@@ -171,10 +171,18 @@ public class SalesController : ControllerBase
             return Unauthorized();
         }
 
+        // Convert dates to UTC to avoid PostgreSQL "Kind=Unspecified" error
+        DateTime? startDateUtc = startDate.HasValue 
+            ? DateTime.SpecifyKind(startDate.Value, DateTimeKind.Utc) 
+            : null;
+        DateTime? endDateUtc = endDate.HasValue 
+            ? DateTime.SpecifyKind(endDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc) 
+            : null;
+
         var request = new SalesHistoryFilterRequest
         {
-            StartDate = startDate,
-            EndDate = endDate,
+            StartDate = startDateUtc,
+            EndDate = endDateUtc,
             PointOfSaleId = pointOfSaleId,
             ProductId = productId,
             UserId = userId,

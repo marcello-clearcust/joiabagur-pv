@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
-    container_name: joiabagur-pv-postgres
+    container_name: jpv-pv-postgres
     environment:
       POSTGRES_DB: joiabagur_pv
       POSTGRES_USER: postgres
@@ -14,11 +14,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - joiabagur-network
+      - jpv-network
 
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: joiabagur-pv-pgadmin
+    container_name: jpv-pv-pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@joiabagur.com
       PGADMIN_DEFAULT_PASSWORD: admin123
@@ -27,11 +27,11 @@ services:
     depends_on:
       - postgres
     networks:
-      - joiabagur-network
+      - jpv-network
 
 volumes:
   postgres_data:
 
 networks:
-  joiabagur-network:
+  jpv-network:
     driver: bridge

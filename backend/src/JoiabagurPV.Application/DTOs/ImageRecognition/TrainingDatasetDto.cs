@@ -16,7 +16,7 @@ public class TrainingPhotoDto
     public string ProductSku { get; set; } = string.Empty;
 
     /// <summary>
-    /// Product name (used as class label).
+    /// Product name (for display purposes; SKU is used as class label).
     /// </summary>
     public string ProductName { get; set; } = string.Empty;
 
@@ -52,7 +52,7 @@ public class TrainingDatasetResponse
     public int TotalProducts { get; set; }
 
     /// <summary>
-    /// Product class labels (unique product names).
+    /// Product class labels (unique product SKUs - immutable identifiers).
     /// </summary>
     public List<string> ClassLabels { get; set; } = new();
 }
@@ -73,7 +73,7 @@ public class ProductLabelMapping
     public string ProductSku { get; set; } = string.Empty;
 
     /// <summary>
-    /// Product name (class label).
+    /// Product name (for display; SKU is the class label).
     /// </summary>
     public string ProductName { get; set; } = string.Empty;
 
@@ -90,12 +90,13 @@ public class ProductLabelMapping
 public class ClassLabelsResponse
 {
     /// <summary>
-    /// List of class labels (product names) in order matching model output.
+    /// List of class labels (product SKUs) in order matching model output.
+    /// SKUs are used as class labels because they are immutable and unique.
     /// </summary>
     public List<string> ClassLabels { get; set; } = new();
 
     /// <summary>
-    /// Mapping from class label (product name) to product details.
+    /// Mapping from class label (product SKU) to product details.
     /// </summary>
     public Dictionary<string, ProductLabelMapping> ProductMappings { get; set; } = new();
 }

@@ -1,6 +1,6 @@
 # JoiabagurPV Backend
 
-![Backend Tests](https://github.com/marcello-clearcust/joiabagur-pv/actions/workflows/test-backend.yml/badge.svg)
+![Backend Tests](https://github.com/marcello-clearcust/jpv/actions/workflows/test-backend.yml/badge.svg)
 
 Backend API for the JoiabagurPV jewelry point of sale management system.
 

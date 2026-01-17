@@ -122,13 +122,13 @@ JoiabagurPV requires production deployment to deliver the MVP. The current imple
 **Secrets to Store:**
 ```json
 {
-  "joiabagur-prod": {
+  "jpv-prod": {
     "ConnectionStrings:DefaultConnection": "Host=xxx;Database=xxx;...",
     "Jwt:SecretKey": "xxx",
     "Jwt:Issuer": "JoiabagurPV",
     "Jwt:Audience": "JoiabagurPV-Client",
-    "Aws:S3:BucketName": "joiabagur-files-prod",
-    "Aws:Region": "eu-west-1"
+    "Aws:S3:BucketName": "jpv-files-prod",
+    "Aws:Region": "eu-west-3"
   }
 }
 ```
@@ -261,7 +261,7 @@ scripts/ml/
 {
   "Cpu": "0.25 vCPU",
   "Memory": "0.5 GB",
-  "InstanceRoleArn": "arn:aws:iam::xxx:role/joiabagur-apprunner-instance-role"
+  "InstanceRoleArn": "arn:aws:iam::xxx:role/jpv-apprunner-instance-role"
 }
 ```
 
@@ -419,7 +419,7 @@ if (builder.Environment.IsProduction())
 {
     builder.Configuration.AddSecretsManager(configurator: options =>
     {
-        options.SecretFilter = entry => entry.Name == "joiabagur-prod";
+        options.SecretFilter = entry => entry.Name == "jpv-prod";
         options.KeyGenerator = (_, key) => key.Replace(":", "__");
     });
 }
@@ -538,8 +538,8 @@ If production deployment fails:
 2. **SSL certificate**: Use AWS Certificate Manager or bring your own?
    - **Answer**: AWS Certificate Manager (free, automatic renewal)
 
-3. **Region selection**: eu-west-1 (Ireland) or us-east-1 (N. Virginia)?
-   - **Answer**: eu-west-1 (closer to Spain, GDPR compliance)
+3. **Region selection**: eu-west-3 (Paris)
+   - **Answer**: eu-west-3 (closer to Spain, GDPR compliance)
 
 4. **Monitoring level**: Basic CloudWatch or additional monitoring?
    - **Answer**: Basic CloudWatch (sufficient for MVP)

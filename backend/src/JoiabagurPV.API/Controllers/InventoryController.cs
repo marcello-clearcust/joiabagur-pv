@@ -539,12 +539,20 @@ public class InventoryController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
+        // Convert dates to UTC to avoid PostgreSQL "Kind=Unspecified" error
+        DateTime? startDateUtc = startDate.HasValue 
+            ? DateTime.SpecifyKind(startDate.Value, DateTimeKind.Utc) 
+            : null;
+        DateTime? endDateUtc = endDate.HasValue 
+            ? DateTime.SpecifyKind(endDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc) 
+            : null;
+
         var filter = new MovementHistoryFilter
         {
             ProductId = productId,
             PointOfSaleId = pointOfSaleId,
-            StartDate = startDate,
-            EndDate = endDate,
+            StartDate = startDateUtc,
+            EndDate = endDateUtc,
             Page = page,
             PageSize = pageSize
         };

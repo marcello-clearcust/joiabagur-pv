@@ -75,6 +75,7 @@ describe('Model Training Service', () => {
       };
 
       // Setup training dataset mock
+      // Note: classLabels are now SKUs (immutable, unique) instead of product names
       vi.mocked(imageRecognitionService.getTrainingDataset).mockResolvedValue({
         photos: [
           {
@@ -94,7 +95,7 @@ describe('Model Training Service', () => {
         ],
         totalPhotos: 2,
         totalProducts: 2,
-        classLabels: ['Product A', 'Product B'],
+        classLabels: ['SKU-001', 'SKU-002'], // SKUs instead of product names
       });
 
       // Mock upload

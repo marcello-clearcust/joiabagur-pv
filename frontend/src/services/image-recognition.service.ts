@@ -9,6 +9,35 @@ import * as tf from '@tensorflow/tfjs';
 import { imageRecognitionService } from './sales.service';
 import type { ProductSuggestion } from '@/types/sales.types';
 
+/**
+ * Confidence Threshold Configuration
+ * 
+ * The model outputs probability scores for each product class. These thresholds
+ * determine which predictions are shown to the user and when to fall back to
+ * manual entry.
+ * 
+ * CONFIDENCE_THRESHOLD (40%): Minimum confidence for a product to appear in suggestions.
+ *   - Products below this threshold are filtered out
+ *   - Prevents showing low-confidence "noise" predictions
+ * 
+ * MIN_TOP_CONFIDENCE (50%): Minimum confidence for the best prediction.
+ *   - If the top prediction is below 50%, all suggestions are rejected
+ *   - User is redirected to manual entry
+ * 
+ * DOMINANCE_RATIO (1.5x): Top prediction must be significantly better than second.
+ *   - Prevents showing ambiguous results where multiple products score similarly
+ *   - If top is not 1.5x better, all suggestions are rejected
+ * 
+ * MAX_ENTROPY_THRESHOLD (2.0): Maximum prediction uncertainty.
+ *   - High entropy means the model is "confused" between many options
+ *   - Entropy > 2.0 triggers fallback to manual entry
+ * 
+ * Fallback Flow:
+ *   1. If no predictions pass thresholds → empty array returned
+ *   2. Frontend shows "No se encontró correspondencia fiable"
+ *   3. User can retake photo or go to manual entry
+ *   4. Photo is preserved for manual entry attachment
+ */
 const CONFIDENCE_THRESHOLD = 0.4; // 40% confidence threshold for individual suggestions
 const MIN_TOP_CONFIDENCE = 0.5; // 50% minimum for top prediction to be valid
 const DOMINANCE_RATIO = 1.5; // Top prediction must be 1.5x higher than second
@@ -419,6 +448,7 @@ export async function validatePredictions(predictions: tf.Tensor): Promise<Predi
 
 /**
  * Convert model output to product suggestions.
+ * Class labels are now SKUs (immutable, unique identifiers).
  */
 export async function generateSuggestions(
   predictions: tf.Tensor,
@@ -429,7 +459,7 @@ export async function generateSuggestions(
   
   console.log('=== OOD VALIDATION ===');
   console.log('Validation result:', validation);
-  console.log('Class labels available:', classLabels);
+  console.log('Class labels (SKUs) available:', classLabels);
   console.log('======================');
   
   if (!validation.isValid) {
@@ -458,14 +488,13 @@ export async function generateSuggestions(
   const topSuggestions = suggestions.slice(0, MAX_SUGGESTIONS);
 
   // Map to ProductSuggestion objects
-  // Note: In a real implementation, you'd need to fetch product details from the backend
-  // For now, this is a simplified version
+  // Class labels are now SKUs - productName will be filled during enrichment
   return topSuggestions.map((suggestion) => ({
-    productId: '', // Would be populated from backend
-    productSku: '', // Would be populated from backend
-    productName: classLabels[suggestion.index],
+    productId: '', // Will be populated from backend during enrichment
+    productSku: classLabels[suggestion.index], // SKU is the class label
+    productName: '', // Will be populated from backend during enrichment
     confidence: suggestion.confidence * 100, // Convert to percentage
-    photoUrl: '', // Would be populated from backend
+    photoUrl: '', // Will be populated from backend during enrichment
   }));
 }
 
@@ -508,7 +537,7 @@ export async function recognizeProduct(imageFile: File): Promise<ProductSuggesti
     // This ensures we use the exact labels the model was trained with
     const trainedClassLabels = await loadClassLabels(metadata.version);
     
-    // DEBUG: Log predictions and class labels
+    // DEBUG: Log predictions and class labels (SKUs)
     const predictionData = await predictions.data();
     const numPredictions = predictionData.length;
     const numLabels = trainedClassLabels.length;
@@ -516,7 +545,7 @@ export async function recognizeProduct(imageFile: File): Promise<ProductSuggesti
     console.log('=== IMAGE RECOGNITION DEBUG ===');
     console.log('Model version:', metadata.version);
     console.log('Number of model outputs:', numPredictions);
-    console.log('Number of class labels:', numLabels);
+    console.log('Number of class labels (SKUs):', numLabels);
     
     // CRITICAL: Check for mismatch between model outputs and labels
     if (numPredictions !== numLabels) {
@@ -525,22 +554,25 @@ export async function recognizeProduct(imageFile: File): Promise<ProductSuggesti
       console.error('Please retrain the model to fix this issue.');
     }
     
-    console.log('Class labels:', trainedClassLabels);
+    // Get product mappings early to show both SKU and name in logs
+    const classLabelsData = await imageRecognitionService.getClassLabels();
+    
+    console.log('Class labels (SKUs):', trainedClassLabels);
     console.log('Raw predictions:');
     Array.from(predictionData).forEach((p, i) => {
-      const label = trainedClassLabels[i] || `Unknown-${i}`;
+      const sku = trainedClassLabels[i] || `Unknown-${i}`;
+      // Get product name from mappings for readability
+      const productName = classLabelsData.productMappings[sku]?.productName || '(unknown)';
       const bar = '█'.repeat(Math.round(p * 20));
-      console.log(`  [${i}] ${label}: ${(p * 100).toFixed(1)}% ${bar}`);
+      // Format: [index] SKU (ProductName): confidence%
+      console.log(`  [${i}] ${sku} (${productName}): ${(p * 100).toFixed(1)}% ${bar}`);
     });
     console.log('================================');
     
-    // Step 9: Generate suggestions using the trained class labels
+    // Step 9: Generate suggestions using the trained class labels (SKUs)
     const suggestions = await generateSuggestions(predictions, trainedClassLabels);
 
-    // Step 10: Get current product mappings from API for enrichment (IDs, URLs, etc.)
-    const classLabelsData = await imageRecognitionService.getClassLabels();
-    
-    // Step 11: Enrich with product details from mappings
+    // Step 10: Enrich with product details from mappings (already fetched above for logging)
     const enrichedSuggestions = enrichSuggestionsFromMappings(suggestions, classLabelsData.productMappings);
 
     // Clean up tensors
@@ -577,23 +609,34 @@ function loadImageElement(imageFile: File): Promise<HTMLImageElement> {
 
 /**
  * Enrich suggestions with product details from class label mappings.
+ * Matches by SKU (class label) which is immutable and unique.
  */
 function enrichSuggestionsFromMappings(
   suggestions: ProductSuggestion[],
   productMappings: Record<string, { productId: string; productSku: string; productName: string; photoUrl: string }>
 ): ProductSuggestion[] {
+  console.log('=== ENRICHMENT DEBUG ===');
+  console.log('Available product mappings (by SKU):', Object.keys(productMappings));
+  
   return suggestions.map((suggestion) => {
-    // Find product in mappings by name (class label)
-    const product = productMappings[suggestion.productName];
+    // Find product in mappings by SKU (class label is now SKU)
+    const product = productMappings[suggestion.productSku];
     
     if (product) {
+      // Log both SKU and product name for developer readability
+      console.log(`✅ Enriched SKU "${suggestion.productSku}" (${product.productName}) -> productId: ${product.productId}`);
       return {
         ...suggestion,
         productId: product.productId,
-        productSku: product.productSku,
+        productName: product.productName, // Get current name from database
         photoUrl: product.photoUrl,
       };
     }
+    
+    // Log when enrichment fails - this helps debug issues
+    console.warn(`⚠️ Could not find product mapping for SKU: "${suggestion.productSku}"`);
+    console.warn('This could mean the model was trained with a product that was deleted.');
+    console.warn('Consider retraining the model to fix this issue.');
     
     return suggestion;
   });

@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
-    container_name: joiabagur-pv-postgres-prod
+    container_name: jpv-pv-postgres-prod
     environment:
       POSTGRES_DB: joiabagur_pv_prod
       POSTGRES_USER: ${DB_USER}
@@ -11,14 +11,14 @@ services:
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     networks:
-      - joiabagur-network
+      - jpv-network
     restart: unless-stopped
 
   api:
     build:
       context: .
       dockerfile: src/JoiabagurPV.API/Dockerfile
-    container_name: joiabagur-pv-api-prod
+    container_name: jpv-pv-api-prod
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -28,12 +28,12 @@ services:
     depends_on:
       - postgres
     networks:
-      - joiabagur-network
+      - jpv-network
     restart: unless-stopped
 
 volumes:
   postgres_prod_data:
 
 networks:
-  joiabagur-network:
+  jpv-network:
     driver: bridge

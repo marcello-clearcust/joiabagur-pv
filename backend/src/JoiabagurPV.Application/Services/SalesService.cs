@@ -45,7 +45,21 @@ public class SalesService : ISalesService
     }
 
     /// <inheritdoc/>
-    public async Task<CreateSaleResult> CreateSaleAsync(CreateSaleRequest request, Guid userId)
+    /// <remarks>
+    /// <para><b>Transaction Management:</b></para>
+    /// <para>This method implements a double stock validation pattern for concurrency safety:</para>
+    /// <list type="number">
+    /// <item>First validation: Before transaction (fast fail for obvious issues)</item>
+    /// <item>Second validation: Inside transaction (prevents race conditions)</item>
+    /// </list>
+    /// <para>If stock changes between validations, the error message shows the difference.</para>
+    /// <para><b>Atomic Operations:</b></para>
+    /// <para>Sale, SalePhoto, and InventoryMovement are created in a single transaction.</para>
+    /// <para>If any step fails, all changes are rolled back to maintain data integrity.</para>
+    /// <para><b>Price Snapshot:</b></para>
+    /// <para>The product price at sale time is frozen in Sale.Price to preserve historical accuracy.</para>
+    /// </remarks>
+    public async Task<CreateSaleResult> CreateSaleAsync(CreateSaleRequest request, Guid userId, bool isAdmin)
     {
         try
         {
@@ -59,20 +73,23 @@ public class SalesService : ISalesService
                 };
             }
 
-            // Validate operator is assigned to point of sale
-            var isAssigned = await _userPointOfSaleRepository
-                .GetAll()
-                .AnyAsync(ups => ups.UserId == userId && 
-                                ups.PointOfSaleId == request.PointOfSaleId &&
-                                ups.IsActive);
-
-            if (!isAssigned)
+            // Validate operator is assigned to point of sale (admins can sell from any POS)
+            if (!isAdmin)
             {
-                return new CreateSaleResult
+                var isAssigned = await _userPointOfSaleRepository
+                    .GetAll()
+                    .AnyAsync(ups => ups.UserId == userId && 
+                                    ups.PointOfSaleId == request.PointOfSaleId &&
+                                    ups.IsActive);
+
+                if (!isAssigned)
                 {
-                    Success = false,
-                    ErrorMessage = "Operator is not assigned to this point of sale."
-                };
+                    return new CreateSaleResult
+                    {
+                        Success = false,
+                        ErrorMessage = "Operator is not assigned to this point of sale."
+                    };
+                }
             }
 
             // Validate product exists and is active

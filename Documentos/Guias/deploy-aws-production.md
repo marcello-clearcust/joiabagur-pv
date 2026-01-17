@@ -79,13 +79,13 @@ aws --version
 aws configure
 # AWS Access Key ID: [tu-access-key]
 # AWS Secret Access Key: [tu-secret-key]
-# Default region name: eu-west-1
+# Default region name: eu-west-3
 # Default output format: json
 ```
 
 ### 2.3 Permisos IAM Necesarios
 
-Crear usuario IAM `joiabagur-deploy` con las siguientes políticas:
+Crear usuario IAM `jpv-deploy` con las siguientes políticas:
 
 ```json
 {
@@ -139,12 +139,12 @@ Crear usuario IAM `joiabagur-deploy` con las siguientes políticas:
 
 | Recurso | Nombre |
 |---------|--------|
-| RDS Instance | `joiabagur-db-prod` |
-| S3 Files | `joiabagur-files-prod` |
-| S3 Frontend | `joiabagur-frontend-prod` |
-| ECR Repository | `joiabagur-api` |
-| App Runner Service | `joiabagur-api-prod` |
-| Secrets Manager | `joiabagur-prod` |
+| RDS Instance | `jpv-db-prod` |
+| S3 Files | `jpv-files-prod` |
+| S3 Frontend | `jpv-frontend-prod` |
+| ECR Repository | `jpv-api` |
+| App Runner Service | `jpv-api-prod` |
+| Secrets Manager | `jpv-prod` |
 | CloudFront Distribution | (auto-generated ID) |
 
 ---
@@ -153,7 +153,7 @@ Crear usuario IAM `joiabagur-deploy` con las siguientes políticas:
 
 ### 4.1 Selección de Región
 
-Usaremos **eu-west-1 (Ireland)** por:
+Usaremos **eu-west-3 (Paris)** por:
 - Proximidad geográfica a España
 - Cumplimiento GDPR
 - Disponibilidad completa de servicios
@@ -161,7 +161,7 @@ Usaremos **eu-west-1 (Ireland)** por:
 ```bash
 # Verificar región configurada
 aws configure get region
-# Debería mostrar: eu-west-1
+# Debería mostrar: eu-west-3
 ```
 
 ### 4.2 Crear VPC (Opcional - Usar Default VPC)
@@ -182,7 +182,7 @@ aws ec2 describe-vpcs --filters "Name=isDefault,Values=true"
 ```bash
 # Crear secreto con todas las credenciales necesarias
 aws secretsmanager create-secret \
-  --name "joiabagur-prod" \
+  --name "jpv-prod" \
   --description "Production secrets for JoiabagurPV" \
   --secret-string '{
     "ConnectionStrings__DefaultConnection": "Host=YOUR_RDS_ENDPOINT;Port=5432;Database=joiabagur_prod;Username=joiabagur_admin;Password=YOUR_SECURE_PASSWORD;SSL Mode=Require",
@@ -190,12 +190,12 @@ aws secretsmanager create-secret \
     "Jwt__Issuer": "JoiabagurPV",
     "Jwt__Audience": "JoiabagurPV-Client",
     "Jwt__ExpirationMinutes": "480",
-    "Aws__S3__BucketName": "joiabagur-files-prod",
-    "Aws__Region": "eu-west-1",
+    "Aws__S3__BucketName": "jpv-files-prod",
+    "Aws__Region": "eu-west-3",
     "FileStorage__Type": "S3",
     "FileStorage__PresignedUrlExpirationMinutes": "60"
   }' \
-  --region eu-west-1
+  --region eu-west-3
 ```
 
 ### 5.2 Actualizar Secreto (Cuando sea necesario)
@@ -203,7 +203,7 @@ aws secretsmanager create-secret \
 ```bash
 # Actualizar valores específicos
 aws secretsmanager update-secret \
-  --secret-id "joiabagur-prod" \
+  --secret-id "jpv-prod" \
   --secret-string '{...valores actualizados...}'
 ```
 
@@ -212,7 +212,7 @@ aws secretsmanager update-secret \
 ```bash
 # Ver valor del secreto (solo en entorno seguro)
 aws secretsmanager get-secret-value \
-  --secret-id "joiabagur-prod" \
+  --secret-id "jpv-prod" \
   --query 'SecretString' \
   --output text | jq .
 ```
@@ -229,12 +229,12 @@ VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'V
 
 # Crear security group
 aws ec2 create-security-group \
-  --group-name "joiabagur-rds-sg" \
+  --group-name "jpv-rds-sg" \
   --description "Security group for JoiabagurPV RDS" \
   --vpc-id $VPC_ID
 
 # Obtener el ID del security group creado
-SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=joiabagur-rds-sg" --query 'SecurityGroups[0].GroupId' --output text)
+SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=jpv-rds-sg" --query 'SecurityGroups[0].GroupId' --output text)
 
 # Permitir acceso PostgreSQL desde cualquier IP (temporalmente para setup)
 # NOTA: Después de configurar App Runner, restringir a solo App Runner
@@ -255,7 +255,7 @@ SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --q
 
 # Crear subnet group para RDS
 aws rds create-db-subnet-group \
-  --db-subnet-group-name "joiabagur-db-subnet-group" \
+  --db-subnet-group-name "jpv-db-subnet-group" \
   --db-subnet-group-description "Subnet group for JoiabagurPV database" \
   --subnet-ids $(echo $SUBNET_IDS | tr ',' ' ')
 ```
@@ -264,7 +264,7 @@ aws rds create-db-subnet-group \
 
 ```bash
 aws rds create-db-instance \
-  --db-instance-identifier "joiabagur-db-prod" \
+  --db-instance-identifier "jpv-db-prod" \
   --db-instance-class "db.t3.micro" \
   --engine "postgres" \
   --engine-version "15.4" \
@@ -274,7 +274,7 @@ aws rds create-db-instance \
   --storage-type "gp2" \
   --db-name "joiabagur_prod" \
   --vpc-security-group-ids $SG_ID \
-  --db-subnet-group-name "joiabagur-db-subnet-group" \
+  --db-subnet-group-name "jpv-db-subnet-group" \
   --backup-retention-period 7 \
   --preferred-backup-window "03:00-04:00" \
   --preferred-maintenance-window "Mon:04:00-Mon:05:00" \
@@ -289,11 +289,11 @@ aws rds create-db-instance \
 
 ```bash
 # Este comando espera hasta que la instancia esté disponible (puede tardar 5-10 minutos)
-aws rds wait db-instance-available --db-instance-identifier "joiabagur-db-prod"
+aws rds wait db-instance-available --db-instance-identifier "jpv-db-prod"
 
 # Obtener el endpoint
 aws rds describe-db-instances \
-  --db-instance-identifier "joiabagur-db-prod" \
+  --db-instance-identifier "jpv-db-prod" \
   --query 'DBInstances[0].Endpoint.Address' \
   --output text
 ```
@@ -311,24 +311,24 @@ Una vez obtenido el endpoint de RDS, actualizar el secreto en Secrets Manager co
 ```bash
 # Crear bucket para archivos
 aws s3api create-bucket \
-  --bucket "joiabagur-files-prod" \
-  --region eu-west-1 \
-  --create-bucket-configuration LocationConstraint=eu-west-1
+  --bucket "jpv-files-prod" \
+  --region eu-west-3 \
+  --create-bucket-configuration LocationConstraint=eu-west-3
 
 # Habilitar versionado (para recuperación accidental)
 aws s3api put-bucket-versioning \
-  --bucket "joiabagur-files-prod" \
+  --bucket "jpv-files-prod" \
   --versioning-configuration Status=Enabled
 
 # Bloquear acceso público (usamos pre-signed URLs)
 aws s3api put-public-access-block \
-  --bucket "joiabagur-files-prod" \
+  --bucket "jpv-files-prod" \
   --public-access-block-configuration \
   "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
 # Configurar encriptación por defecto
 aws s3api put-bucket-encryption \
-  --bucket "joiabagur-files-prod" \
+  --bucket "jpv-files-prod" \
   --server-side-encryption-configuration '{
     "Rules": [
       {
@@ -344,7 +344,7 @@ aws s3api put-bucket-encryption \
 
 ```bash
 aws s3api put-bucket-cors \
-  --bucket "joiabagur-files-prod" \
+  --bucket "jpv-files-prod" \
   --cors-configuration '{
     "CORSRules": [
       {
@@ -363,12 +363,12 @@ aws s3api put-bucket-cors \
 ```bash
 # Crear bucket para frontend
 aws s3api create-bucket \
-  --bucket "joiabagur-frontend-prod" \
-  --region eu-west-1 \
-  --create-bucket-configuration LocationConstraint=eu-west-1
+  --bucket "jpv-frontend-prod" \
+  --region eu-west-3 \
+  --create-bucket-configuration LocationConstraint=eu-west-3
 
 # Configurar como sitio web estático
-aws s3 website s3://joiabagur-frontend-prod/ \
+aws s3 website s3://jpv-frontend-prod/ \
   --index-document index.html \
   --error-document index.html
 ```
@@ -377,9 +377,9 @@ aws s3 website s3://joiabagur-frontend-prod/ \
 
 ```bash
 # Crear estructura de carpetas
-echo "" | aws s3 cp - s3://joiabagur-files-prod/product-photos/.keep
-echo "" | aws s3 cp - s3://joiabagur-files-prod/sale-photos/.keep
-echo "" | aws s3 cp - s3://joiabagur-files-prod/ml-models/.keep
+echo "" | aws s3 cp - s3://jpv-files-prod/product-photos/.keep
+echo "" | aws s3 cp - s3://jpv-files-prod/sale-photos/.keep
+echo "" | aws s3 cp - s3://jpv-files-prod/ml-models/.keep
 ```
 
 ---
@@ -391,12 +391,12 @@ echo "" | aws s3 cp - s3://joiabagur-files-prod/ml-models/.keep
 ```bash
 # Crear repositorio ECR
 aws ecr create-repository \
-  --repository-name "joiabagur-api" \
+  --repository-name "jpv-api" \
   --image-scanning-configuration scanOnPush=true \
-  --region eu-west-1
+  --region eu-west-3
 
 # Obtener URI del repositorio
-ECR_URI=$(aws ecr describe-repositories --repository-names "joiabagur-api" --query 'repositories[0].repositoryUri' --output text)
+ECR_URI=$(aws ecr describe-repositories --repository-names "jpv-api" --query 'repositories[0].repositoryUri' --output text)
 echo "ECR URI: $ECR_URI"
 ```
 
@@ -404,14 +404,14 @@ echo "ECR URI: $ECR_URI"
 
 ```bash
 # Login a ECR
-aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $ECR_URI
+aws ecr get-login-password --region eu-west-3 | docker login --username AWS --password-stdin $ECR_URI
 
 # Build de la imagen (desde directorio backend)
 cd backend
-docker build -t joiabagur-api:latest -f src/JoiabagurPV.API/Dockerfile .
+docker build -t jpv-api:latest -f src/JoiabagurPV.API/Dockerfile .
 
 # Tag y push
-docker tag joiabagur-api:latest $ECR_URI:latest
+docker tag jpv-api:latest $ECR_URI:latest
 docker push $ECR_URI:latest
 ```
 
@@ -436,12 +436,12 @@ EOF
 
 # Crear rol
 aws iam create-role \
-  --role-name "joiabagur-apprunner-role" \
+  --role-name "jpv-apprunner-role" \
   --assume-role-policy-document file:///tmp/apprunner-trust-policy.json
 
 # Adjuntar política para ECR
 aws iam attach-role-policy \
-  --role-name "joiabagur-apprunner-role" \
+  --role-name "jpv-apprunner-role" \
   --policy-arn "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
 ```
 
@@ -459,7 +459,7 @@ cat > /tmp/apprunner-instance-policy.json << 'EOF'
         "secretsmanager:GetSecretValue",
         "secretsmanager:DescribeSecret"
       ],
-      "Resource": "arn:aws:secretsmanager:eu-west-1:*:secret:joiabagur-prod*"
+      "Resource": "arn:aws:secretsmanager:eu-west-3:*:secret:jpv-prod*"
     },
     {
       "Effect": "Allow",
@@ -470,8 +470,8 @@ cat > /tmp/apprunner-instance-policy.json << 'EOF'
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::joiabagur-files-prod",
-        "arn:aws:s3:::joiabagur-files-prod/*"
+        "arn:aws:s3:::jpv-files-prod",
+        "arn:aws:s3:::jpv-files-prod/*"
       ]
     }
   ]
@@ -496,13 +496,13 @@ EOF
 
 # Crear rol
 aws iam create-role \
-  --role-name "joiabagur-apprunner-instance-role" \
+  --role-name "jpv-apprunner-instance-role" \
   --assume-role-policy-document file:///tmp/apprunner-instance-trust.json
 
 # Crear y adjuntar política
 aws iam put-role-policy \
-  --role-name "joiabagur-apprunner-instance-role" \
-  --policy-name "joiabagur-instance-policy" \
+  --role-name "jpv-apprunner-instance-role" \
+  --policy-name "jpv-instance-policy" \
   --policy-document file:///tmp/apprunner-instance-policy.json
 ```
 
@@ -510,26 +510,26 @@ aws iam put-role-policy \
 
 ```bash
 # Obtener ARNs de roles
-ACCESS_ROLE_ARN=$(aws iam get-role --role-name "joiabagur-apprunner-role" --query 'Role.Arn' --output text)
-INSTANCE_ROLE_ARN=$(aws iam get-role --role-name "joiabagur-apprunner-instance-role" --query 'Role.Arn' --output text)
+ACCESS_ROLE_ARN=$(aws iam get-role --role-name "jpv-apprunner-role" --query 'Role.Arn' --output text)
+INSTANCE_ROLE_ARN=$(aws iam get-role --role-name "jpv-apprunner-instance-role" --query 'Role.Arn' --output text)
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
 
 # Crear servicio App Runner
 aws apprunner create-service \
-  --service-name "joiabagur-api-prod" \
+  --service-name "jpv-api-prod" \
   --source-configuration '{
     "AuthenticationConfiguration": {
       "AccessRoleArn": "'$ACCESS_ROLE_ARN'"
     },
     "AutoDeploymentsEnabled": false,
     "ImageRepository": {
-      "ImageIdentifier": "'$ACCOUNT_ID'.dkr.ecr.eu-west-1.amazonaws.com/joiabagur-api:latest",
+      "ImageIdentifier": "'$ACCOUNT_ID'.dkr.ecr.eu-west-3.amazonaws.com/jpv-api:latest",
       "ImageRepositoryType": "ECR",
       "ImageConfiguration": {
         "Port": "8080",
         "RuntimeEnvironmentVariables": {
           "ASPNETCORE_ENVIRONMENT": "Production",
-          "AWS_REGION": "eu-west-1"
+          "AWS_REGION": "eu-west-3"
         }
       }
     }
@@ -547,8 +547,8 @@ aws apprunner create-service \
     "HealthyThreshold": 1,
     "UnhealthyThreshold": 5
   }' \
-  --auto-scaling-configuration-arn "arn:aws:apprunner:eu-west-1:'$ACCOUNT_ID':autoscalingconfiguration/DefaultConfiguration/1/00000000000000000000000000000001" \
-  --region eu-west-1
+  --auto-scaling-configuration-arn "arn:aws:apprunner:eu-west-3:'$ACCOUNT_ID':autoscalingconfiguration/DefaultConfiguration/1/00000000000000000000000000000001" \
+  --region eu-west-3
 ```
 
 ### 8.6 Obtener URL del Servicio
@@ -556,7 +556,7 @@ aws apprunner create-service \
 ```bash
 # Esperar a que el servicio esté running (puede tardar 2-5 minutos)
 aws apprunner describe-service \
-  --service-arn $(aws apprunner list-services --query 'ServiceSummaryList[?ServiceName==`joiabagur-api-prod`].ServiceArn' --output text) \
+  --service-arn $(aws apprunner list-services --query 'ServiceSummaryList[?ServiceName==`jpv-api-prod`].ServiceArn' --output text) \
   --query 'Service.ServiceUrl' \
   --output text
 ```
@@ -571,7 +571,7 @@ aws apprunner describe-service \
 # Crear OAI para acceso seguro a S3
 aws cloudfront create-cloud-front-origin-access-identity \
   --cloud-front-origin-access-identity-config '{
-    "CallerReference": "joiabagur-frontend-oai",
+    "CallerReference": "jpv-frontend-oai",
     "Comment": "OAI for JoiabagurPV frontend"
   }'
 
@@ -586,7 +586,7 @@ echo "OAI ID: $OAI_ID"
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
 
 aws s3api put-bucket-policy \
-  --bucket "joiabagur-frontend-prod" \
+  --bucket "jpv-frontend-prod" \
   --policy '{
     "Version": "2012-10-17",
     "Statement": [
@@ -597,7 +597,7 @@ aws s3api put-bucket-policy \
           "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity '$OAI_ID'"
         },
         "Action": "s3:GetObject",
-        "Resource": "arn:aws:s3:::joiabagur-frontend-prod/*"
+        "Resource": "arn:aws:s3:::jpv-frontend-prod/*"
       }
     ]
   }'
@@ -609,15 +609,15 @@ aws s3api put-bucket-policy \
 # Crear archivo de configuración
 cat > /tmp/cloudfront-config.json << 'EOF'
 {
-  "CallerReference": "joiabagur-frontend-dist",
+  "CallerReference": "jpv-frontend-dist",
   "Comment": "JoiabagurPV Frontend Distribution",
   "DefaultRootObject": "index.html",
   "Origins": {
     "Quantity": 1,
     "Items": [
       {
-        "Id": "S3-joiabagur-frontend-prod",
-        "DomainName": "joiabagur-frontend-prod.s3.eu-west-1.amazonaws.com",
+        "Id": "S3-jpv-frontend-prod",
+        "DomainName": "jpv-frontend-prod.s3.eu-west-3.amazonaws.com",
         "S3OriginConfig": {
           "OriginAccessIdentity": "origin-access-identity/cloudfront/OAI_ID_PLACEHOLDER"
         }
@@ -625,7 +625,7 @@ cat > /tmp/cloudfront-config.json << 'EOF'
     ]
   },
   "DefaultCacheBehavior": {
-    "TargetOriginId": "S3-joiabagur-frontend-prod",
+    "TargetOriginId": "S3-jpv-frontend-prod",
     "ViewerProtocolPolicy": "redirect-to-https",
     "AllowedMethods": {
       "Quantity": 2,
@@ -692,12 +692,12 @@ En el repositorio de GitHub, ir a **Settings > Secrets and variables > Actions**
 
 | Secret Name | Descripción |
 |-------------|-------------|
-| `AWS_ACCESS_KEY_ID` | Access key del usuario IAM joiabagur-deploy |
+| `AWS_ACCESS_KEY_ID` | Access key del usuario IAM jpv-deploy |
 | `AWS_SECRET_ACCESS_KEY` | Secret key del usuario IAM |
-| `AWS_REGION` | `eu-west-1` |
+| `AWS_REGION` | `eu-west-3` |
 | `ECR_REPOSITORY` | URI completo del repositorio ECR |
 | `APP_RUNNER_SERVICE_ARN` | ARN del servicio App Runner |
-| `S3_FRONTEND_BUCKET` | `joiabagur-frontend-prod` |
+| `S3_FRONTEND_BUCKET` | `jpv-frontend-prod` |
 | `CLOUDFRONT_DISTRIBUTION_ID` | ID de la distribución CloudFront |
 
 ### 10.2 Workflow de Deploy Backend
@@ -716,7 +716,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: eu-west-1
+  AWS_REGION: eu-west-3
 
 jobs:
   deploy:
@@ -741,7 +741,7 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: joiabagur-api
+          ECR_REPOSITORY: jpv-api
           IMAGE_TAG: ${{ github.sha }}
         working-directory: backend
         run: |
@@ -782,7 +782,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: eu-west-1
+  AWS_REGION: eu-west-3
 
 jobs:
   deploy:
@@ -848,7 +848,7 @@ docker exec -t joyeria-postgres-dev pg_dump -U dev_user -d joyeria_dev > backup_
 
 ```bash
 # Conectar a RDS (temporalmente con acceso público habilitado)
-RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "joiabagur-db-prod" --query 'DBInstances[0].Endpoint.Address' --output text)
+RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier "jpv-db-prod" --query 'DBInstances[0].Endpoint.Address' --output text)
 
 # Importar datos
 PGPASSWORD=YOUR_SECURE_PASSWORD psql -h $RDS_ENDPOINT -U joiabagur_admin -d joiabagur_prod < backup_dev.sql
@@ -858,10 +858,10 @@ PGPASSWORD=YOUR_SECURE_PASSWORD psql -h $RDS_ENDPOINT -U joiabagur_admin -d joia
 
 ```bash
 # Subir fotos de productos existentes
-aws s3 sync ./uploads/product-photos s3://joiabagur-files-prod/product-photos/
+aws s3 sync ./uploads/product-photos s3://jpv-files-prod/product-photos/
 
 # Subir fotos de ventas existentes (si hay)
-aws s3 sync ./uploads/sale-photos s3://joiabagur-files-prod/sale-photos/
+aws s3 sync ./uploads/sale-photos s3://jpv-files-prod/sale-photos/
 ```
 
 ### 11.4 Aplicar Migraciones EF Core
@@ -933,7 +933,7 @@ curl -s -o /dev/null -w "%{http_code}" https://$CLOUDFRONT_URL
 aws logs describe-log-groups --log-group-name-prefix "/aws/apprunner/joiabagur"
 
 # Tail logs en tiempo real
-aws logs tail "/aws/apprunner/joiabagur-api-prod/service" --follow
+aws logs tail "/aws/apprunner/jpv-api-prod/service" --follow
 ```
 
 ### 13.2 Métricas Importantes
@@ -947,7 +947,7 @@ aws logs tail "/aws/apprunner/joiabagur-api-prod/service" --follow
 ```bash
 # Crear alarma para errores 5xx
 aws cloudwatch put-metric-alarm \
-  --alarm-name "joiabagur-5xx-errors" \
+  --alarm-name "jpv-5xx-errors" \
   --metric-name "5xxCount" \
   --namespace "AWS/AppRunner" \
   --statistic Sum \
@@ -955,7 +955,7 @@ aws cloudwatch put-metric-alarm \
   --threshold 10 \
   --comparison-operator GreaterThanThreshold \
   --evaluation-periods 1 \
-  --dimensions Name=ServiceName,Value=joiabagur-api-prod
+  --dimensions Name=ServiceName,Value=jpv-api-prod
 ```
 
 ---
@@ -974,7 +974,7 @@ RDS está configurado con:
 ```bash
 # Listar snapshots disponibles
 aws rds describe-db-snapshots \
-  --db-instance-identifier "joiabagur-db-prod" \
+  --db-instance-identifier "jpv-db-prod" \
   --query 'DBSnapshots[*].[DBSnapshotIdentifier,SnapshotCreateTime,Status]' \
   --output table
 ```
@@ -984,8 +984,8 @@ aws rds describe-db-snapshots \
 ```bash
 # Restaurar a nueva instancia (no destructivo)
 aws rds restore-db-instance-from-db-snapshot \
-  --db-instance-identifier "joiabagur-db-restored" \
-  --db-snapshot-identifier "rds:joiabagur-db-prod-2026-01-12-03-00" \
+  --db-instance-identifier "jpv-db-restored" \
+  --db-snapshot-identifier "rds:jpv-db-prod-2026-01-12-03-00" \
   --db-instance-class "db.t3.micro"
 ```
 
@@ -994,8 +994,8 @@ aws rds restore-db-instance-from-db-snapshot \
 ```bash
 # Restaurar a un momento específico
 aws rds restore-db-instance-to-point-in-time \
-  --source-db-instance-identifier "joiabagur-db-prod" \
-  --target-db-instance-identifier "joiabagur-db-pitr" \
+  --source-db-instance-identifier "jpv-db-prod" \
+  --target-db-instance-identifier "jpv-db-pitr" \
   --restore-time "2026-01-12T10:30:00Z"
 ```
 
@@ -1003,7 +1003,7 @@ aws rds restore-db-instance-to-point-in-time \
 
 ```bash
 # Sincronizar S3 a backup local (periódicamente)
-aws s3 sync s3://joiabagur-files-prod ./backups/s3-files/
+aws s3 sync s3://jpv-files-prod ./backups/s3-files/
 ```
 
 ---
@@ -1030,7 +1030,7 @@ aws s3 sync s3://joiabagur-files-prod ./backups/s3-files/
 ```bash
 # Crear alerta de billing (requiere habilitar billing alerts primero)
 aws cloudwatch put-metric-alarm \
-  --alarm-name "joiabagur-billing-alert-20" \
+  --alarm-name "jpv-billing-alert-20" \
   --metric-name "EstimatedCharges" \
   --namespace "AWS/Billing" \
   --statistic Maximum \
@@ -1062,7 +1062,7 @@ aws apprunner describe-service \
 
 # Ver logs de error
 aws logs filter-log-events \
-  --log-group-name "/aws/apprunner/joiabagur-api-prod/service" \
+  --log-group-name "/aws/apprunner/jpv-api-prod/service" \
   --filter-pattern "ERROR"
 ```
 
@@ -1085,7 +1085,7 @@ nc -zv RDS_ENDPOINT 5432
 
 ```bash
 # Verificar política del bucket
-aws s3api get-bucket-policy --bucket joiabagur-files-prod
+aws s3api get-bucket-policy --bucket jpv-files-prod
 ```
 
 ### 16.4 CloudFront Error 403
@@ -1096,7 +1096,7 @@ aws s3api get-bucket-policy --bucket joiabagur-files-prod
 
 ```bash
 # Verificar contenido del bucket
-aws s3 ls s3://joiabagur-frontend-prod/
+aws s3 ls s3://jpv-frontend-prod/
 ```
 
 ### 16.5 Secrets Manager Access Denied
@@ -1107,7 +1107,7 @@ aws s3 ls s3://joiabagur-frontend-prod/
 
 ```bash
 # Verificar secreto existe
-aws secretsmanager describe-secret --secret-id joiabagur-prod
+aws secretsmanager describe-secret --secret-id jpv-prod
 ```
 
 ---
@@ -1117,11 +1117,11 @@ aws secretsmanager describe-secret --secret-id joiabagur-prod
 ```bash
 # Estado general
 aws apprunner describe-service --service-arn $SERVICE_ARN
-aws rds describe-db-instances --db-instance-identifier joiabagur-db-prod
-aws s3 ls s3://joiabagur-files-prod --recursive --summarize
+aws rds describe-db-instances --db-instance-identifier jpv-db-prod
+aws s3 ls s3://jpv-files-prod --recursive --summarize
 
 # Logs
-aws logs tail "/aws/apprunner/joiabagur-api-prod/service" --follow
+aws logs tail "/aws/apprunner/jpv-api-prod/service" --follow
 
 # Redeploy manual
 aws apprunner start-deployment --service-arn $SERVICE_ARN

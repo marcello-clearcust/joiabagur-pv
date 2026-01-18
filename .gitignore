@@ -228,6 +228,7 @@ secrets.json
 appsettings.Development.json
 appsettings.Production.json
 *.secrets.json
+Documentos/Guias/aws-production-credentials.md
 
 # Azure / AWS
 .azure/

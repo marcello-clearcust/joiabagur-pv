@@ -92,14 +92,14 @@
 
 ## 10. Custom Domain Setup (Optional)
 
-- [ ] 10.1 Request SSL certificate in AWS ACM (us-east-1 region for CloudFront)
-- [ ] 10.2 Validate certificate via DNS (add CNAME records in external DNS provider)
-- [ ] 10.3 Configure CloudFront alternate domain name (e.g., pv.joiabagur.com)
-- [ ] 10.4 Configure App Runner custom domain (e.g., api.joiabagur.com)
-- [ ] 10.5 Add CNAME records in external DNS provider
-- [ ] 10.6 Update GitHub secret PRODUCTION_API_URL with custom domain
-- [ ] 10.7 Update App Runner CORS with custom frontend domain
-- [ ] 10.8 Redeploy frontend and backend with new URLs
+- [x] 10.1 Request SSL wildcard certificate *.joiabagur.com in AWS ACM (us-east-1)
+- [x] 10.2 Validate certificate via DNS
+- [x] 10.3 Configure CloudFront alternate domain name (pv.joiabagur.com)
+- [x] 10.4 Configure App Runner custom domain (api.joiabagur.com)
+- [x] 10.5 Add CNAME records in external DNS provider
+- [x] 10.6 Update GitHub secret PRODUCTION_API_URL with custom domain
+- [x] 10.7 Update App Runner CORS with custom frontend domain
+- [x] 10.8 Redeploy frontend and backend with new URLs
 
 ## 11. Infrastructure as Code (Optional)
 

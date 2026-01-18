@@ -29,4 +29,15 @@ public class LoginResponse
     /// The user's role.
     /// </summary>
     public required string Role { get; set; }
+
+    /// <summary>
+    /// JWT access token for API authorization.
+    /// Used for cross-origin scenarios where cookies don't work.
+    /// </summary>
+    public string? AccessToken { get; set; }
+
+    /// <summary>
+    /// JWT refresh token for obtaining new access tokens.
+    /// </summary>
+    public string? RefreshToken { get; set; }
 }

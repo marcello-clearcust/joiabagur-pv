@@ -8,11 +8,14 @@ import { ApiError, ApiResponse } from '@/types/api.types';
 
 /**
  * Base API service with Axios client configured for backend communication.
- * Uses HTTP-only cookies for JWT authentication (set by backend).
+ * Supports both cookie-based auth (same-origin) and token-based auth (cross-origin).
  * Provides automatic token refresh on 401 responses.
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+// Token storage keys (must match auth.service.ts)
+const ACCESS_TOKEN_KEY = 'jpv_access_token';
 
 // Create Axios instance with default configuration
 const apiClient: AxiosInstance = axios.create({
@@ -21,7 +24,7 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Always send cookies for auth
+  withCredentials: true, // Also send cookies for same-origin scenarios
 });
 
 // Track if we're currently refreshing to prevent multiple refresh attempts
@@ -42,9 +45,14 @@ const processQueue = (error: AxiosError | null) => {
   failedQueue = [];
 };
 
-// Request interceptor - minimal, cookies are sent automatically
+// Request interceptor - adds Authorization header from localStorage
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Add Authorization header if token exists in localStorage
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error: AxiosError) => {

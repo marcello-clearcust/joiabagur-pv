@@ -65,7 +65,13 @@ public class AuthController : ControllerBase
             var ipAddress = GetIpAddress();
             var (response, accessToken, refreshToken) = await _authenticationService.LoginAsync(request, ipAddress);
 
+            // Set cookies for same-origin scenarios
             SetTokenCookies(accessToken, refreshToken);
+
+            // Also include tokens in response body for cross-origin scenarios
+            // where third-party cookies are blocked
+            response.AccessToken = accessToken;
+            response.RefreshToken = refreshToken;
 
             return Ok(response);
         }

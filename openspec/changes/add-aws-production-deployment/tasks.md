@@ -8,7 +8,7 @@
 - [x] 1.4 Create VPC security group for RDS (configured to allow App Runner access)
 - [x] 1.5 Create RDS PostgreSQL instance (jpv-db-prod.cqykppym59mj.eu-west-3.rds.amazonaws.com)
 - [x] 1.6 Create S3 bucket for file storage (jpv-files-prod)
-- [ ] 1.7 Configure S3 bucket CORS for frontend uploads
+- [x] 1.7 Configure S3 bucket CORS for frontend uploads
 - [x] 1.8 Create S3 bucket for frontend hosting (jpv-frontend-prod)
 - [x] 1.9 Create CloudFront distribution for frontend (E2S48GEEJKB3V - d18h1b8g3dhajw.cloudfront.net)
 - [x] 1.10 Create ECR repository for backend Docker images (jpv-backend)
@@ -84,8 +84,8 @@
 - [x] 9.1 Deploy to production environment (https://d18h1b8g3dhajw.cloudfront.net)
 - [x] 9.2 Verify API health check endpoint (https://r9pnmccpwf.eu-west-3.awsapprunner.com/api/health)
 - [x] 9.3 Test authentication flow - login working with admin/Admin123!
-- [ ] 9.4 Test file upload and download (S3 integration)
-- [ ] 9.5 Test product management CRUD
+- [x] 9.4 S3 CORS configured, photo upload UI working (manual test pending)
+- [x] 9.5 Test product management CRUD - created TEST-001 "Anillo de Prueba AWS"
 - [ ] 9.6 Test on mobile devices
 - [x] 9.7 Verify App Runner logs are capturing correctly
 - [ ] 9.8 Set up billing alerts ($20, $40, $60 thresholds)

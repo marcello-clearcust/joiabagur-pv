@@ -91,14 +91,27 @@ export function ImageRecognitionSalesPage() {
   }, []);
 
   // Capture photo from camera
-  const capturePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
+  // Note: Not using useCallback to avoid stale closure issues with processImage
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) {
+      toast.error('Error: Cámara no disponible');
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    if (!context) return;
+    if (!context) {
+      toast.error('Error: No se pudo obtener contexto del canvas');
+      return;
+    }
+
+    // Validate video dimensions - video might not be ready yet
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error('La cámara aún no está lista. Espera un momento e intenta de nuevo.');
+      return;
+    }
 
     // Set canvas dimensions to match video
     canvas.width = video.videoWidth;
@@ -109,20 +122,26 @@ export function ImageRecognitionSalesPage() {
 
     // Get image as data URL
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedImage(imageDataUrl);
+    
+    // Stop camera first, then update state and process
     stopCamera();
 
     // Convert to file and process
     canvas.toBlob((blob) => {
       if (blob) {
+        // Set captured image state - this will trigger UI update
+        setCapturedImage(imageDataUrl);
         const file = new File([blob], 'captured-photo.jpg', { type: 'image/jpeg' });
         processImage(file, imageDataUrl);
+      } else {
+        toast.error('Error al capturar la imagen. Intenta de nuevo.');
       }
     }, 'image/jpeg', 0.9);
-  }, [stopCamera]);
+  };
 
   // Handle file upload
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  // Note: Not using useCallback to avoid stale closure issues with processImage
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -150,7 +169,7 @@ export function ImageRecognitionSalesPage() {
 
     // Allow selecting the same file again
     event.target.value = '';
-  }, []);
+  };
 
   // Process image with AI
   const processImage = async (file: File, previewUrl?: string | null) => {

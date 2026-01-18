@@ -122,24 +122,32 @@ Sistema de identificación de productos mediante reconocimiento de imágenes usa
 ## Épica 5: Gestión de Devoluciones
 
 **Descripción:**  
-Permite registrar devoluciones de productos vendidos, incrementando el stock y manteniendo trazabilidad con la venta original.
+Permite registrar devoluciones de productos vendidos, asociándolas a una o más ventas originales, incrementando el stock automáticamente y manteniendo trazabilidad completa. Soporta devoluciones parciales, categorización obligatoria y foto opcional.
 
 **Alcance:**
-- Registro de devolución asociada a venta original
-- Incremento automático de stock en el punto de venta correspondiente
-- Registro de motivo de devolución (opcional)
-- Validación de venta existente
-- Generación automática de movimiento de inventario
+- Registro de devolución asociada a una o más ventas originales (multi-venta)
+- Soporte para devoluciones parciales (devolver parte de las unidades vendidas)
+- Ventana de devolución de 30 días desde la venta
+- Devolución obligatoria en el mismo punto de venta de la venta
+- Categoría de devolución obligatoria (Defectuoso, Tamaño incorrecto, No satisfecho, Otro)
+- Motivo de texto libre opcional (máximo 500 caracteres)
+- Foto opcional de devolución (ej: foto del producto defectuoso)
+- Incremento automático de stock en el punto de venta
+- Generación automática de movimiento de inventario (tipo "Return")
+- Validación de cantidad disponible (vendida - ya devuelta)
+- Operadores pueden registrar devoluciones en sus puntos de venta asignados
 
 **Entidades del modelo de datos relacionadas:**
-- `Return` (devolución con referencia a venta original)
+- `Return` (devolución con cantidad, categoría y motivo)
+- `ReturnSale` (relación muchos a muchos entre devoluciones y ventas, con cantidad y precio snapshot)
+- `ReturnPhoto` (foto opcional asociada a la devolución)
 - `InventoryMovement` (movimiento automático de tipo "Return")
-- `Sale` (venta original referenciada)
+- `Sale` (ventas originales referenciadas)
 - `Inventory` (stock incrementado)
 
 **User Stories:**
 - [HU-EP5-001: Registrar devolución de producto vendido](Historias/HU-EP5-001.md)
-- [HU-EP5-002: Buscar venta original para asociar devolución](Historias/HU-EP5-002.md)
+- [HU-EP5-002: Buscar ventas elegibles para asociar devolución](Historias/HU-EP5-002.md)
 - [HU-EP5-003: Consultar historial de devoluciones](Historias/HU-EP5-003.md)
 
 ---

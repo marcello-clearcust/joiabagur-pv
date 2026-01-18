@@ -100,6 +100,23 @@ public interface IInventoryService
         int quantity, 
         Guid userId);
 
+    /// <summary>
+    /// Creates a return movement and updates stock automatically.
+    /// Used by returns-management to record inventory movements during return.
+    /// </summary>
+    /// <param name="productId">The ID of the product returned.</param>
+    /// <param name="pointOfSaleId">The ID of the point of sale.</param>
+    /// <param name="returnId">The ID of the return.</param>
+    /// <param name="quantity">The quantity returned (positive number).</param>
+    /// <param name="userId">The ID of the user who registered the return.</param>
+    /// <returns>The movement creation result.</returns>
+    Task<SaleMovementResult> CreateReturnMovementAsync(
+        Guid productId,
+        Guid pointOfSaleId,
+        Guid returnId,
+        int quantity,
+        Guid userId);
+
     #endregion
 }
 

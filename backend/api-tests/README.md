@@ -14,6 +14,7 @@ This directory contains HTTP request files for testing the Joiabagur PV API endp
 - `point-of-sales.http` - Point of sale CRUD and assignments
 - `payment-methods.http` - Payment method CRUD operations
 - `inventory.http` - Inventory management (assignment, import, adjustment, movements)
+- `returns.http` - Returns management (create return, eligible sales, history)
 
 ## How to Use
 
@@ -70,7 +71,14 @@ curl http://localhost:5056/api/users -b cookies.txt
 5. View movement history
 6. Test unassignment (requires 0 stock)
 
-### 5. Test Authorization
+### 5. Test Returns Management
+1. Create a sale first (use sales endpoints)
+2. Get eligible sales for the product/POS
+3. Create return with selected sales
+4. Verify return appears in history
+5. Check inventory increased by return quantity
+
+### 6. Test Authorization
 1. Try accessing admin endpoints without auth → 401
 2. Create operator and login as operator
 3. Try accessing admin endpoints as operator → 403

@@ -321,4 +321,113 @@ public static class TestDataGenerator
     {
         return InventoryMovementFaker(inventoryId, userId).Generate(count);
     }
+
+    /// <summary>
+    /// Creates a Sale faker with customizable rules.
+    /// </summary>
+    public static Faker<Sale> SaleFaker(Guid? productId = null, Guid? pointOfSaleId = null, Guid? paymentMethodId = null, Guid? userId = null, int? quantity = null, decimal? price = null)
+    {
+        return new Faker<Sale>()
+            .RuleFor(s => s.Id, f => f.Random.Guid())
+            .RuleFor(s => s.ProductId, f => productId ?? f.Random.Guid())
+            .RuleFor(s => s.PointOfSaleId, f => pointOfSaleId ?? f.Random.Guid())
+            .RuleFor(s => s.PaymentMethodId, f => paymentMethodId ?? f.Random.Guid())
+            .RuleFor(s => s.UserId, f => userId ?? f.Random.Guid())
+            .RuleFor(s => s.Quantity, f => quantity ?? f.Random.Int(1, 5))
+            .RuleFor(s => s.Price, f => price ?? f.Random.Decimal(10, 1000))
+            .RuleFor(s => s.SaleDate, f => f.Date.Recent(10))
+            .RuleFor(s => s.Notes, f => f.Lorem.Sentence().OrNull(f))
+            .RuleFor(s => s.CreatedAt, f => f.Date.Past());
+    }
+
+    /// <summary>
+    /// Creates a single Sale with optional customization.
+    /// </summary>
+    public static Sale CreateSale(Guid? productId = null, Guid? pointOfSaleId = null, Guid? paymentMethodId = null, Guid? userId = null, int? quantity = null, decimal? price = null, DateTime? saleDate = null)
+    {
+        var sale = SaleFaker(productId, pointOfSaleId, paymentMethodId, userId, quantity, price).Generate();
+        if (saleDate.HasValue) sale.SaleDate = saleDate.Value;
+        return sale;
+    }
+
+    /// <summary>
+    /// Creates multiple Sale instances.
+    /// </summary>
+    public static List<Sale> CreateSales(int count, Guid? productId = null, Guid? pointOfSaleId = null)
+    {
+        return SaleFaker(productId, pointOfSaleId).Generate(count);
+    }
+
+    /// <summary>
+    /// Creates a PaymentMethod faker with customizable rules.
+    /// </summary>
+    public static Faker<PaymentMethod> PaymentMethodFaker(bool? isActive = null)
+    {
+        return new Faker<PaymentMethod>()
+            .RuleFor(pm => pm.Id, f => f.Random.Guid())
+            .RuleFor(pm => pm.Code, f => f.Random.AlphaNumeric(6).ToUpperInvariant())
+            .RuleFor(pm => pm.Name, f => f.Finance.AccountName())
+            .RuleFor(pm => pm.Description, f => f.Lorem.Sentence())
+            .RuleFor(pm => pm.IsActive, f => isActive ?? true)
+            .RuleFor(pm => pm.CreatedAt, f => f.Date.Past())
+            .RuleFor(pm => pm.UpdatedAt, f => f.Date.Recent());
+    }
+
+    /// <summary>
+    /// Creates a single PaymentMethod with optional customization.
+    /// </summary>
+    public static PaymentMethod CreatePaymentMethod(bool? isActive = null, string? code = null, string? name = null)
+    {
+        var pm = PaymentMethodFaker(isActive).Generate();
+        if (code != null) pm.Code = code;
+        if (name != null) pm.Name = name;
+        return pm;
+    }
+
+    /// <summary>
+    /// Creates a Return faker with customizable rules.
+    /// </summary>
+    public static Faker<Return> ReturnFaker(Guid? productId = null, Guid? pointOfSaleId = null, Guid? userId = null, int? quantity = null, ReturnCategory? category = null)
+    {
+        return new Faker<Return>()
+            .RuleFor(r => r.Id, f => f.Random.Guid())
+            .RuleFor(r => r.ProductId, f => productId ?? f.Random.Guid())
+            .RuleFor(r => r.PointOfSaleId, f => pointOfSaleId ?? f.Random.Guid())
+            .RuleFor(r => r.UserId, f => userId ?? f.Random.Guid())
+            .RuleFor(r => r.Quantity, f => quantity ?? f.Random.Int(1, 5))
+            .RuleFor(r => r.Category, f => category ?? f.PickRandom<ReturnCategory>())
+            .RuleFor(r => r.Reason, f => f.Lorem.Sentence().OrNull(f))
+            .RuleFor(r => r.ReturnDate, f => f.Date.Recent())
+            .RuleFor(r => r.CreatedAt, f => f.Date.Past());
+    }
+
+    /// <summary>
+    /// Creates a single Return with optional customization.
+    /// </summary>
+    public static Return CreateReturn(Guid? productId = null, Guid? pointOfSaleId = null, Guid? userId = null, int? quantity = null, ReturnCategory? category = null)
+    {
+        return ReturnFaker(productId, pointOfSaleId, userId, quantity, category).Generate();
+    }
+
+    /// <summary>
+    /// Creates a ReturnSale faker with customizable rules.
+    /// </summary>
+    public static Faker<ReturnSale> ReturnSaleFaker(Guid? returnId = null, Guid? saleId = null, int? quantity = null, decimal? unitPrice = null)
+    {
+        return new Faker<ReturnSale>()
+            .RuleFor(rs => rs.Id, f => f.Random.Guid())
+            .RuleFor(rs => rs.ReturnId, f => returnId ?? f.Random.Guid())
+            .RuleFor(rs => rs.SaleId, f => saleId ?? f.Random.Guid())
+            .RuleFor(rs => rs.Quantity, f => quantity ?? f.Random.Int(1, 5))
+            .RuleFor(rs => rs.UnitPrice, f => unitPrice ?? f.Random.Decimal(10, 1000))
+            .RuleFor(rs => rs.CreatedAt, f => f.Date.Past());
+    }
+
+    /// <summary>
+    /// Creates a single ReturnSale with optional customization.
+    /// </summary>
+    public static ReturnSale CreateReturnSale(Guid? returnId = null, Guid? saleId = null, int? quantity = null, decimal? unitPrice = null)
+    {
+        return ReturnSaleFaker(returnId, saleId, quantity, unitPrice).Generate();
+    }
 }

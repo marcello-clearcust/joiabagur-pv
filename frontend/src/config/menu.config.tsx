@@ -41,7 +41,7 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
   {
     title: 'Devoluciones',
     icon: RotateCcw,
-    path: ROUTES.RETURNS,
+    path: ROUTES.RETURNS.ROOT,
   },
   {
     title: 'Reportes',
@@ -104,7 +104,7 @@ export const MENU_OPERATOR: MenuConfig = [
   {
     title: 'Devoluciones',
     icon: RotateCcw,
-    path: ROUTES.RETURNS,
+    path: ROUTES.RETURNS.ROOT,
   },
   {
     title: 'Inventario',

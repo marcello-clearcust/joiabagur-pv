@@ -157,6 +157,9 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
 
                     b.HasIndex("MovementDate");
 
+                    b.HasIndex("ReturnId")
+                        .IsUnique();
+
                     b.HasIndex("SaleId")
                         .IsUnique();
 
@@ -590,6 +593,139 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.Return", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("PointOfSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("ReturnDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PointOfSaleId", "ReturnDate");
+
+                    b.HasIndex("ProductId", "ReturnDate");
+
+                    b.ToTable("Returns", (string)null);
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.ReturnPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnId")
+                        .IsUnique();
+
+                    b.ToTable("ReturnPhotos", (string)null);
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.ReturnSale", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SaleId");
+
+                    b.HasIndex("ReturnId", "SaleId")
+                        .IsUnique();
+
+                    b.ToTable("ReturnSales", (string)null);
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Sale", b =>
                 {
                     b.Property<Guid>("Id")
@@ -828,6 +964,11 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("JoiabagurPV.Domain.Entities.Return", null)
+                        .WithOne("InventoryMovement")
+                        .HasForeignKey("JoiabagurPV.Domain.Entities.InventoryMovement", "ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("JoiabagurPV.Domain.Entities.Sale", null)
                         .WithOne("InventoryMovement")
                         .HasForeignKey("JoiabagurPV.Domain.Entities.InventoryMovement", "SaleId")
@@ -904,6 +1045,63 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.Return", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.PointOfSale", "PointOfSale")
+                        .WithMany()
+                        .HasForeignKey("PointOfSaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PointOfSale");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.ReturnPhoto", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.Return", "Return")
+                        .WithOne("Photo")
+                        .HasForeignKey("JoiabagurPV.Domain.Entities.ReturnPhoto", "ReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Return");
+                });
+
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.ReturnSale", b =>
+                {
+                    b.HasOne("JoiabagurPV.Domain.Entities.Return", "Return")
+                        .WithMany("ReturnSales")
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("JoiabagurPV.Domain.Entities.Sale", "Sale")
+                        .WithMany("ReturnSales")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Return");
+
+                    b.Navigation("Sale");
                 });
 
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Sale", b =>
@@ -998,11 +1196,22 @@ namespace JoiabagurPV.Infrastructure.Data.Migrations
                     b.Navigation("Photos");
                 });
 
+            modelBuilder.Entity("JoiabagurPV.Domain.Entities.Return", b =>
+                {
+                    b.Navigation("InventoryMovement");
+
+                    b.Navigation("Photo");
+
+                    b.Navigation("ReturnSales");
+                });
+
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.Sale", b =>
                 {
                     b.Navigation("InventoryMovement");
 
                     b.Navigation("Photo");
+
+                    b.Navigation("ReturnSales");
                 });
 
             modelBuilder.Entity("JoiabagurPV.Domain.Entities.User", b =>

@@ -81,6 +81,11 @@ public class Sale : BaseEntity
     public virtual InventoryMovement? InventoryMovement { get; set; }
 
     /// <summary>
+    /// Navigation property for returns associated with this sale (many-to-many through ReturnSale).
+    /// </summary>
+    public virtual ICollection<ReturnSale> ReturnSales { get; set; } = new List<ReturnSale>();
+
+    /// <summary>
     /// Calculates the total amount for this sale.
     /// </summary>
     /// <returns>Total amount (Price * Quantity).</returns>

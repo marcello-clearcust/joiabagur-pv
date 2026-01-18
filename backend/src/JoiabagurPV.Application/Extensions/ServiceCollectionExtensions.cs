@@ -53,6 +53,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPaymentMethodValidationService, PaymentMethodValidationService>();
         services.AddScoped<IImageCompressionService, ImageCompressionService>();
 
+        // Register returns management services
+        services.AddScoped<IReturnService, ReturnService>();
+
         // Register image recognition services
         services.AddScoped<IImageRecognitionService, ImageRecognitionService>();
         services.AddScoped<IModelHealthService, ModelHealthService>();

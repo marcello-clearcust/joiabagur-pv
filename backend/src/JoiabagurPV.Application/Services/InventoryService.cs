@@ -586,6 +586,92 @@ public class InventoryService : IInventoryService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<SaleMovementResult> CreateReturnMovementAsync(
+        Guid productId,
+        Guid pointOfSaleId,
+        Guid returnId,
+        int quantity,
+        Guid userId)
+    {
+        // Validate quantity
+        if (quantity <= 0)
+        {
+            return new SaleMovementResult
+            {
+                Success = false,
+                ErrorMessage = "La cantidad debe ser mayor que cero."
+            };
+        }
+
+        // Find inventory
+        var inventory = await _inventoryRepository.FindByProductAndPointOfSaleAsync(productId, pointOfSaleId);
+
+        if (inventory == null || !inventory.IsActive)
+        {
+            return new SaleMovementResult
+            {
+                Success = false,
+                ErrorMessage = "El producto no está asignado a este punto de venta."
+            };
+        }
+
+        var quantityBefore = inventory.Quantity;
+        var quantityAfter = quantityBefore + quantity; // Positive for returns (adding stock back)
+
+        // NOTE: This method is designed to be called within an existing transaction
+        // (e.g., from ReturnService), so it does NOT manage its own transaction.
+        // The caller is responsible for transaction management and commit/rollback.
+
+        try
+        {
+            // Update inventory (atomic operation)
+            inventory.Quantity = quantityAfter;
+            inventory.LastUpdatedAt = DateTime.UtcNow;
+            await _inventoryRepository.UpdateAsync(inventory);
+
+            // Create movement record
+            var movement = new InventoryMovement
+            {
+                InventoryId = inventory.Id,
+                ReturnId = returnId,
+                UserId = userId,
+                MovementType = MovementType.Return,
+                QuantityChange = quantity, // Positive for returns
+                QuantityBefore = quantityBefore,
+                QuantityAfter = quantityAfter,
+                Reason = null, // Returns don't need a reason in movement (reason is in Return entity)
+                MovementDate = DateTime.UtcNow
+            };
+
+            await _movementRepository.AddAsync(movement);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Return movement created for product {ProductId} at POS {PointOfSaleId} (Return {ReturnId}): {Before} -> {After} (+{Quantity})",
+                productId, pointOfSaleId, returnId, quantityBefore, quantityAfter, quantity);
+
+            return new SaleMovementResult
+            {
+                Success = true,
+                Inventory = MapToDto(inventory, inventory.Product, inventory.PointOfSale),
+                Movement = MapMovementToDto(movement, inventory),
+                QuantityBefore = quantityBefore,
+                QuantityAfter = quantityAfter
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during return movement creation");
+            
+            return new SaleMovementResult
+            {
+                Success = false,
+                ErrorMessage = "Error al crear el movimiento de devolución."
+            };
+        }
+    }
+
     #endregion
 
     #region Private Methods

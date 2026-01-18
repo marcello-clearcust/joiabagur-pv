@@ -32,27 +32,14 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Use Respawn for database cleanup - no manual TRUNCATEs needed
         await _factory.ResetDatabaseAsync();
-        await ResetImageRecognitionTablesAsync();
         
         _adminClient = await CreateAuthenticatedClientAsync("admin", "Admin123!");
         _operatorClient = await CreateAuthenticatedClientAsync("operator", "Operator123!");
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
-
-    private async Task ResetImageRecognitionTablesAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        await context.Database.ExecuteSqlRawAsync(@"
-            TRUNCATE TABLE ""ModelTrainingJobs"" CASCADE;
-            TRUNCATE TABLE ""ModelMetadata"" CASCADE;
-            TRUNCATE TABLE ""ProductPhotos"" CASCADE;
-            TRUNCATE TABLE ""Products"" CASCADE;
-        ");
-    }
 
     private async Task<HttpClient> CreateAuthenticatedClientAsync(string username, string password)
     {

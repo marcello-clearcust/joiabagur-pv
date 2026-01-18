@@ -124,11 +124,11 @@ describe('ImageRecognitionSalesPage', () => {
       renderWithProviders(<ImageRecognitionSalesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/activar cámara/i)).toBeInTheDocument();
+        expect(screen.getByText(/abrir cámara/i)).toBeInTheDocument();
       });
 
       // Act
-      const activateButton = screen.getByRole('button', { name: /activar cámara/i });
+      const activateButton = screen.getByRole('button', { name: /abrir cámara/i });
       await user.click(activateButton);
 
       // Assert
@@ -151,11 +151,11 @@ describe('ImageRecognitionSalesPage', () => {
       renderWithProviders(<ImageRecognitionSalesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/activar cámara/i)).toBeInTheDocument();
+        expect(screen.getByText(/abrir cámara/i)).toBeInTheDocument();
       });
 
       // Act
-      const activateButton = screen.getByRole('button', { name: /activar cámara/i });
+      const activateButton = screen.getByRole('button', { name: /abrir cámara/i });
       await user.click(activateButton);
 
       // Assert
@@ -175,11 +175,11 @@ describe('ImageRecognitionSalesPage', () => {
       renderWithProviders(<ImageRecognitionSalesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/activar cámara/i)).toBeInTheDocument();
+        expect(screen.getByText(/abrir cámara/i)).toBeInTheDocument();
       });
 
       // Act
-      await user.click(screen.getByRole('button', { name: /activar cámara/i }));
+      await user.click(screen.getByRole('button', { name: /abrir cámara/i }));
 
       // Assert
       await waitFor(() => {
@@ -200,10 +200,10 @@ describe('ImageRecognitionSalesPage', () => {
       renderWithProviders(<ImageRecognitionSalesPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/activar cámara/i)).toBeInTheDocument();
+        expect(screen.getByText(/abrir cámara/i)).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole('button', { name: /activar cámara/i }));
+      await user.click(screen.getByRole('button', { name: /abrir cámara/i }));
 
       // Wait for camera to be active - look for "Capturar" button instead
       await waitFor(() => {

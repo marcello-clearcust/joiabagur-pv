@@ -311,6 +311,13 @@ export function ImageRecognitionSalesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Video element always rendered but hidden when camera inactive - fixes ref availability race condition */}
+            <video
+              ref={videoRef}
+              className={`w-full rounded-lg bg-black ${cameraActive ? '' : 'hidden'}`}
+              autoPlay
+              playsInline
+            />
             {!cameraActive ? (
               <div className="flex flex-col gap-3">
                 <Button onClick={startCamera} size="lg" className="w-full">
@@ -342,25 +349,17 @@ export function ImageRecognitionSalesPage() {
                 />
               </div>
             ) : (
-              <div className="space-y-3">
-                <video
-                  ref={videoRef}
-                  className="w-full rounded-lg bg-black"
-                  autoPlay
-                  playsInline
-                />
-                <div className="flex gap-2">
-                  <Button onClick={capturePhoto} size="lg" className="flex-1">
-                    <Camera className="mr-2 h-5 w-5" />
-                    Capturar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={stopCamera}
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
+              <div className="flex gap-2">
+                <Button onClick={capturePhoto} size="lg" className="flex-1">
+                  <Camera className="mr-2 h-5 w-5" />
+                  Capturar
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={stopCamera}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
               </div>
             )}
             <canvas ref={canvasRef} className="hidden" />

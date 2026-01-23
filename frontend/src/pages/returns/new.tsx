@@ -93,8 +93,9 @@ export function NewReturnPage() {
 
     setSearching(true);
     try {
-      const response = await productService.getProducts({ search: query, pageSize: 10 });
-      setSearchResults(response.items.filter(p => p.isActive));
+      const results = await productService.searchProducts(query);
+      // Convert ProductListItem[] to Product[] for compatibility
+      setSearchResults(results.filter(p => p.isActive) as unknown as Product[]);
     } catch (error) {
       console.error('Error searching products:', error);
     } finally {

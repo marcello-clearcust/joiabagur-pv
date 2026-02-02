@@ -67,6 +67,14 @@ public interface IInventoryService
     /// <returns>Centralized stock with breakdown.</returns>
     Task<CentralizedStockDto?> GetStockBreakdownAsync(Guid productId);
 
+    /// <summary>
+    /// Searches inventory by product name or SKU for a specific point of sale.
+    /// </summary>
+    /// <param name="pointOfSaleId">The point of sale ID.</param>
+    /// <param name="query">The search query (product name or SKU).</param>
+    /// <returns>List of matching inventory records.</returns>
+    Task<List<InventoryDto>> SearchInventoryAsync(Guid pointOfSaleId, string query);
+
     #endregion
 
     #region Stock Adjustment Operations

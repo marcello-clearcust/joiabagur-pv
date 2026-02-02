@@ -387,6 +387,32 @@ public class InventoryService : IInventoryService
         };
     }
 
+    /// <inheritdoc/>
+    public async Task<List<InventoryDto>> SearchInventoryAsync(Guid pointOfSaleId, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+        {
+            return new List<InventoryDto>();
+        }
+
+        // Get all active inventory for the point of sale
+        var inventories = await _inventoryRepository.FindByPointOfSaleAsync(pointOfSaleId, activeOnly: true);
+
+        // Filter by product name or SKU (case-insensitive)
+        var searchTerm = query.Trim().ToLowerInvariant();
+        var filteredInventories = inventories
+            .Where(i => 
+                (i.Product != null && i.Product.Name.ToLowerInvariant().Contains(searchTerm)) ||
+                (i.Product != null && i.Product.SKU.ToLowerInvariant().Contains(searchTerm))
+            )
+            .OrderBy(i => i.Product?.Name)
+            .Take(20) // Limit results for autocomplete
+            .Select(i => MapToDto(i, i.Product, i.PointOfSale))
+            .ToList();
+
+        return filteredInventories;
+    }
+
     #endregion
 
     #region Stock Adjustment Operations

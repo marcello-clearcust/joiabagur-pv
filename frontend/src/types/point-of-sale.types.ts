@@ -25,10 +25,10 @@ export interface CreatePointOfSaleRequest {
 
 export interface UpdatePointOfSaleRequest {
   name: string;
-  code: string;
   address?: string;
   phone?: string;
   email?: string;
+  isActive: boolean;
 }
 
 export interface PointOfSaleStatusRequest {

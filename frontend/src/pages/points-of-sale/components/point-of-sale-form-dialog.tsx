@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
 import type { PointOfSale } from '@/types/point-of-sale.types';
@@ -44,6 +45,7 @@ const pointOfSaleSchema = z.object({
   address: z.string().max(200, 'La dirección no puede exceder 200 caracteres').optional(),
   phone: z.string().max(20, 'El teléfono no puede exceder 20 caracteres').optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
+  isActive: z.boolean(),
 });
 
 type PointOfSaleFormData = z.infer<typeof pointOfSaleSchema>;
@@ -70,6 +72,7 @@ export function PointOfSaleFormDialog({
       address: '',
       phone: '',
       email: '',
+      isActive: true,
     },
   });
 
@@ -82,6 +85,7 @@ export function PointOfSaleFormDialog({
         address: pointOfSale.address || '',
         phone: pointOfSale.phone || '',
         email: pointOfSale.email || '',
+        isActive: pointOfSale.isActive,
       });
     } else {
       form.reset({
@@ -90,6 +94,7 @@ export function PointOfSaleFormDialog({
         address: '',
         phone: '',
         email: '',
+        isActive: true,
       });
     }
   }, [pointOfSale, form]);
@@ -99,13 +104,13 @@ export function PointOfSaleFormDialog({
     setIsSubmitting(true);
     try {
       if (isEditMode) {
-        // Update existing point of sale
+        // Update existing point of sale (code is immutable, not sent)
         await pointOfSaleService.updatePointOfSale(pointOfSale.id, {
           name: data.name,
-          code: data.code,
           address: data.address || undefined,
           phone: data.phone || undefined,
           email: data.email || undefined,
+          isActive: data.isActive,
         });
         toast.success('Punto de venta actualizado correctamente');
       } else {
@@ -185,10 +190,13 @@ export function PointOfSaleFormDialog({
                       {...field}
                       className="uppercase"
                       onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      disabled={isEditMode}
                     />
                   </FormControl>
                   <FormDescription>
-                    Código único del punto de venta (alfanumérico, _ y - permitidos)
+                    {isEditMode
+                      ? 'El código no puede modificarse después de la creación'
+                      : 'Código único del punto de venta (alfanumérico, _ y - permitidos)'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -241,6 +249,31 @@ export function PointOfSaleFormDialog({
                 )}
               />
             </div>
+
+            {/* IsActive Field - Only show in edit mode */}
+            {isEditMode && (
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Punto de Venta Activo</FormLabel>
+                      <FormDescription>
+                        Los puntos de venta inactivos no aparecerán en las listas para nuevas operaciones
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>

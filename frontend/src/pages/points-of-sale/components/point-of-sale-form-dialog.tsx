@@ -81,7 +81,7 @@ export function PointOfSaleFormDialog({
     if (pointOfSale) {
       form.reset({
         name: pointOfSale.name,
-        code: pointOfSale.code,
+        code: pointOfSale.code.toUpperCase(),
         address: pointOfSale.address || '',
         phone: pointOfSale.phone || '',
         email: pointOfSale.email || '',
@@ -124,22 +124,22 @@ export function PointOfSaleFormDialog({
         });
         toast.success('Punto de venta creado correctamente');
       }
+      setIsSubmitting(false);
       onClose(true);
     } catch (error: any) {
+      setIsSubmitting(false);
       const errorMessage =
         error?.message ||
         error?.response?.data?.errors?.[0] ||
         'Error al guardar el punto de venta';
       toast.error(errorMessage);
       console.error('Failed to save point of sale:', error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   // Handle dialog close
-  const handleClose = () => {
-    if (!isSubmitting) {
+  const handleClose = (open: boolean) => {
+    if (!open && !isSubmitting) {
       form.reset();
       onClose();
     }

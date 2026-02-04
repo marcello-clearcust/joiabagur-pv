@@ -1,12 +1,10 @@
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Auth;
-using JoiabagurPV.Application.DTOs.Inventory;
-using JoiabagurPV.Application.DTOs.PaymentMethods;
 using JoiabagurPV.Application.DTOs.PointOfSales;
-using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Application.DTOs.Sales;
-using JoiabagurPV.Application.DTOs.Users;
+using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Infrastructure.Data;
+using JoiabagurPV.Tests.TestHelpers.Mothers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
@@ -17,6 +15,7 @@ namespace JoiabagurPV.Tests.IntegrationTests;
 /// <summary>
 /// Integration tests for SalesController.
 /// Tests sale creation, validation, authorization, stock updates, and transaction integrity.
+/// Uses Respawn for database cleanup and Mother Objects for test data creation.
 /// </summary>
 [Collection(IntegrationTestCollection.Name)]
 public class SalesControllerTests : IAsyncLifetime
@@ -25,10 +24,13 @@ public class SalesControllerTests : IAsyncLifetime
     private readonly HttpClient _client;
     private HttpClient? _adminClient;
     private HttpClient? _operatorClient;
-    private Guid _testProductId;
-    private Guid _testPointOfSaleId;
-    private Guid _testPaymentMethodId;
-    private Guid _operatorUserId;
+
+    // Test data created via Mother Objects
+    private Product _testProduct = null!;
+    private PointOfSale _testPos = null!;
+    private PaymentMethod _testPaymentMethod = null!;
+    private User _testOperator = null!;
+    private Inventory _testInventory = null!;
 
     public SalesControllerTests(ApiWebApplicationFactory factory)
     {
@@ -38,112 +40,74 @@ public class SalesControllerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Use Respawn for database cleanup - no manual TRUNCATEs needed
         await _factory.ResetDatabaseAsync();
-        await ResetSalesTablesAsync();
         
         _adminClient = await CreateAuthenticatedClientAsync("admin", "Admin123!");
         
-        // Create an operator user
-        var createOperatorRequest = new CreateUserRequest
-        {
-            Username = "salesoperator",
-            Password = "Operator123!",
-            FirstName = "Sales",
-            LastName = "Operator",
-            Role = "Operator"
-        };
-        var operatorResponse = await _adminClient.PostAsJsonAsync("/api/users", createOperatorRequest);
-        var operatorDto = await operatorResponse.Content.ReadFromJsonAsync<UserDto>();
-        _operatorUserId = operatorDto!.Id;
-        
-        _operatorClient = await CreateAuthenticatedClientAsync("salesoperator", "Operator123!");
-        
-        // Create test data: POS, Product, Payment Method, Inventory, and Assignments
+        // Create test data using Mother Objects
         await SetupTestDataAsync();
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private async Task ResetSalesTablesAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        await context.Database.ExecuteSqlRawAsync(@"
-            TRUNCATE TABLE ""SalePhotos"" CASCADE;
-            TRUNCATE TABLE ""Sales"" CASCADE;
-            TRUNCATE TABLE ""InventoryMovements"" CASCADE;
-            TRUNCATE TABLE ""Inventories"" CASCADE;
-            TRUNCATE TABLE ""ProductPhotos"" CASCADE;
-            TRUNCATE TABLE ""Products"" CASCADE;
-            TRUNCATE TABLE ""PointOfSalePaymentMethods"" CASCADE;
-            TRUNCATE TABLE ""UserPointOfSales"" CASCADE;
-            TRUNCATE TABLE ""PaymentMethods"" CASCADE;
-            TRUNCATE TABLE ""PointOfSales"" CASCADE;
-        ");
-    }
-
+    /// <summary>
+    /// Sets up all prerequisite test data using the Mother Object pattern.
+    /// Creates interconnected entities needed for sales testing.
+    /// </summary>
     private async Task SetupTestDataAsync()
     {
+        using var mother = new TestDataMother(_factory.Services);
+
         // Create Point of Sale
-        var createPosRequest = new CreatePointOfSaleRequest
-        {
-            Code = "TEST-POS",
-            Name = "Test Point of Sale",
-            Address = "Test Address"
-        };
-        var posResponse = await _adminClient!.PostAsJsonAsync("/api/point-of-sales", createPosRequest);
-        var posDto = await posResponse.Content.ReadFromJsonAsync<PointOfSaleDto>();
-        _testPointOfSaleId = posDto!.Id;
+        _testPos = await mother.PointOfSale()
+            .WithCode("TEST-POS")
+            .WithName("Test Point of Sale")
+            .WithAddress("Test Address")
+            .CreateAsync();
 
         // Create Payment Method
-        var createPaymentMethodRequest = new CreatePaymentMethodRequest
+        _testPaymentMethod = await mother.PaymentMethod()
+            .WithCode("CASH")
+            .WithName("Cash")
+            .WithDescription("Cash payment")
+            .CreateAsync();
+
+        // Associate payment method with POS
+        mother.Context.PointOfSalePaymentMethods.Add(new PointOfSalePaymentMethod
         {
-            Code = "CASH",
-            Name = "Cash",
-            Description = "Cash payment"
-        };
-        var pmResponse = await _adminClient!.PostAsJsonAsync("/api/payment-methods", createPaymentMethodRequest);
-        var pmDto = await pmResponse.Content.ReadFromJsonAsync<PaymentMethodDto>();
-        _testPaymentMethodId = pmDto!.Id;
-
-        // Assign Payment Method to POS
-        await _adminClient!.PostAsync($"/api/point-of-sales/{_testPointOfSaleId}/payment-methods/{_testPaymentMethodId}", null);
-
-        // Assign Operator to POS
-        await _adminClient!.PostAsync($"/api/users/{_operatorUserId}/point-of-sales/{_testPointOfSaleId}", null);
+            Id = Guid.NewGuid(),
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            CreatedAt = DateTime.UtcNow
+        });
+        await mother.Context.SaveChangesAsync();
 
         // Create Product
-        var createProductRequest = new CreateProductRequest
-        {
-            SKU = "TEST-SKU-001",
-            Name = "Test Product",
-            Description = "Test product for sales",
-            Price = 100.00m
-        };
-        var productResponse = await _adminClient!.PostAsJsonAsync("/api/products", createProductRequest);
-        var productDto = await productResponse.Content.ReadFromJsonAsync<ProductDto>();
-        _testProductId = productDto!.Id;
+        _testProduct = await mother.Product()
+            .WithSku("TEST-SKU-001")
+            .WithName("Test Product")
+            .WithDescription("Test product for sales")
+            .WithPrice(100.00m)
+            .CreateAsync();
 
-        // Assign Product to POS
-        var assignRequest = new AssignProductRequest
-        {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId
-        };
-        var assignResponse = await _adminClient!.PostAsJsonAsync("/api/inventory/assign", assignRequest);
-        assignResponse.EnsureSuccessStatusCode();
-        
-        // Add initial stock via stock adjustment
-        var stockAdjustment = new StockAdjustmentRequest
-        {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            QuantityChange = 10,
-            Reason = "Initial stock for tests"
-        };
-        var adjustResponse = await _adminClient!.PostAsJsonAsync("/api/inventory/adjustment", stockAdjustment);
-        adjustResponse.EnsureSuccessStatusCode();
+        // Create Inventory with initial stock
+        _testInventory = await mother.Inventory()
+            .WithProduct(_testProduct.Id)
+            .WithPointOfSale(_testPos.Id)
+            .WithQuantity(10)
+            .CreateAsync();
+
+        // Create operator and assign to POS
+        _testOperator = await mother.User()
+            .WithUsername("salesoperator")
+            .WithName("Sales", "Operator")
+            .AsOperator()
+            .AssignedTo(_testPos.Id)
+            .CreateAsync();
+
+        // Authenticate as the operator
+        _operatorClient = await CreateAuthenticatedClientAsync("salesoperator", "Test123!");
     }
 
     private async Task<HttpClient> CreateAuthenticatedClientAsync(string username, string password)
@@ -175,9 +139,9 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 2,
             Notes = "Test sale"
         };
@@ -197,7 +161,7 @@ public class SalesControllerTests : IAsyncLifetime
             .FirstOrDefaultAsync();
         
         sale.Should().NotBeNull();
-        sale!.ProductId.Should().Be(_testProductId);
+        sale!.ProductId.Should().Be(_testProduct.Id);
         sale.Quantity.Should().Be(2);
         sale.Price.Should().Be(100.00m);
         sale.InventoryMovement.Should().NotBeNull();
@@ -211,9 +175,9 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 20, // More than available (10)
             Notes = "Test sale with insufficient stock"
         };
@@ -234,8 +198,8 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
             PaymentMethodId = Guid.NewGuid(), // Non-existent payment method
             Quantity = 1
         };
@@ -250,21 +214,19 @@ public class SalesControllerTests : IAsyncLifetime
     [Fact]
     public async Task CreateSale_OperatorNotAssignedToPOS_ReturnsBadRequest()
     {
-        // Arrange - Create another POS without assigning operator
-        var createPosRequest = new CreatePointOfSaleRequest
-        {
-            Code = "OTHER-POS",
-            Name = "Other POS",
-            Address = "Other Address"
-        };
-        var posResponse = await _adminClient!.PostAsJsonAsync("/api/point-of-sales", createPosRequest);
-        var posDto = await posResponse.Content.ReadFromJsonAsync<PointOfSaleDto>();
+        // Arrange - Create another POS without assigning operator using Mother Object
+        using var mother = new TestDataMother(_factory.Services);
+        var otherPos = await mother.PointOfSale()
+            .WithCode("OTHER-POS")
+            .WithName("Other POS")
+            .WithAddress("Other Address")
+            .CreateAsync();
 
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = posDto!.Id,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = otherPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1
         };
 
@@ -284,9 +246,9 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 0
         };
 
@@ -303,9 +265,9 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 3
         };
 
@@ -320,12 +282,12 @@ public class SalesControllerTests : IAsyncLifetime
         
         // Verify inventory was updated
         var inventory = await context.Inventories
-            .FirstOrDefaultAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+            .FirstOrDefaultAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
         
         inventory.Should().NotBeNull();
         inventory!.Quantity.Should().Be(7); // 10 - 3
 
-        // Verify movement was created (find the sale movement, not the adjustment from setup)
+        // Verify movement was created
         var movement = await context.InventoryMovements
             .Where(m => m.InventoryId == inventory.Id && m.MovementType == Domain.Enums.MovementType.Sale)
             .FirstOrDefaultAsync();
@@ -347,9 +309,9 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange - Create a sale first
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1
         };
         var createResponse = await _operatorClient!.PostAsJsonAsync("/api/sales", createRequest);
@@ -368,7 +330,7 @@ public class SalesControllerTests : IAsyncLifetime
         var sale = await response.Content.ReadFromJsonAsync<SaleDto>();
         sale.Should().NotBeNull();
         sale!.Id.Should().Be((Guid)saleId);
-        sale.ProductId.Should().Be(_testProductId);
+        sale.ProductId.Should().Be(_testProduct.Id);
         sale.Quantity.Should().Be(1);
     }
 
@@ -394,9 +356,9 @@ public class SalesControllerTests : IAsyncLifetime
         {
             var createRequest = new CreateSaleRequest
             {
-                ProductId = _testProductId,
-                PointOfSaleId = _testPointOfSaleId,
-                PaymentMethodId = _testPaymentMethodId,
+                ProductId = _testProduct.Id,
+                PointOfSaleId = _testPos.Id,
+                PaymentMethodId = _testPaymentMethod.Id,
                 Quantity = 1
             };
             await _operatorClient!.PostAsJsonAsync("/api/sales", createRequest);
@@ -420,14 +382,14 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange - Create sales
         await _operatorClient!.PostAsJsonAsync("/api/sales", new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1
         });
 
         // Act - Filter by product
-        var response = await _operatorClient!.GetAsync($"/api/sales?productId={_testProductId}");
+        var response = await _operatorClient!.GetAsync($"/api/sales?productId={_testProduct.Id}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -435,7 +397,7 @@ public class SalesControllerTests : IAsyncLifetime
         var history = await response.Content.ReadFromJsonAsync<SalesHistoryResponse>();
         history.Should().NotBeNull();
         history!.Sales.Should().HaveCount(1);
-        history.Sales[0].ProductId.Should().Be(_testProductId);
+        history.Sales[0].ProductId.Should().Be(_testProduct.Id);
     }
 
     #endregion
@@ -448,9 +410,9 @@ public class SalesControllerTests : IAsyncLifetime
         // Arrange
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1
         };
 
@@ -473,16 +435,16 @@ public class SalesControllerTests : IAsyncLifetime
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var inventory = await context.Inventories
-                .FirstAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+                .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
             inventory.Quantity = 6;
             await context.SaveChangesAsync();
         }
 
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 2 // After sale, 4 units remain (< 5 threshold)
         };
 
@@ -506,16 +468,16 @@ public class SalesControllerTests : IAsyncLifetime
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var inventory = await context.Inventories
-                .FirstAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+                .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
             inventory.Quantity = 100;
             await context.SaveChangesAsync();
         }
 
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1 // 99 units remain (well above threshold)
         };
 
@@ -537,16 +499,16 @@ public class SalesControllerTests : IAsyncLifetime
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var inventory = await context.Inventories
-                .FirstAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+                .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
             inventory.Quantity = 1;
             await context.SaveChangesAsync();
         }
 
         var createRequest = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1 // Last unit
         };
 
@@ -573,27 +535,35 @@ public class SalesControllerTests : IAsyncLifetime
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var inventory = await context.Inventories
-                .FirstAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+                .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
             inventory.Quantity = 1;
             await context.SaveChangesAsync();
         }
 
-        // Create second operator client
-        var operator2Client = await CreateAuthenticatedClientAsync("operator2", "Operator123!");
+        // Create second operator using Mother Object
+        using var mother = new TestDataMother(_factory.Services);
+        await mother.User()
+            .WithUsername("operator2")
+            .WithName("Second", "Operator")
+            .AsOperator()
+            .AssignedTo(_testPos.Id)
+            .CreateAsync();
+
+        var operator2Client = await CreateAuthenticatedClientAsync("operator2", "Test123!");
 
         var request1 = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1
         };
 
         var request2 = new CreateSaleRequest
         {
-            ProductId = _testProductId,
-            PointOfSaleId = _testPointOfSaleId,
-            PaymentMethodId = _testPaymentMethodId,
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
             Quantity = 1
         };
 
@@ -616,7 +586,7 @@ public class SalesControllerTests : IAsyncLifetime
         var finalContext = finalScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
         var finalInventory = await finalContext.Inventories
-            .FirstAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+            .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
         
         finalInventory.Quantity.Should().Be(0, "final quantity should be 0 after selling last unit");
     }
@@ -629,7 +599,7 @@ public class SalesControllerTests : IAsyncLifetime
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var inventory = await context.Inventories
-                .FirstAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+                .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
             inventory.Quantity = 10;
             await context.SaveChangesAsync();
         }
@@ -641,9 +611,9 @@ public class SalesControllerTests : IAsyncLifetime
         {
             var request = new CreateSaleRequest
             {
-                ProductId = _testProductId,
-                PointOfSaleId = _testPointOfSaleId,
-                PaymentMethodId = _testPaymentMethodId,
+                ProductId = _testProduct.Id,
+                PointOfSaleId = _testPos.Id,
+                PaymentMethodId = _testPaymentMethod.Id,
                 Quantity = 1
             };
 
@@ -664,10 +634,10 @@ public class SalesControllerTests : IAsyncLifetime
         var finalContext2 = finalScope2.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
         var finalInventory = await finalContext2.Inventories
-            .FirstAsync(i => i.ProductId == _testProductId && i.PointOfSaleId == _testPointOfSaleId);
+            .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
         
         var sales = await finalContext2.Sales
-            .Where(s => s.ProductId == _testProductId)
+            .Where(s => s.ProductId == _testProduct.Id)
             .ToListAsync();
         
         var totalSold = sales.Sum(s => s.Quantity);

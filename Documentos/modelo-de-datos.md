@@ -34,8 +34,12 @@ erDiagram
     PaymentMethod ||--o{ Sale : "usado en"
     
     Sale ||--o{ SalePhoto : "tiene foto"
-    Sale ||--o{ Return : "puede tener devolución"
+    Sale ||--o{ ReturnSale : "asociada a devoluciones"
     Sale ||--o{ InventoryMovement : "genera movimiento"
+    
+    Return ||--o{ ReturnSale : "asociada a ventas"
+    Return ||--o{ ReturnPhoto : "tiene foto"
+    Return ||--o{ InventoryMovement : "genera movimiento"
     
     Inventory ||--o{ InventoryMovement : "tiene movimientos"
     
@@ -157,15 +161,38 @@ erDiagram
     
     Return {
         uuid Id PK
-        uuid SaleId FK "venta original"
         uuid ProductId FK
         uuid PointOfSaleId FK
         uuid UserId FK "usuario que registra la devolución"
-        string? Reason
+        int Quantity "cantidad total devuelta"
+        enum ReturnCategory "Defectuoso, TamañoIncorrecto, NoSatisfecho, Otro"
+        string? Reason "motivo libre opcional, max 500 chars"
         datetime ReturnDate
         datetime CreatedAt
-        indexed(SaleId)
         indexed(PointOfSaleId, ReturnDate)
+        indexed(ProductId, ReturnDate)
+    }
+    
+    ReturnSale {
+        uuid Id PK
+        uuid ReturnId FK
+        uuid SaleId FK
+        int Quantity "cantidad de esta venta incluida en la devolución"
+        decimal UnitPrice "precio unitario snapshot de Sale.Price"
+        datetime CreatedAt
+        unique(ReturnId, SaleId)
+        indexed(SaleId)
+        indexed(ReturnId)
+    }
+    
+    ReturnPhoto {
+        uuid Id PK
+        uuid ReturnId FK
+        string FilePath "S3/blob path"
+        string FileName
+        int FileSize "bytes"
+        string MimeType
+        datetime CreatedAt
     }
     
     Inventory {
@@ -383,20 +410,72 @@ Fotos asociadas a ventas cuando se registran mediante reconocimiento de imágene
 
 ### Return (Devoluciones)
 
-Registro de devoluciones de productos vendidos.
+Registro de devoluciones de productos vendidos. Una devolución puede estar asociada a una o más ventas originales mediante la tabla de relación `ReturnSale`.
 
 **Campos Clave:**
 - `Id`: Identificador único (UUID)
-- `SaleId`: Referencia a la venta original
-- `ProductId`: Producto devuelto (redundante pero útil para consultas)
-- `PointOfSaleId`: Punto de venta donde se recibe la devolución
+- `ProductId`: Producto devuelto
+- `PointOfSaleId`: Punto de venta donde se recibe la devolución (debe coincidir con la venta original)
 - `UserId`: Usuario que registra la devolución
-- `Reason`: Motivo de la devolución (opcional)
+- `Quantity`: Cantidad total de unidades devueltas
+- `ReturnCategory`: Categoría obligatoria de la devolución (Defectuoso, TamañoIncorrecto, NoSatisfecho, Otro)
+- `Reason`: Motivo de texto libre de la devolución (opcional, máximo 500 caracteres)
 - `ReturnDate`: Fecha y hora de la devolución
 
+**Reglas de Negocio:**
+- La devolución debe realizarse en el mismo punto de venta donde se realizó la venta original
+- Solo se pueden devolver unidades de ventas realizadas en los últimos 30 días
+- La cantidad total devuelta no puede exceder la cantidad disponible (vendida - ya devuelta previamente)
+- El stock se incrementa automáticamente mediante `InventoryMovement` (tipo "Return")
+- Operadores solo pueden registrar devoluciones en sus puntos de venta asignados
+
 **Consideraciones:**
-- Una venta puede tener múltiples devoluciones (parciales) en el futuro
-- El stock se incrementa automáticamente mediante `InventoryMovement`
+- Una devolución puede asociarse a múltiples ventas (ej: cliente compró 2 unidades el lunes, 3 el martes, devuelve 4)
+- Una venta puede tener múltiples devoluciones parciales
+- El valor total de la devolución se calcula como: SUM(ReturnSale.Quantity * ReturnSale.UnitPrice)
+
+---
+
+### ReturnSale (Relación Devolución-Venta)
+
+Tabla de relación muchos a muchos entre devoluciones y ventas. Permite asociar una devolución a múltiples ventas originales, registrando la cantidad devuelta y el precio snapshot de cada venta.
+
+**Campos Clave:**
+- `Id`: Identificador único (UUID)
+- `ReturnId`: Referencia a la devolución
+- `SaleId`: Referencia a la venta original
+- `Quantity`: Cantidad de unidades de esta venta incluidas en la devolución
+- `UnitPrice`: Precio unitario snapshot copiado de Sale.Price al momento de la devolución
+
+**Consideraciones:**
+- Permite calcular el valor exacto devuelto por venta
+- Preserva el precio histórico para reportes financieros precisos
+- La suma de ReturnSale.Quantity para un SaleId no puede exceder Sale.Quantity
+
+**Cálculo de cantidad disponible para devolución:**
+```
+Para cada Sale en últimos 30 días en mismo POS con mismo Producto:
+  disponible = Sale.Quantity - SUM(ReturnSale.Quantity WHERE SaleId = Sale.Id)
+```
+
+---
+
+### ReturnPhoto (Fotos de Devoluciones)
+
+Fotos opcionales asociadas a devoluciones para documentación (ej: foto del producto defectuoso).
+
+**Campos Clave:**
+- `Id`: Identificador único (UUID)
+- `ReturnId`: Referencia a la devolución
+- `FilePath`: Ruta en S3/Blob Storage
+- `FileName`: Nombre original del archivo
+- `FileSize`: Tamaño en bytes
+- `MimeType`: Tipo MIME de la imagen
+
+**Consideraciones:**
+- Una devolución puede tener 0 o 1 foto
+- Las fotos se comprimen (JPEG 80%, máximo 2MB) antes de almacenar
+- Mismo patrón de almacenamiento que SalePhoto
 
 ---
 
@@ -516,8 +595,14 @@ Historial completo y trazable de todos los movimientos de inventario (ventas, de
    - Una venta debe tener un método de pago válido para el punto de venta
 
 7. **Devoluciones:**
-   - Una devolución debe referenciar una venta existente
-   - El producto devuelto debe coincidir con el producto de la venta original
+   - Una devolución debe asociarse a una o más ventas existentes (vía ReturnSale)
+   - El producto devuelto debe coincidir con el producto de las ventas originales
+   - La devolución debe realizarse en el mismo punto de venta de las ventas originales
+   - Solo se pueden asociar ventas de los últimos 30 días
+   - La cantidad total devuelta no puede exceder la cantidad disponible (vendida - ya devuelta)
+   - La categoría de devolución es obligatoria (Defectuoso, TamañoIncorrecto, NoSatisfecho, Otro)
+   - El motivo de texto libre es opcional (máximo 500 caracteres)
+   - Operadores solo pueden registrar devoluciones en sus puntos de venta asignados
 
 ---
 
@@ -585,10 +670,20 @@ Todas las entidades utilizan `Id` (UUID) como clave primaria con índice automá
 
 | Índice | Campos | Propósito | Casos de Uso |
 |--------|--------|-----------|--------------|
-| `IX_Return_Sale` | `(SaleId)` | Búsqueda de devoluciones por venta | Gestión de devoluciones |
 | `IX_Return_PointOfSale_ReturnDate` | `(PointOfSaleId, ReturnDate DESC)` | Historial de devoluciones por punto de venta | Reportes de devoluciones |
+| `IX_Return_Product_ReturnDate` | `(ProductId, ReturnDate DESC)` | Historial de devoluciones por producto | Análisis de productos |
 
-**Justificación:** Optimiza las consultas de devoluciones asociadas a ventas y por punto de venta.
+**Justificación:** Optimiza las consultas de devoluciones por punto de venta y producto.
+
+#### Tabla: ReturnSale
+
+| Índice | Campos | Propósito | Casos de Uso |
+|--------|--------|-----------|--------------|
+| `IX_ReturnSale_Sale` | `(SaleId)` | Búsqueda de devoluciones asociadas a una venta | Cálculo de cantidad disponible para devolución |
+| `IX_ReturnSale_Return` | `(ReturnId)` | Obtener ventas asociadas a una devolución | Detalle de devolución |
+| `UQ_ReturnSale_Return_Sale` | `(ReturnId, SaleId)` | Evitar duplicados de asociación | Integridad de datos |
+
+**Justificación:** Optimiza el cálculo de cantidades disponibles para devolución y la consulta de ventas asociadas a una devolución.
 
 ### Índices Adicionales para Búsquedas
 

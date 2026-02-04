@@ -2,7 +2,45 @@
   "hash": "a53e1da4",
   "configHash": "fc9e27a9",
   "lockfileHash": "11f28e2e",
-  "browserHash": "477c67d2",
-  "optimized": {},
-  "chunks": {}
+  "browserHash": "c42c113a",
+  "optimized": {
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "ae390a2c",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "7d30afed",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "d225fe85",
+      "needsInterop": true
+    },
+    "next-themes": {
+      "src": "../../node_modules/next-themes/dist/index.mjs",
+      "file": "next-themes.js",
+      "fileHash": "d836146c",
+      "needsInterop": false
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "3b100cfb",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-ZWIT7H2Z": {
+      "file": "chunk-ZWIT7H2Z.js"
+    },
+    "chunk-ANYMWHWL": {
+      "file": "chunk-ANYMWHWL.js"
+    }
+  }
 }

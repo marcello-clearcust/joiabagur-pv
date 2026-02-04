@@ -83,6 +83,21 @@ public class ApplicationDbContext : DbContext
     public DbSet<SalePhoto> SalePhotos { get; set; }
 
     /// <summary>
+    /// Gets or sets the Returns DbSet.
+    /// </summary>
+    public DbSet<Return> Returns { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ReturnSales DbSet (junction table for Return-Sale many-to-many).
+    /// </summary>
+    public DbSet<ReturnSale> ReturnSales { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ReturnPhotos DbSet.
+    /// </summary>
+    public DbSet<ReturnPhoto> ReturnPhotos { get; set; }
+
+    /// <summary>
     /// Gets or sets the ModelMetadata DbSet.
     /// </summary>
     public DbSet<ModelMetadata> ModelMetadata { get; set; }

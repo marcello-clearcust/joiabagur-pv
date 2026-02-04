@@ -4,6 +4,7 @@ using JoiabagurPV.Application.Services;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
+using JoiabagurPV.Tests.TestHelpers;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -40,11 +41,9 @@ public class PaymentMethodServiceTests
     public async Task GetAllAsync_ShouldReturnAllPaymentMethods()
     {
         // Arrange
-        var paymentMethods = new List<PaymentMethod>
-        {
-            new() { Id = Guid.NewGuid(), Code = "CASH", Name = "Efectivo", IsActive = true },
-            new() { Id = Guid.NewGuid(), Code = "BIZUM", Name = "Bizum", IsActive = true }
-        };
+        var pm1 = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Efectivo");
+        var pm2 = TestDataGenerator.CreatePaymentMethod(code: "BIZUM", name: "Bizum");
+        var paymentMethods = new List<PaymentMethod> { pm1, pm2 };
         _paymentMethodRepositoryMock.Setup(r => r.GetAllAsync(true)).ReturnsAsync(paymentMethods);
 
         // Act
@@ -60,10 +59,8 @@ public class PaymentMethodServiceTests
     public async Task GetAllAsync_WhenIncludeInactiveFalse_ShouldReturnOnlyActive()
     {
         // Arrange
-        var activePaymentMethods = new List<PaymentMethod>
-        {
-            new() { Id = Guid.NewGuid(), Code = "CASH", Name = "Efectivo", IsActive = true }
-        };
+        var pm = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Efectivo");
+        var activePaymentMethods = new List<PaymentMethod> { pm };
         _paymentMethodRepositoryMock.Setup(r => r.GetAllAsync(false)).ReturnsAsync(activePaymentMethods);
 
         // Act
@@ -82,12 +79,11 @@ public class PaymentMethodServiceTests
     public async Task GetByIdAsync_WhenExists_ShouldReturnPaymentMethod()
     {
         // Arrange
-        var id = Guid.NewGuid();
-        var paymentMethod = new PaymentMethod { Id = id, Code = "CASH", Name = "Efectivo", IsActive = true };
-        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(paymentMethod);
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Efectivo");
+        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(paymentMethod.Id)).ReturnsAsync(paymentMethod);
 
         // Act
-        var result = await _service.GetByIdAsync(id);
+        var result = await _service.GetByIdAsync(paymentMethod.Id);
 
         // Assert
         result.Should().NotBeNull();
@@ -164,19 +160,18 @@ public class PaymentMethodServiceTests
     public async Task UpdateAsync_WithValidData_ShouldUpdatePaymentMethod()
     {
         // Arrange
-        var id = Guid.NewGuid();
-        var existingMethod = new PaymentMethod { Id = id, Code = "CASH", Name = "Old Name", IsActive = true };
+        var existingMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Old Name");
         var request = new UpdatePaymentMethodRequest
         {
             Name = "New Name",
             Description = "Updated description"
         };
-        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(existingMethod);
+        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(existingMethod.Id)).ReturnsAsync(existingMethod);
         _paymentMethodRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<PaymentMethod>()))
             .ReturnsAsync((PaymentMethod pm) => pm);
 
         // Act
-        var result = await _service.UpdateAsync(id, request);
+        var result = await _service.UpdateAsync(existingMethod.Id, request);
 
         // Assert
         result.Should().NotBeNull();
@@ -208,14 +203,13 @@ public class PaymentMethodServiceTests
     public async Task ChangeStatusAsync_ShouldUpdateStatus()
     {
         // Arrange
-        var id = Guid.NewGuid();
-        var paymentMethod = new PaymentMethod { Id = id, Code = "CASH", Name = "Cash", IsActive = true };
-        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(paymentMethod);
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Cash");
+        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(paymentMethod.Id)).ReturnsAsync(paymentMethod);
         _paymentMethodRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<PaymentMethod>()))
             .ReturnsAsync((PaymentMethod pm) => pm);
 
         // Act
-        var result = await _service.ChangeStatusAsync(id, false);
+        var result = await _service.ChangeStatusAsync(paymentMethod.Id, false);
 
         // Assert
         result.Should().NotBeNull();
@@ -232,23 +226,22 @@ public class PaymentMethodServiceTests
     {
         // Arrange
         var pointOfSaleId = Guid.NewGuid();
-        var paymentMethodId = Guid.NewGuid();
-        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Cash", IsActive = true };
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Cash");
         
         _pointOfSaleRepositoryMock.Setup(r => r.ExistsAsync(pointOfSaleId)).ReturnsAsync(true);
-        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(paymentMethodId)).ReturnsAsync(paymentMethod);
-        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(paymentMethod.Id)).ReturnsAsync(paymentMethod);
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethod.Id))
             .ReturnsAsync((PointOfSalePaymentMethod?)null);
         _posPaymentMethodRepositoryMock.Setup(r => r.AddAsync(It.IsAny<PointOfSalePaymentMethod>()))
             .ReturnsAsync((PointOfSalePaymentMethod pm) => pm);
 
         // Act
-        var result = await _service.AssignToPointOfSaleAsync(pointOfSaleId, paymentMethodId);
+        var result = await _service.AssignToPointOfSaleAsync(pointOfSaleId, paymentMethod.Id);
 
         // Assert
         result.Should().NotBeNull();
         result.PointOfSaleId.Should().Be(pointOfSaleId);
-        result.PaymentMethodId.Should().Be(paymentMethodId);
+        result.PaymentMethodId.Should().Be(paymentMethod.Id);
         result.IsActive.Should().BeTrue();
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
     }
@@ -291,23 +284,22 @@ public class PaymentMethodServiceTests
     {
         // Arrange
         var pointOfSaleId = Guid.NewGuid();
-        var paymentMethodId = Guid.NewGuid();
-        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Cash", IsActive = true };
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Cash");
         var existingAssignment = new PointOfSalePaymentMethod
         {
             PointOfSaleId = pointOfSaleId,
-            PaymentMethodId = paymentMethodId,
+            PaymentMethodId = paymentMethod.Id,
             IsActive = true,
             PaymentMethod = paymentMethod
         };
 
         _pointOfSaleRepositoryMock.Setup(r => r.ExistsAsync(pointOfSaleId)).ReturnsAsync(true);
-        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(paymentMethodId)).ReturnsAsync(paymentMethod);
-        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+        _paymentMethodRepositoryMock.Setup(r => r.GetByIdAsync(paymentMethod.Id)).ReturnsAsync(paymentMethod);
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethod.Id))
             .ReturnsAsync(existingAssignment);
 
         // Act
-        var act = () => _service.AssignToPointOfSaleAsync(pointOfSaleId, paymentMethodId);
+        var act = () => _service.AssignToPointOfSaleAsync(pointOfSaleId, paymentMethod.Id);
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
@@ -359,28 +351,32 @@ public class PaymentMethodServiceTests
     {
         // Arrange
         var pointOfSaleId = Guid.NewGuid();
-        var paymentMethodId = Guid.NewGuid();
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod();
         var assignment = new PointOfSalePaymentMethod
         {
             Id = Guid.NewGuid(),
             PointOfSaleId = pointOfSaleId,
-            PaymentMethodId = paymentMethodId,
+            PaymentMethodId = paymentMethod.Id,
             IsActive = true
         };
 
-        var activeAssignments = new List<PointOfSalePaymentMethod>
+        var otherAssignment = new PointOfSalePaymentMethod
         {
-            assignment,
-            new() { Id = Guid.NewGuid(), PointOfSaleId = pointOfSaleId, PaymentMethodId = Guid.NewGuid(), IsActive = true }
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = Guid.NewGuid(),
+            IsActive = true
         };
 
-        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+        var activeAssignments = new List<PointOfSalePaymentMethod> { assignment, otherAssignment };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethod.Id))
             .ReturnsAsync(assignment);
         _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
             .ReturnsAsync(activeAssignments);
 
         // Act
-        await _service.UnassignFromPointOfSaleAsync(pointOfSaleId, paymentMethodId);
+        await _service.UnassignFromPointOfSaleAsync(pointOfSaleId, paymentMethod.Id);
 
         // Assert
         _posPaymentMethodRepositoryMock.Verify(r => r.DeleteAsync(assignment.Id), Times.Once);
@@ -392,24 +388,24 @@ public class PaymentMethodServiceTests
     {
         // Arrange
         var pointOfSaleId = Guid.NewGuid();
-        var paymentMethodId = Guid.NewGuid();
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod();
         var assignment = new PointOfSalePaymentMethod
         {
             Id = Guid.NewGuid(),
             PointOfSaleId = pointOfSaleId,
-            PaymentMethodId = paymentMethodId,
+            PaymentMethodId = paymentMethod.Id,
             IsActive = true
         };
 
         var activeAssignments = new List<PointOfSalePaymentMethod> { assignment };
 
-        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethod.Id))
             .ReturnsAsync(assignment);
         _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
             .ReturnsAsync(activeAssignments);
 
         // Act
-        var act = () => _service.UnassignFromPointOfSaleAsync(pointOfSaleId, paymentMethodId);
+        var act = () => _service.UnassignFromPointOfSaleAsync(pointOfSaleId, paymentMethod.Id);
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
@@ -444,30 +440,33 @@ public class PaymentMethodServiceTests
     {
         // Arrange
         var pointOfSaleId = Guid.NewGuid();
-        var paymentMethodId = Guid.NewGuid();
-        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Efectivo", IsActive = true };
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Efectivo");
         var assignment = new PointOfSalePaymentMethod
         {
             Id = Guid.NewGuid(),
             PointOfSaleId = pointOfSaleId,
-            PaymentMethodId = paymentMethodId,
+            PaymentMethodId = paymentMethod.Id,
             IsActive = true,
             PaymentMethod = paymentMethod
         };
 
-        var activeAssignments = new List<PointOfSalePaymentMethod>
+        var otherAssignment = new PointOfSalePaymentMethod
         {
-            assignment,
-            new() { Id = Guid.NewGuid(), PointOfSaleId = pointOfSaleId, PaymentMethodId = Guid.NewGuid(), IsActive = true }
+            Id = Guid.NewGuid(),
+            PointOfSaleId = pointOfSaleId,
+            PaymentMethodId = Guid.NewGuid(),
+            IsActive = true
         };
 
-        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+        var activeAssignments = new List<PointOfSalePaymentMethod> { assignment, otherAssignment };
+
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethod.Id))
             .ReturnsAsync(assignment);
         _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
             .ReturnsAsync(activeAssignments);
 
         // Act
-        var result = await _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethodId, false);
+        var result = await _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethod.Id, false);
 
         // Assert
         result.Should().NotBeNull();
@@ -481,26 +480,25 @@ public class PaymentMethodServiceTests
     {
         // Arrange
         var pointOfSaleId = Guid.NewGuid();
-        var paymentMethodId = Guid.NewGuid();
-        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Efectivo", IsActive = true };
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Efectivo");
         var assignment = new PointOfSalePaymentMethod
         {
             Id = Guid.NewGuid(),
             PointOfSaleId = pointOfSaleId,
-            PaymentMethodId = paymentMethodId,
+            PaymentMethodId = paymentMethod.Id,
             IsActive = true,
             PaymentMethod = paymentMethod
         };
 
         var activeAssignments = new List<PointOfSalePaymentMethod> { assignment };
 
-        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethod.Id))
             .ReturnsAsync(assignment);
         _posPaymentMethodRepositoryMock.Setup(r => r.GetByPointOfSaleAsync(pointOfSaleId, false))
             .ReturnsAsync(activeAssignments);
 
         // Act
-        var act = () => _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethodId, false);
+        var act = () => _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethod.Id, false);
 
         // Assert
         await act.Should().ThrowAsync<DomainException>()
@@ -513,22 +511,21 @@ public class PaymentMethodServiceTests
     {
         // Arrange
         var pointOfSaleId = Guid.NewGuid();
-        var paymentMethodId = Guid.NewGuid();
-        var paymentMethod = new PaymentMethod { Id = paymentMethodId, Code = "CASH", Name = "Efectivo", IsActive = true };
+        var paymentMethod = TestDataGenerator.CreatePaymentMethod(code: "CASH", name: "Efectivo");
         var assignment = new PointOfSalePaymentMethod
         {
             Id = Guid.NewGuid(),
             PointOfSaleId = pointOfSaleId,
-            PaymentMethodId = paymentMethodId,
+            PaymentMethodId = paymentMethod.Id,
             IsActive = false,
             PaymentMethod = paymentMethod
         };
 
-        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethodId))
+        _posPaymentMethodRepositoryMock.Setup(r => r.GetAssignmentAsync(pointOfSaleId, paymentMethod.Id))
             .ReturnsAsync(assignment);
 
         // Act
-        var result = await _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethodId, true);
+        var result = await _service.ChangeAssignmentStatusAsync(pointOfSaleId, paymentMethod.Id, true);
 
         // Assert
         result.Should().NotBeNull();

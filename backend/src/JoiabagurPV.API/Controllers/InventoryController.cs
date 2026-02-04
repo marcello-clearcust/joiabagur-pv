@@ -235,6 +235,37 @@ public class InventoryController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Searches inventory by product name or SKU for a specific point of sale.
+    /// Only administrators can access this endpoint.
+    /// </summary>
+    /// <param name="pointOfSaleId">The point of sale ID.</param>
+    /// <param name="query">The search query (product name or SKU, minimum 2 characters).</param>
+    /// <returns>List of matching inventory records.</returns>
+    [HttpGet("search")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(typeof(List<InventoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SearchInventory(
+        [FromQuery] Guid pointOfSaleId,
+        [FromQuery] string query)
+    {
+        if (pointOfSaleId == Guid.Empty)
+        {
+            return BadRequest(new { error = "El ID del punto de venta es requerido." });
+        }
+
+        if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+        {
+            return BadRequest(new { error = "La búsqueda requiere al menos 2 caracteres." });
+        }
+
+        var result = await _inventoryService.SearchInventoryAsync(pointOfSaleId, query);
+        return Ok(result);
+    }
+
     #endregion
 
     #region Stock Import Endpoints

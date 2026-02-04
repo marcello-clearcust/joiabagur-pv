@@ -1,0 +1,173 @@
+### Returns API Testing
+### Endpoints for returns management (EP5)
+
+### Variables
+@baseUrl = http://localhost:5056/api
+
+### ===========================================
+### AUTHENTICATION (Run first to get cookie)
+### ===========================================
+
+### Login as Admin
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin123!"
+}
+
+### ===========================================
+### GET ELIGIBLE SALES FOR RETURN
+### ===========================================
+
+### Get eligible sales for a product at a point of sale
+### Replace with actual IDs
+GET {{baseUrl}}/returns/eligible-sales?productId=YOUR_PRODUCT_ID&pointOfSaleId=YOUR_POS_ID
+Content-Type: application/json
+
+### ===========================================
+### CREATE RETURN
+### ===========================================
+
+### Create a simple return (one sale association)
+POST {{baseUrl}}/returns
+Content-Type: application/json
+
+{
+  "productId": "YOUR_PRODUCT_ID",
+  "pointOfSaleId": "YOUR_POS_ID",
+  "quantity": 1,
+  "returnCategory": 1,
+  "reason": "Producto defectuoso - rayado",
+  "saleAssociations": [
+    {
+      "saleId": "YOUR_SALE_ID",
+      "quantity": 1
+    }
+  ]
+}
+
+### Create a return with multiple sale associations
+POST {{baseUrl}}/returns
+Content-Type: application/json
+
+{
+  "productId": "YOUR_PRODUCT_ID",
+  "pointOfSaleId": "YOUR_POS_ID",
+  "quantity": 3,
+  "returnCategory": 2,
+  "reason": "Tamaño incorrecto - cliente solicitó cambio",
+  "saleAssociations": [
+    {
+      "saleId": "YOUR_SALE_ID_1",
+      "quantity": 2
+    },
+    {
+      "saleId": "YOUR_SALE_ID_2",
+      "quantity": 1
+    }
+  ]
+}
+
+### Create a return with photo (Base64 encoded JPEG)
+POST {{baseUrl}}/returns
+Content-Type: application/json
+
+{
+  "productId": "YOUR_PRODUCT_ID",
+  "pointOfSaleId": "YOUR_POS_ID",
+  "quantity": 1,
+  "returnCategory": 1,
+  "reason": "Producto defectuoso - ver foto adjunta",
+  "saleAssociations": [
+    {
+      "saleId": "YOUR_SALE_ID",
+      "quantity": 1
+    }
+  ],
+  "photoBase64": "/9j/4AAQSkZJRgABAQEASABIAAD...",
+  "photoFileName": "defecto.jpg"
+}
+
+### ===========================================
+### GET RETURNS HISTORY
+### ===========================================
+
+### Get all returns (last 30 days by default)
+GET {{baseUrl}}/returns
+Content-Type: application/json
+
+### Get returns with date filter
+GET {{baseUrl}}/returns?startDate=2026-01-01&endDate=2026-01-31
+Content-Type: application/json
+
+### Get returns for specific point of sale
+GET {{baseUrl}}/returns?pointOfSaleId=YOUR_POS_ID
+Content-Type: application/json
+
+### Get returns for specific product
+GET {{baseUrl}}/returns?productId=YOUR_PRODUCT_ID
+Content-Type: application/json
+
+### Get returns with pagination
+GET {{baseUrl}}/returns?page=1&pageSize=20
+Content-Type: application/json
+
+### Get returns with all filters combined
+GET {{baseUrl}}/returns?startDate=2026-01-01&endDate=2026-01-31&pointOfSaleId=YOUR_POS_ID&productId=YOUR_PRODUCT_ID&page=1&pageSize=20
+Content-Type: application/json
+
+### ===========================================
+### GET RETURN DETAILS
+### ===========================================
+
+### Get return by ID
+### Replace with actual return ID
+GET {{baseUrl}}/returns/YOUR_RETURN_ID
+Content-Type: application/json
+
+### ===========================================
+### GET RETURN PHOTO
+### ===========================================
+
+### Get return photo file
+### Replace with actual return ID
+GET {{baseUrl}}/returns/YOUR_RETURN_ID/photo/file
+Content-Type: application/json
+
+### ===========================================
+### RETURN CATEGORIES
+### ===========================================
+# 1 = Defectuoso
+# 2 = TamañoIncorrecto
+# 3 = NoSatisfecho
+# 4 = Otro
+
+### ===========================================
+### TESTING WORKFLOW
+### ===========================================
+# 1. Login as admin or operator
+# 2. Get eligible sales for a product
+# 3. Select sale(s) to associate with return
+# 4. Create return with chosen category
+# 5. Verify return in history
+# 6. Check inventory movement was created
+
+### ===========================================
+### ERROR SCENARIOS TO TEST
+### ===========================================
+
+### Try to return more than available quantity
+# Should return 400 Bad Request
+
+### Try to return from sale older than 30 days
+# Should not show in eligible sales
+
+### Try to return at different point of sale
+# Should return 403 Forbidden for operators
+# Should validate POS match for return
+
+### Try to create return without category
+# Should return 400 Bad Request - validation error

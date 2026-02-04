@@ -2,9 +2,9 @@
  * Stock Adjustment Page
  * Allows administrators to adjust stock quantities
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, PenLine, Loader2, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, PenLine, Loader2, Minus, Plus, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -31,23 +44,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
 import { inventoryService } from '@/services/inventory.service';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
 import { PointOfSale } from '@/types/point-of-sale.types';
-import { Inventory, PaginatedInventoryResult } from '@/types/inventory.types';
+import { Inventory } from '@/types/inventory.types';
 import { ROUTES } from '@/routing/routes';
 
 export function InventoryAdjustPage() {
   const [pointsOfSale, setPointsOfSale] = useState<PointOfSale[]>([]);
   const [selectedPosId, setSelectedPosId] = useState<string>('');
-  const [inventoryResult, setInventoryResult] = useState<PaginatedInventoryResult | null>(null);
   const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(null);
   const [quantityChange, setQuantityChange] = useState<number>(0);
   const [reason, setReason] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [adjusting, setAdjusting] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  
+  // Product search/autocomplete state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Inventory[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -68,46 +88,56 @@ export function InventoryAdjustPage() {
     loadData();
   }, []);
 
-  // Load inventory when POS changes
-  const loadInventory = useCallback(async () => {
-    if (!selectedPosId) return;
-    
-    try {
-      const result = await inventoryService.getStock(selectedPosId);
-      setInventoryResult(result);
-      setSelectedInventory(null);
-      setQuantityChange(0);
-      setReason('');
-    } catch (error) {
-      toast.error('Error al cargar el inventario');
-      console.error(error);
-    }
-  }, [selectedPosId]);
-
+  // Reset product selection when POS changes
   useEffect(() => {
-    loadInventory();
-  }, [loadInventory]);
-
-  const handleProductSelect = (productId: string) => {
-    const inventory = inventoryResult?.items.find((i) => i.productId === productId);
-    setSelectedInventory(inventory || null);
+    setSelectedInventory(null);
+    setSearchQuery('');
+    setSearchResults([]);
     setQuantityChange(0);
     setReason('');
-  };
+  }, [selectedPosId]);
 
-  const handleAdjustment = () => {
-    if (!selectedInventory || quantityChange === 0 || !reason.trim()) {
-      toast.error('Complete todos los campos requeridos');
+  // Search inventory with debounce
+  useEffect(() => {
+    if (!selectedPosId || !searchQuery || searchQuery.length < 2) {
+      setSearchResults([]);
       return;
     }
 
-    const newQuantity = selectedInventory.quantity + quantityChange;
-    if (newQuantity < 0) {
-      toast.error(`El ajuste resultaría en stock negativo (${newQuantity})`);
-      return;
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
 
-    setShowConfirmDialog(true);
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const results = await inventoryService.searchInventory(selectedPosId, searchQuery);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Error searching inventory:', error);
+        toast.error('Error al buscar productos');
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+
+    // Cleanup timeout on unmount or when dependencies change
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, selectedPosId]);
+
+  const handleProductSelect = (inventory: Inventory) => {
+    setSelectedInventory(inventory);
+    setSearchQuery(`${inventory.productSku} - ${inventory.productName}`);
+    setComboboxOpen(false);
+    setQuantityChange(0);
+    setReason('');
   };
 
   const handleConfirmAdjustment = async () => {
@@ -126,7 +156,16 @@ export function InventoryAdjustPage() {
         toast.success(
           `Stock ajustado: ${result.quantityBefore} → ${result.quantityAfter}`
         );
-        await loadInventory();
+        
+        // Update the selected inventory with the new quantity
+        setSelectedInventory({
+          ...selectedInventory,
+          quantity: result.quantityAfter,
+        });
+        
+        // Reset form
+        setQuantityChange(0);
+        setReason('');
       } else {
         toast.error(result.errorMessage || 'Error al ajustar el stock');
       }
@@ -138,6 +177,21 @@ export function InventoryAdjustPage() {
       setAdjusting(false);
       setShowConfirmDialog(false);
     }
+  };
+
+  const handleAdjustment = () => {
+    if (!selectedInventory || quantityChange === 0 || !reason.trim()) {
+      toast.error('Complete todos los campos requeridos');
+      return;
+    }
+
+    const newQuantity = selectedInventory.quantity + quantityChange;
+    if (newQuantity < 0) {
+      toast.error(`El ajuste resultaría en stock negativo (${newQuantity})`);
+      return;
+    }
+
+    setShowConfirmDialog(true);
   };
 
   const newQuantity = selectedInventory
@@ -183,10 +237,10 @@ export function InventoryAdjustPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Point of Sale Selector */}
-          <div className="space-y-2">
-            <Label>Punto de Venta</Label>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="pos-select">Punto de Venta</Label>
             <Select value={selectedPosId} onValueChange={setSelectedPosId}>
-              <SelectTrigger className="w-full max-w-sm">
+              <SelectTrigger id="pos-select" className="w-full max-w-sm">
                 <SelectValue placeholder="Seleccionar punto de venta" />
               </SelectTrigger>
               <SelectContent>
@@ -199,30 +253,82 @@ export function InventoryAdjustPage() {
             </Select>
           </div>
 
-          {/* Product Selector */}
-          <div className="space-y-2">
-            <Label>Producto</Label>
-            <Select
-              value={selectedInventory?.productId || ''}
-              onValueChange={handleProductSelect}
-              disabled={!inventoryResult || inventoryResult.items.length === 0}
-            >
-              <SelectTrigger className="w-full max-w-md">
-                <SelectValue placeholder="Seleccionar producto" />
-              </SelectTrigger>
-              <SelectContent>
-                {inventoryResult?.items.map((item) => (
-                  <SelectItem key={item.productId} value={item.productId}>
-                    {item.productSku} - {item.productName} (Stock: {item.quantity})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {inventoryResult && inventoryResult.items.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No hay productos asignados a este punto de venta
-              </p>
-            )}
+          {/* Product Selector - Autocomplete */}
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="product-select">Producto</Label>
+            <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="product-select"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={comboboxOpen}
+                  className="w-full max-w-sm justify-between"
+                  disabled={!selectedPosId}
+                >
+                  {selectedInventory ? (
+                    <span className="truncate">
+                      {selectedInventory.productSku} - {selectedInventory.productName} (Stock: {selectedInventory.quantity})
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Buscar producto por nombre o SKU...</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Buscar por nombre o SKU..."
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                  />
+                  <CommandList>
+                    {searchLoading ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="ml-2 text-sm text-muted-foreground">Buscando...</span>
+                      </div>
+                    ) : searchQuery.length < 2 ? (
+                      <CommandEmpty>
+                        Escriba al menos 2 caracteres para buscar
+                      </CommandEmpty>
+                    ) : searchResults.length === 0 ? (
+                      <CommandEmpty>
+                        No se encontraron productos
+                      </CommandEmpty>
+                    ) : (
+                      <CommandGroup>
+                        {searchResults.map((item) => (
+                          <CommandItem
+                            key={item.productId}
+                            value={item.productId}
+                            onSelect={() => handleProductSelect(item)}
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4',
+                                selectedInventory?.productId === item.productId
+                                  ? 'opacity-100'
+                                  : 'opacity-0'
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {item.productSku} - {item.productName}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                Stock actual: {item.quantity}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {selectedInventory && (

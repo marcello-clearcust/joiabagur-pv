@@ -1,9 +1,6 @@
 using FluentAssertions;
 using JoiabagurPV.Application.DTOs.Auth;
-using JoiabagurPV.Domain.Entities;
-using JoiabagurPV.Domain.Enums;
-using JoiabagurPV.Infrastructure.Data;
-using Microsoft.Extensions.DependencyInjection;
+using JoiabagurPV.Tests.TestHelpers.Mothers;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -11,6 +8,7 @@ namespace JoiabagurPV.Tests.IntegrationTests;
 
 /// <summary>
 /// Integration tests for AuthController.
+/// Uses Respawn for database cleanup and Mother Objects for test data creation.
 /// </summary>
 [Collection(IntegrationTestCollection.Name)]
 public class AuthControllerTests : IAsyncLifetime
@@ -115,22 +113,14 @@ public class AuthControllerTests : IAsyncLifetime
     [Fact]
     public async Task Login_WithInactiveUser_ShouldReturnUnauthorized()
     {
-        // Arrange
-        // Create an inactive user
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var inactiveUser = new User
-        {
-            Username = "inactive_user",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test123!", workFactor: 4),
-            FirstName = "Inactive",
-            LastName = "User",
-            Role = UserRole.Operator,
-            IsActive = false
-        };
-        context.Users.Add(inactiveUser);
-        await context.SaveChangesAsync();
+        // Arrange - Create an inactive user using Mother Object
+        using var mother = new TestDataMother(_factory.Services);
+        await mother.User()
+            .WithUsername("inactive_user")
+            .WithName("Inactive", "User")
+            .AsOperator()
+            .Inactive()
+            .CreateAsync();
 
         var request = new LoginRequest
         {

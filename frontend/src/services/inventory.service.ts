@@ -150,6 +150,23 @@ export const inventoryService = {
     }
   },
 
+  /**
+   * Search inventory by product name or SKU for a specific point of sale
+   */
+  searchInventory: async (pointOfSaleId: string, query: string): Promise<Inventory[]> => {
+    if (!query || query.length < 2) {
+      return [];
+    }
+
+    const response = await apiClient.get<Inventory[]>(
+      `${INVENTORY_ENDPOINTS.STOCK}/search`,
+      {
+        params: { pointOfSaleId, query },
+      }
+    );
+    return response.data;
+  },
+
   // ==================== Stock Import Operations ====================
 
   /**

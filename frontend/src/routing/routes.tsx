@@ -37,7 +37,12 @@ export const ROUTES = {
     DETAIL: (id: string) => `/sales/${id}`,
   },
   AI_MODEL: '/admin/ai-model',
-  RETURNS: '/returns',
+  RETURNS: {
+    ROOT: '/returns',
+    NEW: '/returns/new',
+    HISTORY: '/returns/history',
+    DETAIL: (id: string) => `/returns/${id}`,
+  },
   PAYMENT_METHODS: '/payment-methods',
   USERS: '/users',
   POINTS_OF_SALE: '/points-of-sale',

@@ -23,6 +23,8 @@ const ManualSalesPage = lazy(() => import('@/pages/sales/new'));
 const ImageRecognitionSalesPage = lazy(() => import('@/pages/sales/new-image'));
 const SalesHistoryPage = lazy(() => import('@/pages/sales/history'));
 const ReturnsPage = lazy(() => import('@/pages/returns'));
+const NewReturnPage = lazy(() => import('@/pages/returns/new'));
+const ReturnsHistoryPage = lazy(() => import('@/pages/returns/history'));
 const AIModelPage = lazy(() => import('@/pages/admin/ai-model'));
 const PaymentMethodsPage = lazy(() => import('@/pages/payment-methods'));
 const UsersPage = lazy(() => import('@/pages/users'));
@@ -67,7 +69,9 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.SALES.NEW} element={<ManualSalesPage />} />
             <Route path={ROUTES.SALES.NEW_IMAGE} element={<ImageRecognitionSalesPage />} />
             <Route path={ROUTES.SALES.HISTORY} element={<SalesHistoryPage />} />
-            <Route path={ROUTES.RETURNS} element={<ReturnsPage />} />
+            <Route path={ROUTES.RETURNS.ROOT} element={<ReturnsPage />} />
+            <Route path={ROUTES.RETURNS.NEW} element={<NewReturnPage />} />
+            <Route path={ROUTES.RETURNS.HISTORY} element={<ReturnsHistoryPage />} />
           </Route>
         </Route>
 

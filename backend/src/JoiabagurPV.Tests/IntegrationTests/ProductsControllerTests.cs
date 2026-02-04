@@ -32,10 +32,8 @@ public class ProductsControllerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Use Respawn for database cleanup - no manual TRUNCATEs needed
         await _factory.ResetDatabaseAsync();
-        
-        // Also reset product tables (not included in base ResetDatabaseAsync)
-        await ResetProductTablesAsync();
         
         _adminClient = await CreateAuthenticatedClientAsync("admin", "Admin123!");
         
@@ -54,18 +52,6 @@ public class ProductsControllerTests : IAsyncLifetime
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
-
-    private async Task ResetProductTablesAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        await context.Database.ExecuteSqlRawAsync(@"
-            TRUNCATE TABLE ""ProductPhotos"" CASCADE;
-            TRUNCATE TABLE ""Products"" CASCADE;
-            TRUNCATE TABLE ""Collections"" CASCADE;
-        ");
-    }
 
     private async Task<HttpClient> CreateAuthenticatedClientAsync(string username, string password)
     {

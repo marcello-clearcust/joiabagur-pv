@@ -2900,3 +2900,156 @@ LOCAL (Admin Laptop):
 **Validación:** ✅ Ambas propuestas OpenSpec válidas
 
 ---
+
+## Prompt sobre Refactorización de Tests de Integración con Respawn, Mother Object y Bogus
+
+### Prompt 1: Refactorizar tests de integración
+
+For integration test we should:
+- use Respawn instead of manual truncate queries.
+- use mother object pattern to simplify the code of the tests on the same entity.
+
+Refactor the tests.
+If is not documented in specs for integration testing, add to spec to avoid this issue in the future.
+
+---
+
+**Respuesta:** Refactorización completa de tests de integración:
+
+**1. Eliminación de TRUNCATEs manuales:**
+- Eliminados todos los `ExecuteSqlRawAsync` con TRUNCATE de:
+  - `ReturnsControllerTests.cs`
+  - `SalesControllerTests.cs`
+  - `ProductsControllerTests.cs`
+  - `ImageRecognitionControllerTests.cs`
+- Ahora solo usan `_factory.ResetDatabaseAsync()` (Respawn)
+
+**2. Creación de Mother Objects:**
+
+```
+TestHelpers/Mothers/
+├── TestDataMother.cs     # Factory principal
+├── SaleMother.cs         # Builder para Sales
+└── ReturnMother.cs       # Builder para Returns
+```
+
+Cada Mother Object incluye:
+- `ProductMother` - Crear productos
+- `PointOfSaleMother` - Crear puntos de venta
+- `PaymentMethodMother` - Crear métodos de pago
+- `InventoryMother` - Crear inventarios
+- `UserMother` - Crear usuarios con asignaciones POS
+- `SaleMother` - Crear ventas
+- `ReturnMother` - Crear devoluciones
+
+**3. Actualización de spec `backend-testing`:**
+- Añadido escenario "Prohibited Manual Truncation"
+- Añadido requisito "Mother Object Pattern for Integration Tests"
+- Añadido requisito "Integration Test Structure"
+
+---
+
+### Prompt 2: Conflicto entre Bogus y Mother Object
+
+Is there a conflict between Bogus and Mother object pattern?
+If yes, how can we solve it?
+Do not apply changes.
+
+---
+
+**Respuesta:** Sí, existe un conflicto potencial:
+
+**Problema:**
+| Aspecto | Bogus (TestDataGenerator) | Mother Objects |
+|---------|--------------------------|----------------|
+| Propósito | Entidades in-memory para unit tests | Entidades persistidas para integration tests |
+| Datos | Valores aleatorios realistas | Valores fijos por defecto |
+| Persistencia | Ninguna | Guarda en base de datos |
+
+**Conflictos identificados:**
+1. **Duplicación de lógica**: Ambos crean las mismas entidades con diferentes patrones
+2. **Valores inconsistentes**: Bogus usa datos aleatorios, Mother Objects usaban valores fijos
+3. **Código redundante**: Métodos de configuración similares duplicados
+
+**Solución recomendada: Composición**
+Mother Objects deben usar Bogus internamente via `TestDataGenerator`:
+
+```csharp
+// Antes (valores fijos)
+public class ProductMother
+{
+    private string _name = "Test Product";  // Fijo, no realista
+}
+
+// Después (Bogus via TestDataGenerator)
+public class ProductMother
+{
+    public ProductMother(ApplicationDbContext context)
+    {
+        _product = TestDataGenerator.CreateProduct();  // Valores aleatorios realistas
+    }
+}
+```
+
+**Beneficios:**
+- Single source of truth para generación de entidades
+- Datos realistas en todos los tests
+- Sin duplicación de lógica
+
+---
+
+### Prompt 3: Implementar refactorización
+
+Yes, implement the refactoring. Then update spec and documentation for testing.
+
+---
+
+**Respuesta:** Implementación completa de la arquitectura unificada:
+
+**1. Refactorización de Mother Objects:**
+
+Todos los Mother Objects ahora usan `TestDataGenerator` internamente:
+
+```csharp
+public class ProductMother
+{
+    private readonly Product _product;
+    
+    public ProductMother(ApplicationDbContext context)
+    {
+        _product = TestDataGenerator.CreateProduct();  // Bogus genera valores
+    }
+    
+    public ProductMother WithSku(string sku) { _product.SKU = sku; return this; }
+    public async Task<Product> CreateAsync() { ... persiste ... }
+}
+```
+
+**2. Archivos actualizados:**
+- `TestHelpers/Mothers/TestDataMother.cs` - Todas las entity mothers usan `TestDataGenerator.Create*()`
+- `TestHelpers/Mothers/SaleMother.cs` - Usa `TestDataGenerator.CreateSale()`
+- `TestHelpers/Mothers/ReturnMother.cs` - Usa `TestDataGenerator.CreateReturn()`
+
+**3. Spec actualizado (`backend-testing/spec.md`):**
+
+Nuevos escenarios añadidos:
+- "Test Data Generation with Bogus" - Single source of truth
+- "TestDataGenerator as Single Source" - Previene duplicación futura
+- "Mother Object Default Values via Bogus" - Mother Objects DEBEN usar TestDataGenerator
+- "Unified Test Data Architecture" - Documenta el patrón de composición
+
+**Arquitectura final:**
+```
+TestDataGenerator (Bogus Fakers)
+       ↑ usa internamente
+   Mother Objects
+       ↑ usa
+Integration Tests    Unit Tests (usan TestDataGenerator directamente)
+```
+
+**Validación:**
+- ✅ Build exitoso (0 errores)
+- ✅ 16 tests de ReturnService pasan
+- ✅ Spec válido (`openspec validate backend-testing --strict`)
+
+---

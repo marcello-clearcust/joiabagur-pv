@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Package, FileSpreadsheet, Plus, PenLine, History, Building2 } from 'lucide-react';
+import { Package, FileSpreadsheet, Plus, PenLine, History, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,8 @@ export function InventoryPage() {
   const [inventoryResult, setInventoryResult] = useState<PaginatedInventoryResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [stockLoading, setStockLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
 
   // Load points of sale
   useEffect(() => {
@@ -64,13 +66,13 @@ export function InventoryPage() {
     loadPointsOfSale();
   }, []);
 
-  // Load stock when POS changes
+  // Load stock when POS or page changes
   const loadStock = useCallback(async () => {
     if (!selectedPosId) return;
     
     setStockLoading(true);
     try {
-      const result = await inventoryService.getStock(selectedPosId);
+      const result = await inventoryService.getStock(selectedPosId, currentPage, pageSize);
       setInventoryResult(result);
     } catch (error) {
       toast.error('Error al cargar el stock');
@@ -78,11 +80,16 @@ export function InventoryPage() {
     } finally {
       setStockLoading(false);
     }
-  }, [selectedPosId]);
+  }, [selectedPosId, currentPage]);
 
   useEffect(() => {
     loadStock();
   }, [loadStock]);
+
+  // Reset to page 1 when POS changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedPosId]);
 
   if (loading) {
     return (
@@ -244,6 +251,38 @@ export function InventoryPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination */}
+          {inventoryResult && inventoryResult.totalCount > pageSize && (
+            <div className="flex items-center justify-between border-t pt-4 mt-4">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, inventoryResult.totalCount)} de {inventoryResult.totalCount} productos
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || stockLoading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <div className="text-sm">
+                  Página {currentPage} de {Math.ceil(inventoryResult.totalCount / pageSize)}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                  disabled={currentPage >= Math.ceil(inventoryResult.totalCount / pageSize) || stockLoading}
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

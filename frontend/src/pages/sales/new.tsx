@@ -62,7 +62,6 @@ export function ManualSalesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [pointsOfSale, setPointsOfSale] = useState<PointOfSale[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -83,12 +82,8 @@ export function ManualSalesPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [posData, productsData] = await Promise.all([
-          pointOfSaleService.getPointsOfSale(),
-          productService.getProducts(),
-        ]);
+        const posData = await pointOfSaleService.getPointsOfSale();
         setPointsOfSale(posData);
-        setProducts(productsData || []);
         if (posData.length > 0) {
           setSelectedPosId(posData[0].id);
         }
@@ -96,32 +91,19 @@ export function ManualSalesPage() {
         // If a productId was passed from image recognition, pre-select that product
         // Note: productId could be empty string if image recognition enrichment failed
         if (locationState?.productId && locationState.productId.trim() !== '') {
-          // First try to find in already loaded products
-          let preSelectedProduct = productsData?.find(
-            (p) => p.id === locationState.productId
-          );
-          
-          // If not found in local list, fetch directly from API
-          // This handles cases where the product list loading is incomplete
-          // or the admin is accessing a product not in the initial page
-          if (!preSelectedProduct) {
-            try {
-              preSelectedProduct = await productService.getProduct(locationState.productId);
-              // Add to local list for future searches
-              if (preSelectedProduct) {
-                setProducts(prev => [...prev, preSelectedProduct!]);
-              }
-            } catch (fetchError) {
-              console.warn('Could not fetch product by ID:', fetchError);
+          try {
+            const preSelectedProduct = await productService.getProduct(locationState.productId);
+            
+            if (preSelectedProduct) {
+              setSelectedProduct(preSelectedProduct);
+              setProductSearch(preSelectedProduct.sku);
+              toast.success(`Producto "${preSelectedProduct.name}" seleccionado automáticamente`);
+            } else {
+              // Product truly not found or not accessible
+              toast.warning('El producto seleccionado no está disponible en tus puntos de venta');
             }
-          }
-          
-          if (preSelectedProduct) {
-            setSelectedProduct(preSelectedProduct);
-            setProductSearch(preSelectedProduct.sku);
-            toast.success(`Producto "${preSelectedProduct.name}" seleccionado automáticamente`);
-          } else {
-            // Product truly not found or not accessible
+          } catch (fetchError) {
+            console.warn('Could not fetch product by ID:', fetchError);
             toast.warning('El producto seleccionado no está disponible en tus puntos de venta');
           }
         }
@@ -207,23 +189,31 @@ export function ManualSalesPage() {
     checkStock();
   }, [selectedProduct, selectedPosId]);
 
-  // Product search
-  const handleProductSearch = useCallback((query: string) => {
-    setProductSearch(query);
-    if (!query.trim()) {
+  // Product search using API with debounce
+  useEffect(() => {
+    if (!productSearch.trim() || productSearch.length < 2) {
       setSearchResults([]);
       return;
     }
     
     setSearchLoading(true);
-    const filtered = products.filter(
-      (p) =>
-        p.sku.toLowerCase().includes(query.toLowerCase()) ||
-        p.name.toLowerCase().includes(query.toLowerCase())
-    );
-    setSearchResults(filtered.slice(0, 10));
-    setSearchLoading(false);
-  }, [products]);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const results = await productService.searchProducts(productSearch);
+        setSearchResults(results.slice(0, 10));
+      } catch (error) {
+        console.error('Error searching products:', error);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => {
+      clearTimeout(timeoutId);
+      setSearchLoading(false);
+    };
+  }, [productSearch]);
 
   // Select product from search
   const handleSelectProduct = (product: Product) => {
@@ -320,10 +310,10 @@ export function ManualSalesPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar producto..."
+                placeholder="Buscar producto (mín. 2 caracteres)..."
                 className="pl-10"
                 value={productSearch}
-                onChange={(e) => handleProductSearch(e.target.value)}
+                onChange={(e) => setProductSearch(e.target.value)}
               />
               
               {/* Search Results Dropdown */}

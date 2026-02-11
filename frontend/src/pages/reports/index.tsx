@@ -1,7 +1,14 @@
 /**
- * Reports Module - EP9
- * Placeholder page for queries and reports
+ * Reports Module - EP9/EP10
+ * Reports hub page with links to available reports
  */
+
+import { Link } from 'react-router-dom';
+import { TrendingUp, PackageX } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ROUTES } from '@/routing/routes';
+
 export function ReportsPage() {
   return (
     <div className="space-y-6">
@@ -11,8 +18,52 @@ export function ReportsPage() {
           Consultas y reportes del sistema
         </p>
       </div>
-      <div className="rounded-lg border p-8 text-center text-muted-foreground">
-        Módulo de reportes - Por implementar (EP9)
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="size-5" />
+              Márgenes por Producto
+            </CardTitle>
+            <CardDescription>
+              Análisis de rentabilidad basado en componentes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Visualiza costes, precios y márgenes de cada producto calculados desde sus componentes.
+              Incluye exportación a Excel.
+            </p>
+            <Button variant="secondary" asChild className="w-full">
+              <Link to={ROUTES.REPORTS.PRODUCT_MARGINS}>
+                Ver Reporte
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PackageX className="size-5" />
+              Productos sin Componentes
+            </CardTitle>
+            <CardDescription>
+              Identificar productos sin estructura de costes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Lista de productos que no tienen componentes asignados, con acceso directo a edición.
+            </p>
+            <Button variant="secondary" asChild className="w-full">
+              <Link to={ROUTES.REPORTS.PRODUCTS_WITHOUT_COMPONENTS}>
+                Ver Reporte
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

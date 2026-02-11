@@ -19,6 +19,8 @@ export const ROUTES = {
     CREATE: '/products/create',
     EDIT: (id: string) => `/products/${id}/edit`,
     IMPORT: '/products/import',
+    COMPONENTS: '/products/components',
+    COMPONENT_TEMPLATES: '/products/component-templates',
   },
   INVENTORY: {
     ROOT: '/inventory',
@@ -46,7 +48,11 @@ export const ROUTES = {
   PAYMENT_METHODS: '/payment-methods',
   USERS: '/users',
   POINTS_OF_SALE: '/points-of-sale',
-  REPORTS: '/reports',
+  REPORTS: {
+    ROOT: '/reports',
+    PRODUCT_MARGINS: '/reports/product-margins',
+    PRODUCTS_WITHOUT_COMPONENTS: '/reports/products-without-components',
+  },
 } as const;
 
 /**

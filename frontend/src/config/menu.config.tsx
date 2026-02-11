@@ -46,7 +46,7 @@ export const MENU_ADMINISTRATOR: MenuConfig = [
   {
     title: 'Reportes',
     icon: FileText,
-    path: ROUTES.REPORTS,
+    path: ROUTES.REPORTS.ROOT,
   },
   {
     title: 'Configuración',

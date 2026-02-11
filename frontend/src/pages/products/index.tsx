@@ -4,7 +4,7 @@
  */
 
 import { Link } from 'react-router-dom';
-import { FileSpreadsheet, Package, Plus, Download } from 'lucide-react';
+import { FileSpreadsheet, Package, Plus, Download, Puzzle, LayoutTemplate } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/routing/routes';
@@ -132,6 +132,50 @@ export function ProductsPage() {
                 Descargar Plantilla Excel
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Puzzle className="size-5" />
+              Componentes
+            </CardTitle>
+            <CardDescription>
+              Tabla maestra de componentes de joyas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Gestiona materiales, mano de obra y otros elementos asignables a productos.
+            </p>
+            <Button variant="secondary" asChild className="w-full">
+              <Link to={ROUTES.PRODUCTS.COMPONENTS}>
+                Ver Componentes
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <LayoutTemplate className="size-5" />
+              Plantillas de Componentes
+            </CardTitle>
+            <CardDescription>
+              Plantillas reutilizables para configurar productos
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Crea plantillas de componentes para aplicar rápidamente a productos.
+            </p>
+            <Button variant="secondary" asChild className="w-full">
+              <Link to={ROUTES.PRODUCTS.COMPONENT_TEMPLATES}>
+                Ver Plantillas
+              </Link>
+            </Button>
           </CardContent>
         </Card>
 

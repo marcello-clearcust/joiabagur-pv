@@ -56,6 +56,12 @@ public static class ServiceCollectionExtensions
         // Register returns management services
         services.AddScoped<IReturnService, ReturnService>();
 
+        // Register component management services (EP10)
+        services.AddScoped<IProductComponentService, ProductComponentService>();
+        services.AddScoped<IComponentAssignmentService, ComponentAssignmentService>();
+        services.AddScoped<IComponentTemplateService, ComponentTemplateService>();
+        services.AddScoped<IComponentReportService, ComponentReportService>();
+
         // Register image recognition services
         services.AddScoped<IImageRecognitionService, ImageRecognitionService>();
         services.AddScoped<IModelHealthService, ModelHealthService>();

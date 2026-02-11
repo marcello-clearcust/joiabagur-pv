@@ -35,6 +35,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { ROUTES } from '@/routing/routes';
 import { ProductPhotoUpload } from './components/product-photo-upload';
+import { ComponentAssignmentSection } from './components/component-assignment-section';
+import { useAuth } from '@/providers/auth-provider';
 
 // Validation schema - Note: SKU is not included as it's immutable
 const updateProductSchema = z.object({
@@ -66,6 +68,8 @@ const NO_COLLECTION_VALUE = '__none__';
 export function ProductEditPage() {
   const navigate = useNavigate();
   const { productId } = useParams<{ productId: string }>();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Administrator';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -486,6 +490,17 @@ export function ProductEditPage() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Component Assignment Section - Admin only */}
+      {isAdmin && productId && (
+        <ComponentAssignmentSection
+          productId={productId}
+          productPrice={parseFloat(form.watch('price') || '0')}
+          onAdjustPrice={(suggestedPrice) => {
+            form.setValue('price', suggestedPrice.toFixed(2), { shouldDirty: true });
+          }}
+        />
+      )}
 
       {/* Photo Upload Section */}
       <ProductPhotoUpload

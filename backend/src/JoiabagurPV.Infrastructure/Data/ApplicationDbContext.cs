@@ -108,6 +108,26 @@ public class ApplicationDbContext : DbContext
     public DbSet<ModelTrainingJob> ModelTrainingJobs { get; set; }
 
     /// <summary>
+    /// Gets or sets the ProductComponents DbSet (master table).
+    /// </summary>
+    public DbSet<ProductComponent> ProductComponents { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ProductComponentAssignments DbSet.
+    /// </summary>
+    public DbSet<ProductComponentAssignment> ProductComponentAssignments { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ComponentTemplates DbSet.
+    /// </summary>
+    public DbSet<ComponentTemplate> ComponentTemplates { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ComponentTemplateItems DbSet.
+    /// </summary>
+    public DbSet<ComponentTemplateItem> ComponentTemplateItems { get; set; }
+
+    /// <summary>
     /// Configures the model that was discovered by convention from the entity types
     /// exposed in Microsoft.EntityFrameworkCore.DbSet`1 properties on your derived context.
     /// </summary>

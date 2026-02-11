@@ -257,6 +257,65 @@ Proporciona funcionalidades de consulta y visualización de datos históricos de
 
 ---
 
+## Épica 10: Gestión de Componentes de Joyas
+
+**Descripción:**  
+Permite gestionar los componentes que constituyen las joyas (materiales, mano de obra, etc.) mediante una tabla maestra, asignarlos a productos con cantidades y precios por defecto o override, calcular costes y precios de venta sugeridos, y generar reportes de márgenes. Solo visible para administradores.
+
+**Decisiones de diseño tomadas:**
+- **Precio oficial vs sugerido:** `Product.Price` es el precio oficial de venta. El precio calculado por componentes es solo informativo/sugerencia.
+- **Override obligatorio (asignación manual):** Cada asignación de componente a producto debe tener precios de coste y venta definidos (manual o desde plantilla).
+- **Override opcional:** Solo en plantillas: al aplicar plantilla se cargan precios desde la tabla maestra como valores por defecto.
+- **Precisión decimal:** 4 decimales para cantidad, coste y venta.
+- **Orden:** Los componentes se listan en el orden especificado en la UI; se permite reordenar con drag-and-drop.
+- **Integración:** Gestión de componentes integrada dentro de la sección Productos (subsección).
+- **Visibilidad:** Componentes y totales calculados ocultos para todos los roles (campo solo admin).
+- **Componentes desactivados:** No se pueden asignar nuevos; los ya asignados a productos mantienen su asignación.
+
+**Alcance:**
+- Tabla maestra de componentes (Descripción, CostPrice, SalePrice opcionales, activar/desactivar)
+- Asignación de componentes a productos con cantidad y precios override
+- Autocomplete por descripción para buscar componentes
+- Cálculo de totales en tiempo real (TotalCostPrice, TotalSalePrice)
+- Sincronización de precios desde maestro con confirmación
+- Advertencia de desviación de precio (>10%) con acción rápida para ajustar
+- Plantillas de componentes (lista de componentes + cantidades, precios desde master)
+- Reporte de márgenes por producto (tabla, filtros, totales, export Excel)
+- Reporte de productos sin componentes (con botón para editar)
+
+**Entidades del modelo de datos relacionadas:**
+- `ProductComponent` (tabla maestra: Descripción, CostPrice, SalePrice opcionales, IsActive)
+- `ProductComponentAssignment` (ProductId, ComponentId, Quantity, CostPrice, SalePrice, DisplayOrder)
+- `ComponentTemplate` (plantillas: Id, Name, Description)
+- `ComponentTemplateItem` (TemplateId, ComponentId, Quantity)
+
+**User Stories:**
+- [HU-EP10-001: Gestionar tabla maestra de componentes](Historias/HU-EP10-001.md)
+- [HU-EP10-002: Asignar componentes a producto en edición](Historias/HU-EP10-002.md)
+- [HU-EP10-003: Asignar componentes a producto en creación](Historias/HU-EP10-003.md)
+- [HU-EP10-004: Sincronizar precios desde maestro](Historias/HU-EP10-004.md)
+- [HU-EP10-005: Advertencia de desviación de precio (10%)](Historias/HU-EP10-005.md)
+- [HU-EP10-006: Gestionar plantillas de componentes](Historias/HU-EP10-006.md)
+- [HU-EP10-007: Reporte de márgenes por producto](Historias/HU-EP10-007.md)
+- [HU-EP10-008: Reporte de productos sin componentes](Historias/HU-EP10-008.md)
+
+**Matriz de dependencias entre User Stories de EP10:**
+
+| Historia | Depende de | Es base para |
+|----------|------------|--------------|
+| HU-EP10-001 | EP7 (auth, roles) | HU-EP10-002, HU-EP10-003, HU-EP10-006 |
+| HU-EP10-002 | HU-EP10-001, HU-EP1-003, EP7 | HU-EP10-003, HU-EP10-004, HU-EP10-005, HU-EP10-006, HU-EP10-007 |
+| HU-EP10-003 | HU-EP10-001, HU-EP10-002, HU-EP1-002, EP7 | HU-EP10-006 |
+| HU-EP10-004 | HU-EP10-002 | — |
+| HU-EP10-005 | HU-EP10-002 | — |
+| HU-EP10-006 | HU-EP10-001, HU-EP10-002, HU-EP10-003 | — |
+| HU-EP10-007 | HU-EP10-002, EP9 (Reportes), EP7 | — |
+| HU-EP10-008 | HU-EP10-001, HU-EP1-003, EP9, EP7 | — |
+
+**Orden recomendado de implementación EP10:** 001 → 002 → 003 → 004 → 005 → 006 → 007, 008 (007 y 008 pueden hacerse en paralelo tras 002).
+
+---
+
 ## Resumen de Épicas
 
 | Épica | Descripción Breve | User Stories Estimadas |
@@ -270,7 +329,8 @@ Proporciona funcionalidades de consulta y visualización de datos históricos de
 | **EP7** | Autenticación y Gestión de Usuarios | 6 |
 | **EP8** | Gestión de Puntos de Venta | 4 |
 | **EP9** | Consultas y Reportes | 4 |
-| **TOTAL** | | **36** |
+| **EP10** | Gestión de Componentes de Joyas | 8 |
+| **TOTAL** | | **44** |
 
 ---
 
@@ -318,6 +378,11 @@ Este orden de implementación ha sido definido considerando las dependencias ent
    - Requiere datos existentes (ventas, inventario, devoluciones)
    - Funcionalidad de análisis que se beneficia de tener datos históricos
 
+10. **EP10**: Gestión de Componentes de Joyas (costes de producción)
+   - Requiere: EP1 (productos), EP7 (admin), EP9 (reportes para sección Reportes)
+   - Extiende la gestión de productos con componentes, costes y reportes de márgenes
+   - Orden interno de EP10: HU-EP10-001 → HU-EP10-002 → HU-EP10-003 → HU-EP10-004 → HU-EP10-005 → HU-EP10-006 → HU-EP10-007 → HU-EP10-008
+
 > **Nota importante:** Este orden debe respetarse al generar los tickets de trabajo para asegurar que las dependencias estén resueltas antes de implementar funcionalidades que las requieren.
 
 ---
@@ -325,6 +390,7 @@ Este orden de implementación ha sido definido considerando las dependencias ent
 ## Notas
 
 - Las User Stories se crearán siguiendo el formato definido en `Documentos/Procedimientos/Procedimiento-UserStories.md`
+- Las historias de EP10 incluyen requisitos funcionales (RF), no funcionales (RNF), criterios de aceptación Given/When/Then y matriz de dependencias explícita
 - Cada User Story tendrá su propio archivo en `Documentos/Historias/` con el formato `HU-EP[X]-[NNN].md`
 - Las épicas están diseñadas para cubrir todos los casos de uso del MVP definidos en el README
 - El modelo de datos está optimizado para soportar todas estas épicas de manera eficiente

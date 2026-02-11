@@ -3053,3 +3053,129 @@ Integration Tests    Unit Tests (usan TestDataGenerator directamente)
 - ✅ Spec válido (`openspec validate backend-testing --strict`)
 
 ---
+
+## Prompt sobre Gestión de componentes de joyas y costes de producción
+
+Actua como experto en gestion de costes de produccion de joyas.
+Quiero añadir a los productos (joyas) unos componentes que se establecerán en una tabla maestra de Componentes de las joyas. Cada uno tendrá los siguientes campos:
+1. Descripción (texto, obligatorio, max 35 caracteres)
+2. Precio de coste (decimal positivo, opcional)
+3. Precio de venta (decimal positivo, opcional)
+
+Estos componentes se asignarán a cada producto a traves de la interfaz de "Editar producto".
+Se podrán añadir dinamicamente los componentes (a traves de una busqueda autocomplete) y se especificará una "cantidad" (decimal positivo) de cada componente. Además se cargarán los datos de Precio de coste y Precio de venta (si están definidos) y se podrán modificar especificamente por cada producto (es decir, esos valores son el default pero se pueden modificar SOLO en ese producto en concreto).
+
+Una vez establecidos los componentes, se podrán calcular el precio de coste y de venta totales (multiplicando cada precio por la cantidad) de ese producto, que formarán parte de los datos relativos a ese producto.
+
+Ten en cuenta lo siguiente:
+- Modificar un precio de compra/venta en un producto no modifica los valores de la tabla maestra
+- Modificar un precio de compra/venta en la tabla maestra no modifica los valores de los productos ya definidos
+- Todo la gestion está diponible solo para administradores
+- Los campos que añadiremos solo serán visibles para los administradores
+
+Ejemplos de componentes (Descripción/Precio de coste/Precio de venta):
+Oro/150/200
+Plata/10/20
+Hora de trabajo/50/50
+Diamante/null/null
+Soldadura/null/null
+
+Ejemplo de componente que definen un producto "Anillo erizo de mar plata" (Descripción/Precio de coste/Precio de venta/Cantidad):
+Plata/10/25/3
+Hora de trabajo/50/50/1
+Soldadura/0/1/1
+
+A partir del sistema ya existente, creame un plan para integrar esta funcionalidad.
+Hazme al menos 15 preguntas para aclarar dudas: Una vez aclaradas las dudas, hazme entre 3 y 5 propuestas de mejora.
+
+---
+
+### Respuesta del asistente (resumida):
+
+Exploró el codebase (epicas, specs, modelo de datos, Product, edit.tsx, autorización). Creó plan con modelo ER (ProductComponent, ProductComponentAssignment), 17 preguntas de aclaración y esqueleto de implementación.
+
+---
+
+### Respuestas del usuario a las 17 preguntas:
+
+1. Si, el precio de venta generado por los componentes es solo una sugerencia. No se modifica el precio "oficial" ya establecido.
+2. No (no crear componentes on-the-fly desde edición)
+3. 4 (decimales)
+4. Unidad genérica
+5. El override del precio es obligatorio. No puede haber una asignación de componentes sin precios de compra y de venta.
+6. De momento solo desde la interfaz.
+7. Si (asignar en creación)
+8. Se pueden desactivar. Los asignados se mantienen; solo se evita asignar en el futuro.
+9. Integrada dentro de productos
+10. Se prerellenan
+11. Puede existir sin componentes asignados
+12. No se permite asignar un mismo componente más de una vez
+13. En tiempo real para mejor UX
+14. Si (EUR)
+15. Si, orden con drag-and-drop
+16. Solo por descripción
+17. Ocultos para todos.
+
+---
+
+### Respuesta del asistente (resumida):
+
+Propuso 5 mejoras: 1) Sincronizar precios desde maestro, 2) Plantillas de componentes, 3) Reporte de márgenes, 4) Advertencia desviación precio 10%, 5) Copiar componentes desde otro producto.
+
+---
+
+### Respuestas del usuario sobre mejoras:
+
+1. Ok
+2. Ok pero serían solo plantillas de componentes. Se especificarán obligatoriamente solo una lista de componentes y sus cantidades. Los precios override son opcionales (se usarán los precios de la tabla maestra)
+3. Ok.
+4. Ok, utilizaremos una desviacion max del 10% para dar el warning.
+5. Me parece redundante si aplicamos la mejora 2.
+
+---
+
+### Respuesta del asistente (resumida):
+
+Formuló 16 preguntas adicionales sobre: sincronización (todos o solo sin override, confirmación), plantillas (override opcional, quien crea, almacenamiento, aplicar en crear/editar, fusionar o reemplazar, duplicados), reportes (ubicación, contenido, productos sin componentes), advertencia (ubicación, acción rápida, cuándo calcular), y caso de precios vacíos (bloquear guardado).
+
+---
+
+### Respuestas del usuario:
+
+1. Se actualizan todos los precios
+2. Mostramos un diálogo de confirmación antes de aplicar (con resumen de cambios)
+3. El override es opcional solo en las plantillas. En ese caso, a la hora de asignar esa plantilla a un producto, se cargarán los precios de default.
+4. Solo los administradores. Las plantillas serán una subsección de Productos.
+5. Si (tabla ComponentTemplates)
+6. En ambos casos (crear y editar)
+7. Se fusionan. Si un componente ya está añadido no se sobrescribe.
+8. No, solo una vez por componente
+9. En la sección de Reportes que aun no se ha implementado.
+10. Todo lo especificado (tabla, filtros, totales, export Excel)
+11. Se muestran en un reporte separado de productos sin componentes. Cada linea tendrá un botón para ir a editar producto.
+12. En la pantalla de edición
+13. Tambien incluir una accion rapida
+14. Solo cuando tiene al menos un componente asignado.
+15. Se bloquea el guardado hasta que no se cumplimenten
+16. El orden que garantice el correcto desarrollo.
+
+---
+
+### Respuesta del asistente (resumida):
+
+Orden de implementación: Fase 1 Core (tabla maestra, asignaciones, CRUD, edit/create, totales, validación) → Fase 2 Sync precios → Fase 3 Warning 10% → Fase 4 Plantillas → Fase 5 Reportes (márgenes + productos sin componentes).
+
+---
+
+### Prompt del usuario:
+
+Actualiza las @Documentos/epicas.md y crea las historias de usuarios.
+Especifica bien todas las decisiones tomadas, los criterios de aceptación, los requisitos funcionales y no funcionales y la correlación y las dependencias entre historias.
+
+---
+
+### Respuesta del asistente (resumida):
+
+Actualizó epicas.md con Épica 10 "Gestión de Componentes de Joyas", decisiones de diseño, matriz de dependencias y orden de implementación. Creó 8 historias de usuario (HU-EP10-001 a HU-EP10-008) con formato completo: RF, RNF, criterios Given/When/Then, tareas y dependencias. Total de historias en el proyecto: 44.
+
+---

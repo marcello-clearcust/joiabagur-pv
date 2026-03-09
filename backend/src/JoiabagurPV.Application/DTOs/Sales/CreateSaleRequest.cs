@@ -26,6 +26,12 @@ public class CreateSaleRequest
     public int Quantity { get; set; }
 
     /// <summary>
+    /// Optional manual price override. Only accepted when the selected POS has AllowManualPriceEdit enabled.
+    /// When null, the official product price is used.
+    /// </summary>
+    public decimal? Price { get; set; }
+
+    /// <summary>
     /// Optional notes or comments about the sale.
     /// Max 500 characters.
     /// </summary>

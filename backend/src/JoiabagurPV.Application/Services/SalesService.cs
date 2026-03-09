@@ -15,6 +15,7 @@ public class SalesService : ISalesService
     private readonly ISaleRepository _saleRepository;
     private readonly ISalePhotoRepository _salePhotoRepository;
     private readonly IProductRepository _productRepository;
+    private readonly IPointOfSaleRepository _pointOfSaleRepository;
     private readonly IUserPointOfSaleRepository _userPointOfSaleRepository;
     private readonly IStockValidationService _stockValidationService;
     private readonly IPaymentMethodValidationService _paymentMethodValidationService;
@@ -26,6 +27,7 @@ public class SalesService : ISalesService
         ISaleRepository saleRepository,
         ISalePhotoRepository salePhotoRepository,
         IProductRepository productRepository,
+        IPointOfSaleRepository pointOfSaleRepository,
         IUserPointOfSaleRepository userPointOfSaleRepository,
         IStockValidationService stockValidationService,
         IPaymentMethodValidationService paymentMethodValidationService,
@@ -36,6 +38,7 @@ public class SalesService : ISalesService
         _saleRepository = saleRepository ?? throw new ArgumentNullException(nameof(saleRepository));
         _salePhotoRepository = salePhotoRepository ?? throw new ArgumentNullException(nameof(salePhotoRepository));
         _productRepository = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
+        _pointOfSaleRepository = pointOfSaleRepository ?? throw new ArgumentNullException(nameof(pointOfSaleRepository));
         _userPointOfSaleRepository = userPointOfSaleRepository ?? throw new ArgumentNullException(nameof(userPointOfSaleRepository));
         _stockValidationService = stockValidationService ?? throw new ArgumentNullException(nameof(stockValidationService));
         _paymentMethodValidationService = paymentMethodValidationService ?? throw new ArgumentNullException(nameof(paymentMethodValidationService));
@@ -112,6 +115,27 @@ public class SalesService : ISalesService
                 };
             }
 
+            // Load POS to check AllowManualPriceEdit policy
+            var pointOfSale = await _pointOfSaleRepository.GetByIdAsync(request.PointOfSaleId);
+            if (pointOfSale == null)
+            {
+                return new CreateSaleResult
+                {
+                    Success = false,
+                    ErrorMessage = $"Point of sale with ID {request.PointOfSaleId} not found."
+                };
+            }
+
+            // Reject manual price when POS disallows overrides
+            if (request.Price.HasValue && !pointOfSale.AllowManualPriceEdit)
+            {
+                return new CreateSaleResult
+                {
+                    Success = false,
+                    ErrorMessage = "Manual price editing is not allowed for this point of sale."
+                };
+            }
+
             // FIRST stock validation (before transaction)
             var stockValidation = await _stockValidationService.ValidateStockAvailabilityAsync(
                 request.ProductId,
@@ -164,6 +188,25 @@ public class SalesService : ISalesService
                     };
                 }
 
+                // Price resolution
+                var officialPrice = product.Price;
+                decimal effectivePrice;
+                bool priceWasOverridden;
+                decimal? originalProductPrice;
+
+                if (pointOfSale.AllowManualPriceEdit && request.Price.HasValue && request.Price.Value != officialPrice)
+                {
+                    effectivePrice = request.Price.Value;
+                    priceWasOverridden = true;
+                    originalProductPrice = officialPrice;
+                }
+                else
+                {
+                    effectivePrice = officialPrice;
+                    priceWasOverridden = false;
+                    originalProductPrice = null;
+                }
+
                 // Create Sale record
                 var sale = new Sale
                 {
@@ -171,8 +214,10 @@ public class SalesService : ISalesService
                     PointOfSaleId = request.PointOfSaleId,
                     UserId = userId,
                     PaymentMethodId = request.PaymentMethodId,
-                    Price = product.Price, // Price snapshot
+                    Price = effectivePrice,
                     Quantity = request.Quantity,
+                    PriceWasOverridden = priceWasOverridden,
+                    OriginalProductPrice = originalProductPrice,
                     Notes = request.Notes,
                     SaleDate = DateTime.UtcNow
                 };
@@ -418,6 +463,8 @@ public class SalesService : ISalesService
             Price = sale.Price,
             Quantity = sale.Quantity,
             Total = sale.GetTotal(),
+            PriceWasOverridden = sale.PriceWasOverridden,
+            OriginalProductPrice = sale.OriginalProductPrice,
             Notes = sale.Notes,
             HasPhoto = sale.Photo != null,
             SaleDate = sale.SaleDate,

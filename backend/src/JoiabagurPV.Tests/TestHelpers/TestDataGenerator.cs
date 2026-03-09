@@ -25,9 +25,9 @@ public static class TestDataGenerator
             .RuleFor(u => u.Email, f => f.Internet.Email())
             .RuleFor(u => u.Role, f => role ?? f.PickRandom<UserRole>())
             .RuleFor(u => u.IsActive, f => isActive ?? true)
-            .RuleFor(u => u.CreatedAt, f => f.Date.Past())
-            .RuleFor(u => u.UpdatedAt, f => f.Date.Recent())
-            .RuleFor(u => u.LastLoginAt, f => f.Date.Recent().OrNull(f));
+            .RuleFor(u => u.CreatedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(u => u.UpdatedAt, f => f.Date.Recent().ToUniversalTime())
+            .RuleFor(u => u.LastLoginAt, f => f.Date.Recent().ToUniversalTime().OrNull(f));
     }
 
     /// <summary>
@@ -62,7 +62,7 @@ public static class TestDataGenerator
             .RuleFor(r => r.UserId, f => userId ?? f.Random.Guid())
             .RuleFor(r => r.ExpiresAt, f => expiresAt ?? DateTime.UtcNow.AddHours(8))
             .RuleFor(r => r.IsRevoked, f => isRevoked ?? false)
-            .RuleFor(r => r.CreatedAt, f => f.Date.Recent())
+            .RuleFor(r => r.CreatedAt, f => f.Date.Recent().ToUniversalTime())
             .RuleFor(r => r.CreatedByIp, f => f.Internet.Ip());
     }
 
@@ -90,8 +90,8 @@ public static class TestDataGenerator
             .RuleFor(u => u.UserId, f => userId ?? f.Random.Guid())
             .RuleFor(u => u.PointOfSaleId, f => pointOfSaleId ?? f.Random.Guid())
             .RuleFor(u => u.IsActive, f => isActive ?? true)
-            .RuleFor(u => u.AssignedAt, f => f.Date.Past())
-            .RuleFor(u => u.CreatedAt, f => f.Date.Past());
+            .RuleFor(u => u.AssignedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(u => u.CreatedAt, f => f.Date.Past().ToUniversalTime());
     }
 
     /// <summary>
@@ -123,8 +123,8 @@ public static class TestDataGenerator
             .RuleFor(p => p.Phone, f => f.Phone.PhoneNumber())
             .RuleFor(p => p.Email, f => f.Internet.Email())
             .RuleFor(p => p.IsActive, f => isActive ?? true)
-            .RuleFor(p => p.CreatedAt, f => f.Date.Past())
-            .RuleFor(p => p.UpdatedAt, f => f.Date.Recent());
+            .RuleFor(p => p.CreatedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(p => p.UpdatedAt, f => f.Date.Recent().ToUniversalTime());
     }
 
     /// <summary>
@@ -176,8 +176,8 @@ public static class TestDataGenerator
             .RuleFor(p => p.Price, f => f.Random.Decimal(10, 5000))
             .RuleFor(p => p.CollectionId, f => collectionId)
             .RuleFor(p => p.IsActive, f => isActive ?? true)
-            .RuleFor(p => p.CreatedAt, f => f.Date.Past())
-            .RuleFor(p => p.UpdatedAt, f => f.Date.Recent());
+            .RuleFor(p => p.CreatedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(p => p.UpdatedAt, f => f.Date.Recent().ToUniversalTime());
     }
 
     /// <summary>
@@ -209,8 +209,8 @@ public static class TestDataGenerator
             .RuleFor(c => c.Id, f => f.Random.Guid())
             .RuleFor(c => c.Name, f => f.Commerce.Department())
             .RuleFor(c => c.Description, f => f.Lorem.Sentence())
-            .RuleFor(c => c.CreatedAt, f => f.Date.Past())
-            .RuleFor(c => c.UpdatedAt, f => f.Date.Recent());
+            .RuleFor(c => c.CreatedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(c => c.UpdatedAt, f => f.Date.Recent().ToUniversalTime());
     }
 
     /// <summary>
@@ -243,8 +243,8 @@ public static class TestDataGenerator
             .RuleFor(pp => pp.FileName, f => $"{f.Random.AlphaNumeric(8)}.jpg")
             .RuleFor(pp => pp.DisplayOrder, f => f.Random.Int(0, 10))
             .RuleFor(pp => pp.IsPrimary, f => isPrimary ?? false)
-            .RuleFor(pp => pp.CreatedAt, f => f.Date.Past())
-            .RuleFor(pp => pp.UpdatedAt, f => f.Date.Recent());
+            .RuleFor(pp => pp.CreatedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(pp => pp.UpdatedAt, f => f.Date.Recent().ToUniversalTime());
     }
 
     /// <summary>
@@ -268,8 +268,8 @@ public static class TestDataGenerator
             .RuleFor(i => i.PointOfSaleId, f => pointOfSaleId ?? f.Random.Guid())
             .RuleFor(i => i.Quantity, f => quantity ?? f.Random.Int(0, 100))
             .RuleFor(i => i.IsActive, f => isActive ?? true)
-            .RuleFor(i => i.LastUpdatedAt, f => f.Date.Recent())
-            .RuleFor(i => i.CreatedAt, f => f.Date.Past());
+            .RuleFor(i => i.LastUpdatedAt, f => f.Date.Recent().ToUniversalTime())
+            .RuleFor(i => i.CreatedAt, f => f.Date.Past().ToUniversalTime());
     }
 
     /// <summary>
@@ -302,8 +302,8 @@ public static class TestDataGenerator
             .RuleFor(m => m.QuantityBefore, f => f.Random.Int(0, 100))
             .RuleFor(m => m.QuantityAfter, (f, m) => m.QuantityBefore + m.QuantityChange)
             .RuleFor(m => m.Reason, f => f.Lorem.Sentence())
-            .RuleFor(m => m.MovementDate, f => f.Date.Recent())
-            .RuleFor(m => m.CreatedAt, f => f.Date.Past());
+            .RuleFor(m => m.MovementDate, f => f.Date.Recent().ToUniversalTime())
+            .RuleFor(m => m.CreatedAt, f => f.Date.Past().ToUniversalTime());
     }
 
     /// <summary>
@@ -335,9 +335,9 @@ public static class TestDataGenerator
             .RuleFor(s => s.UserId, f => userId ?? f.Random.Guid())
             .RuleFor(s => s.Quantity, f => quantity ?? f.Random.Int(1, 5))
             .RuleFor(s => s.Price, f => price ?? f.Random.Decimal(10, 1000))
-            .RuleFor(s => s.SaleDate, f => f.Date.Recent(10))
+            .RuleFor(s => s.SaleDate, f => f.Date.Recent(10).ToUniversalTime())
             .RuleFor(s => s.Notes, f => f.Lorem.Sentence().OrNull(f))
-            .RuleFor(s => s.CreatedAt, f => f.Date.Past());
+            .RuleFor(s => s.CreatedAt, f => f.Date.Past().ToUniversalTime());
     }
 
     /// <summary>
@@ -369,8 +369,8 @@ public static class TestDataGenerator
             .RuleFor(pm => pm.Name, f => f.Finance.AccountName())
             .RuleFor(pm => pm.Description, f => f.Lorem.Sentence())
             .RuleFor(pm => pm.IsActive, f => isActive ?? true)
-            .RuleFor(pm => pm.CreatedAt, f => f.Date.Past())
-            .RuleFor(pm => pm.UpdatedAt, f => f.Date.Recent());
+            .RuleFor(pm => pm.CreatedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(pm => pm.UpdatedAt, f => f.Date.Recent().ToUniversalTime());
     }
 
     /// <summary>
@@ -397,8 +397,8 @@ public static class TestDataGenerator
             .RuleFor(r => r.Quantity, f => quantity ?? f.Random.Int(1, 5))
             .RuleFor(r => r.Category, f => category ?? f.PickRandom<ReturnCategory>())
             .RuleFor(r => r.Reason, f => f.Lorem.Sentence().OrNull(f))
-            .RuleFor(r => r.ReturnDate, f => f.Date.Recent())
-            .RuleFor(r => r.CreatedAt, f => f.Date.Past());
+            .RuleFor(r => r.ReturnDate, f => f.Date.Recent().ToUniversalTime())
+            .RuleFor(r => r.CreatedAt, f => f.Date.Past().ToUniversalTime());
     }
 
     /// <summary>
@@ -420,7 +420,7 @@ public static class TestDataGenerator
             .RuleFor(rs => rs.SaleId, f => saleId ?? f.Random.Guid())
             .RuleFor(rs => rs.Quantity, f => quantity ?? f.Random.Int(1, 5))
             .RuleFor(rs => rs.UnitPrice, f => unitPrice ?? f.Random.Decimal(10, 1000))
-            .RuleFor(rs => rs.CreatedAt, f => f.Date.Past());
+            .RuleFor(rs => rs.CreatedAt, f => f.Date.Past().ToUniversalTime());
     }
 
     /// <summary>

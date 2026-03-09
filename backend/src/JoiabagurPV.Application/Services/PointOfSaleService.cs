@@ -69,7 +69,8 @@ public class PointOfSaleService : IPointOfSaleService
             Address = request.Address,
             Phone = request.Phone,
             Email = request.Email,
-            IsActive = true
+            IsActive = true,
+            AllowManualPriceEdit = request.AllowManualPriceEdit
         };
 
         await _pointOfSaleRepository.AddAsync(pointOfSale);
@@ -94,6 +95,7 @@ public class PointOfSaleService : IPointOfSaleService
         pointOfSale.Phone = request.Phone;
         pointOfSale.Email = request.Email;
         pointOfSale.IsActive = request.IsActive;
+        pointOfSale.AllowManualPriceEdit = request.AllowManualPriceEdit;
 
         await _pointOfSaleRepository.UpdateAsync(pointOfSale);
         await _unitOfWork.SaveChangesAsync();
@@ -150,6 +152,7 @@ public class PointOfSaleService : IPointOfSaleService
             Phone = pointOfSale.Phone,
             Email = pointOfSale.Email,
             IsActive = pointOfSale.IsActive,
+            AllowManualPriceEdit = pointOfSale.AllowManualPriceEdit,
             CreatedAt = pointOfSale.CreatedAt,
             UpdatedAt = pointOfSale.UpdatedAt
         };

@@ -44,6 +44,17 @@ public class Sale : BaseEntity
     public string? Notes { get; set; }
 
     /// <summary>
+    /// Whether the sale price was manually overridden by the operator.
+    /// </summary>
+    public bool PriceWasOverridden { get; set; } = false;
+
+    /// <summary>
+    /// The official product price at the time of sale, stored when a manual override was applied.
+    /// Null when the sale used the official product price.
+    /// </summary>
+    public decimal? OriginalProductPrice { get; set; }
+
+    /// <summary>
     /// When the sale occurred.
     /// </summary>
     public DateTime SaleDate { get; set; }

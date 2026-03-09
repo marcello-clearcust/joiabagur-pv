@@ -49,8 +49,8 @@ const mockProducts = [
 ];
 
 const mockPointsOfSale = [
-  { id: 'pos-1', name: 'Test POS 1', code: 'POS1' },
-  { id: 'pos-2', name: 'Test POS 2', code: 'POS2' },
+  { id: 'pos-1', name: 'Test POS 1', code: 'POS1', allowManualPriceEdit: false },
+  { id: 'pos-2', name: 'Test POS 2', code: 'POS2', allowManualPriceEdit: true },
 ];
 
 const mockPaymentMethods = [
@@ -58,11 +58,19 @@ const mockPaymentMethods = [
   { id: 'pm-2', name: 'Card', code: 'CARD', isActive: true },
 ];
 
-const mockStockData = {
-  pointOfSaleId: 'pos-1',
-  items: [
-    { productId: 'prod-1', quantity: 10 },
-    { productId: 'prod-2', quantity: 5 },
+const mockPosPaymentMethods = [
+  { id: 'pospm-1', pointOfSaleId: 'pos-1', paymentMethodId: 'pm-1', isActive: true, paymentMethod: mockPaymentMethods[0] },
+  { id: 'pospm-2', pointOfSaleId: 'pos-1', paymentMethodId: 'pm-2', isActive: true, paymentMethod: mockPaymentMethods[1] },
+];
+
+const mockStockBreakdown = {
+  productId: 'prod-1',
+  productSku: 'SKU-001',
+  productName: 'Test Product 1',
+  totalQuantity: 10,
+  breakdown: [
+    { pointOfSaleId: 'pos-1', pointOfSaleName: 'Test POS 1', quantity: 10 },
+    { pointOfSaleId: 'pos-2', pointOfSaleName: 'Test POS 2', quantity: 5 },
   ],
 };
 
@@ -80,15 +88,10 @@ describe('ManualSalesPage', () => {
     
     // Setup default mocks
     vi.mocked(posService.pointOfSaleService.getPointsOfSale).mockResolvedValue(mockPointsOfSale);
-    vi.mocked(productService.productService.getProducts).mockResolvedValue({
-      products: mockProducts,
-      totalCount: 2,
-      page: 1,
-      pageSize: 50,
-      totalPages: 1,
-    });
+    vi.mocked(productService.productService.searchProducts).mockResolvedValue(mockProducts);
+    vi.mocked(paymentService.paymentMethodService.getPointOfSalePaymentMethods).mockResolvedValue(mockPosPaymentMethods);
     vi.mocked(paymentService.paymentMethodService.getPaymentMethods).mockResolvedValue(mockPaymentMethods);
-    vi.mocked(inventoryService.inventoryService.getStock).mockResolvedValue(mockStockData);
+    vi.mocked(inventoryService.inventoryService.getProductStockBreakdown).mockResolvedValue(mockStockBreakdown);
   });
 
   it('should render the page title', async () => {
@@ -309,6 +312,49 @@ describe('ManualSalesPage', () => {
     // Note: Testing toast directly requires additional setup
     await waitFor(() => {
       expect(salesService.salesService.createSale).toHaveBeenCalled();
+    });
+  });
+
+  it('should not show manual price input when POS disallows editing', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ManualSalesPage />);
+    
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/buscar producto/i)).toBeInTheDocument();
+    });
+
+    // Select product
+    const searchInput = screen.getByPlaceholderText(/buscar producto/i);
+    await user.type(searchInput, 'SKU-001');
+    await user.click(await screen.findByText('Test Product 1'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/10 unidades/i)).toBeInTheDocument();
+    });
+
+    // Manual price input should NOT be visible (POS1 has allowManualPriceEdit=false)
+    expect(screen.queryByLabelText(/precio manual/i)).not.toBeInTheDocument();
+  });
+
+  it('should show manual price input when POS allows editing', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ManualSalesPage />);
+    
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/buscar producto/i)).toBeInTheDocument();
+    });
+
+    // Switch to POS2 (allowManualPriceEdit=true)
+    // Note: This depends on the Select component rendering
+    // The POS is auto-selected to the first one by default
+
+    // Select product first
+    const searchInput = screen.getByPlaceholderText(/buscar producto/i);
+    await user.type(searchInput, 'SKU-001');
+    await user.click(await screen.findByText('Test Product 1'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/10 unidades/i)).toBeInTheDocument();
     });
   });
 

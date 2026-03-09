@@ -26,6 +26,11 @@ public class CreateSaleRequestValidator : AbstractValidator<CreateSaleRequest>
             .GreaterThan(0)
             .WithMessage("Quantity must be greater than zero.");
 
+        RuleFor(x => x.Price)
+            .GreaterThan(0)
+            .When(x => x.Price.HasValue)
+            .WithMessage("Price must be greater than zero.");
+
         RuleFor(x => x.Notes)
             .MaximumLength(500)
             .When(x => !string.IsNullOrEmpty(x.Notes))

@@ -122,6 +122,7 @@ public class PointOfSaleMother
     public PointOfSaleMother WithPhone(string phone) { _pos.Phone = phone; return this; }
     public PointOfSaleMother WithEmail(string email) { _pos.Email = email; return this; }
     public PointOfSaleMother Inactive() { _pos.IsActive = false; return this; }
+    public PointOfSaleMother WithAllowManualPriceEdit(bool allow = true) { _pos.AllowManualPriceEdit = allow; return this; }
 
     public async Task<PointOfSale> CreateAsync()
     {

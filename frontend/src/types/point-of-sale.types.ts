@@ -11,6 +11,7 @@ export interface PointOfSale {
   phone?: string;
   email?: string;
   isActive: boolean;
+  allowManualPriceEdit: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +22,7 @@ export interface CreatePointOfSaleRequest {
   address?: string;
   phone?: string;
   email?: string;
+  allowManualPriceEdit?: boolean;
 }
 
 export interface UpdatePointOfSaleRequest {
@@ -29,6 +31,7 @@ export interface UpdatePointOfSaleRequest {
   phone?: string;
   email?: string;
   isActive: boolean;
+  allowManualPriceEdit: boolean;
 }
 
 export interface PointOfSaleStatusRequest {

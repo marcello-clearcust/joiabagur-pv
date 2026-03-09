@@ -76,6 +76,16 @@ public class SaleDto
     public string? Notes { get; set; }
 
     /// <summary>
+    /// Whether the sale price was manually overridden.
+    /// </summary>
+    public bool PriceWasOverridden { get; set; }
+
+    /// <summary>
+    /// The official product price at the time of sale (when price was overridden).
+    /// </summary>
+    public decimal? OriginalProductPrice { get; set; }
+
+    /// <summary>
     /// Whether this sale has a photo attached.
     /// </summary>
     public bool HasPhoto { get; set; }

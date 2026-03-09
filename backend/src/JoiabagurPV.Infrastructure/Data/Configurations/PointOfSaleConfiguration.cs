@@ -41,6 +41,10 @@ public class PointOfSaleConfiguration : IEntityTypeConfiguration<PointOfSale>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(pos => pos.AllowManualPriceEdit)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.HasIndex(pos => pos.IsActive);
 
         // Relationships

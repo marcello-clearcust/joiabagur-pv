@@ -46,6 +46,7 @@ const pointOfSaleSchema = z.object({
   phone: z.string().max(20, 'El teléfono no puede exceder 20 caracteres').optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   isActive: z.boolean(),
+  allowManualPriceEdit: z.boolean(),
 });
 
 type PointOfSaleFormData = z.infer<typeof pointOfSaleSchema>;
@@ -73,6 +74,7 @@ export function PointOfSaleFormDialog({
       phone: '',
       email: '',
       isActive: true,
+      allowManualPriceEdit: false,
     },
   });
 
@@ -86,6 +88,7 @@ export function PointOfSaleFormDialog({
         phone: pointOfSale.phone || '',
         email: pointOfSale.email || '',
         isActive: pointOfSale.isActive,
+        allowManualPriceEdit: pointOfSale.allowManualPriceEdit,
       });
     } else {
       form.reset({
@@ -95,6 +98,7 @@ export function PointOfSaleFormDialog({
         phone: '',
         email: '',
         isActive: true,
+        allowManualPriceEdit: false,
       });
     }
   }, [pointOfSale, form]);
@@ -111,6 +115,7 @@ export function PointOfSaleFormDialog({
           phone: data.phone || undefined,
           email: data.email || undefined,
           isActive: data.isActive,
+          allowManualPriceEdit: data.allowManualPriceEdit,
         });
         toast.success('Punto de venta actualizado correctamente');
       } else {
@@ -121,6 +126,7 @@ export function PointOfSaleFormDialog({
           address: data.address || undefined,
           phone: data.phone || undefined,
           email: data.email || undefined,
+          allowManualPriceEdit: data.allowManualPriceEdit,
         });
         toast.success('Punto de venta creado correctamente');
       }
@@ -274,6 +280,29 @@ export function PointOfSaleFormDialog({
                 )}
               />
             )}
+
+            {/* AllowManualPriceEdit Field */}
+            <FormField
+              control={form.control}
+              name="allowManualPriceEdit"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <FormLabel>Permitir Edición Manual de Precio</FormLabel>
+                    <FormDescription>
+                      Permite a los operadores modificar el precio de venta en este punto de venta
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>

@@ -26,18 +26,25 @@ Ambos métodos comparten el mismo flujo de validación y confirmación.
    - Por defecto: 1 unidad
    - El sistema valida que la cantidad no exceda el stock disponible
 
-3. **Seleccionar Método de Pago**
+3. **Modificar Precio (si está habilitado)**
+   - Si el punto de venta tiene activada la opción "Permitir Edición Manual de Precio", aparece un campo de precio editable
+   - El precio oficial del producto se muestra como referencia
+   - Si no se modifica, se usa el precio oficial
+   - Si el POS no permite edición, este campo no aparece y se usa siempre el precio oficial
+
+4. **Seleccionar Método de Pago**
    - Solo se muestran métodos activos y asignados al punto de venta actual
 
 4. **Agregar Notas (opcional)**
    - Campo de texto libre, máximo 500 caracteres
 
-5. **Adjuntar Foto (opcional)**
+6. **Adjuntar Foto (opcional)**
    - Puede adjuntar una foto del producto incluso en registro manual
    - La foto se comprime automáticamente a JPEG (máx 2MB)
 
-6. **Confirmar Venta**
+7. **Confirmar Venta**
    - Revise el resumen: producto, cantidad, precio unitario, total
+   - Si el precio fue modificado, se muestra el precio oficial como referencia con indicación "(modificado)"
    - Confirme la operación
 
 ### Validaciones
@@ -47,6 +54,8 @@ Ambos métodos comparten el mismo flujo de validación y confirmación.
 | Stock insuficiente | "Stock insuficiente. Disponible: X unidades" |
 | Método de pago no disponible | "Método de pago no asignado a este punto de venta" |
 | Operador no asignado al POS | "No tiene permisos para operar en este punto de venta" |
+| Precio manual en POS no autorizado | "Manual price editing is not allowed for this point of sale" |
+| Precio manual <= 0 | "Price must be greater than zero" |
 
 ### Advertencia de Stock Bajo
 
@@ -138,6 +147,7 @@ Esta advertencia es informativa y no bloquea la operación.
 - Producto (SKU y nombre)
 - Cantidad
 - Precio unitario y total
+- Indicador de precio modificado ("Precio modificado") cuando se usó un precio manual
 - Método de pago
 - Operador que realizó la venta
 - Indicador de foto adjunta (📷)
@@ -146,6 +156,7 @@ Esta advertencia es informativa y no bloquea la operación.
 
 Haga clic en una venta para ver:
 - Información completa
+- Si el precio fue modificado: precio de venta efectivo y precio oficial original como referencia
 - Foto adjunta (si existe) con opción de ampliar
 - Movimiento de inventario asociado
 

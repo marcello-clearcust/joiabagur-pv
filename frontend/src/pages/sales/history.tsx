@@ -261,6 +261,7 @@ export function SalesHistoryPage() {
                     <TableHead>Punto de Venta</TableHead>
                     <TableHead className="text-center">Cantidad</TableHead>
                     <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-center">Precio</TableHead>
                     <TableHead>Método de Pago</TableHead>
                     {isAdmin && <TableHead>Operador</TableHead>}
                     <TableHead className="text-center">Foto</TableHead>
@@ -285,6 +286,13 @@ export function SalesHistoryPage() {
                       <TableCell className="text-center">{sale.quantity}</TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(sale.total)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {sale.priceWasOverridden && (
+                          <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
+                            Precio modificado
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>{sale.paymentMethodName}</TableCell>
                       {isAdmin && <TableCell>{sale.userName}</TableCell>}
@@ -385,11 +393,23 @@ export function SalesHistoryPage() {
                 <div>
                   <span className="text-muted-foreground">Precio Unitario:</span>
                   <p className="font-medium">{formatCurrency(selectedSale.price)}</p>
+                  {selectedSale.priceWasOverridden && selectedSale.originalProductPrice != null && (
+                    <p className="text-xs text-amber-600">
+                      Precio oficial: {formatCurrency(selectedSale.originalProductPrice)}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Total:</span>
                   <p className="font-medium text-primary">{formatCurrency(selectedSale.total)}</p>
                 </div>
+                {selectedSale.priceWasOverridden && (
+                  <div className="col-span-2">
+                    <Badge variant="outline" className="border-amber-500 text-amber-600">
+                      Precio modificado
+                    </Badge>
+                  </div>
+                )}
                 <div>
                   <span className="text-muted-foreground">Punto de Venta:</span>
                   <p className="font-medium">{selectedSale.pointOfSaleName}</p>

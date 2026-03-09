@@ -71,6 +71,7 @@ export function ManualSalesPage() {
   const [selectedPosId, setSelectedPosId] = useState<string>('');
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
+  const [manualPrice, setManualPrice] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [availableStock, setAvailableStock] = useState<number | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
@@ -215,16 +216,32 @@ export function ManualSalesPage() {
     };
   }, [productSearch]);
 
+  // Check if selected POS allows manual price edit
+  const selectedPos = pointsOfSale.find((pos) => pos.id === selectedPosId);
+  const allowManualPriceEdit = selectedPos?.allowManualPriceEdit ?? false;
+
+  // Reset manual price when POS changes or when manual editing is disabled
+  useEffect(() => {
+    if (!allowManualPriceEdit) {
+      setManualPrice('');
+    }
+  }, [allowManualPriceEdit, selectedPosId]);
+
   // Select product from search
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
     setProductSearch(product.sku);
     setSearchResults([]);
     setQuantity(1);
+    setManualPrice('');
   };
 
-  // Calculate total
-  const total = selectedProduct ? selectedProduct.price * quantity : 0;
+  // Calculate effective price and total
+  const effectivePrice = allowManualPriceEdit && manualPrice !== ''
+    ? parseFloat(manualPrice) || 0
+    : selectedProduct?.price ?? 0;
+  const total = effectivePrice * quantity;
+  const isPriceOverridden = allowManualPriceEdit && manualPrice !== '' && effectivePrice !== selectedProduct?.price;
 
   // Validation
   const isFormValid = 
@@ -232,6 +249,7 @@ export function ManualSalesPage() {
     selectedPosId && 
     selectedPaymentMethodId && 
     quantity > 0 &&
+    effectivePrice > 0 &&
     availableStock !== null &&
     availableStock >= quantity;
 
@@ -246,6 +264,7 @@ export function ManualSalesPage() {
         pointOfSaleId: selectedPosId,
         paymentMethodId: selectedPaymentMethodId,
         quantity,
+        price: isPriceOverridden ? effectivePrice : undefined,
         notes: notes || undefined,
       });
 
@@ -380,6 +399,31 @@ export function ManualSalesPage() {
                       <p className="mt-1 text-lg font-bold text-primary">
                         €{selectedProduct.price.toFixed(2)}
                       </p>
+                      {allowManualPriceEdit && (
+                        <div className="mt-2 space-y-1">
+                          <Label htmlFor="manual-price" className="text-sm">
+                            Precio manual
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">€</span>
+                            <Input
+                              id="manual-price"
+                              type="number"
+                              min={0.01}
+                              step={0.01}
+                              placeholder={selectedProduct.price.toFixed(2)}
+                              value={manualPrice}
+                              onChange={(e) => setManualPrice(e.target.value)}
+                              className="w-32"
+                            />
+                          </div>
+                          {isPriceOverridden && (
+                            <p className="text-xs text-amber-600">
+                              Precio oficial: €{selectedProduct.price.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <Badge variant={selectedProduct.isActive ? 'primary' : 'secondary'}>
                       {selectedProduct.isActive ? 'Activo' : 'Inactivo'}
@@ -487,9 +531,15 @@ export function ManualSalesPage() {
             {/* Total */}
             <div className="rounded-lg bg-muted p-4">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>€{(selectedProduct?.price || 0).toFixed(2)}</span>
+                <span className="text-muted-foreground">Precio unitario</span>
+                <span>€{effectivePrice.toFixed(2)}</span>
               </div>
+              {isPriceOverridden && (
+                <div className="flex items-center justify-between text-xs text-amber-600">
+                  <span>Precio oficial</span>
+                  <span>€{(selectedProduct?.price || 0).toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Cantidad</span>
                 <span>×{quantity}</span>
@@ -535,6 +585,12 @@ export function ManualSalesPage() {
                   <div className="mt-2 space-y-1 text-sm">
                     <p><strong>Producto:</strong> {selectedProduct.name}</p>
                     <p><strong>SKU:</strong> {selectedProduct.sku}</p>
+                    <p><strong>Precio unitario:</strong> €{effectivePrice.toFixed(2)}</p>
+                    {isPriceOverridden && (
+                      <p className="text-amber-600">
+                        <strong>Precio oficial:</strong> €{selectedProduct.price.toFixed(2)} (modificado)
+                      </p>
+                    )}
                     <p><strong>Cantidad:</strong> {quantity}</p>
                     <p><strong>Total:</strong> €{total.toFixed(2)}</p>
                   </div>

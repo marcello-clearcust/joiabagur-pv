@@ -34,6 +34,13 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.Quantity)
             .IsRequired();
 
+        builder.Property(s => s.PriceWasOverridden)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(s => s.OriginalProductPrice)
+            .HasPrecision(18, 2);
+
         builder.Property(s => s.Notes)
             .HasMaxLength(500);
 

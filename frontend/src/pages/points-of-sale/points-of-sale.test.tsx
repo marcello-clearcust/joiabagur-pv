@@ -16,6 +16,22 @@ vi.mock('@/services/point-of-sale.service', () => ({
     createPointOfSale: vi.fn(),
     updatePointOfSale: vi.fn(),
     changePointOfSaleStatus: vi.fn(),
+    getPointOfSaleOperators: vi.fn().mockResolvedValue([]),
+    getPointOfSalePaymentMethods: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+// Mock user service (used by operator assignments dialog)
+vi.mock('@/services/user.service', () => ({
+  userService: {
+    getUsers: vi.fn().mockResolvedValue([]),
+  },
+}));
+
+// Mock payment method service (used by payment method assignments dialog)
+vi.mock('@/services/payment-method.service', () => ({
+  paymentMethodService: {
+    getPaymentMethods: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -37,6 +53,7 @@ describe('PointsOfSalePage', () => {
       phone: '+34 600 123 456',
       email: 'centro@test.com',
       isActive: true,
+      allowManualPriceEdit: false,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     },
@@ -48,6 +65,7 @@ describe('PointsOfSalePage', () => {
       phone: '+34 600 789 012',
       email: 'plaza@test.com',
       isActive: true,
+      allowManualPriceEdit: true,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     },
@@ -59,6 +77,7 @@ describe('PointsOfSalePage', () => {
       phone: null,
       email: null,
       isActive: false,
+      allowManualPriceEdit: false,
       createdAt: '2024-01-01T00:00:00Z',
       updatedAt: '2024-01-01T00:00:00Z',
     },
@@ -241,9 +260,9 @@ describe('PointsOfSalePage', () => {
       const assignButton = screen.getByRole('menuitem', { name: /asignar operadores/i });
       await user.click(assignButton);
 
-      // Dialog should open
+      // Dialog should open — use dialog title role to avoid matching info banner text
       await waitFor(() => {
-        expect(screen.getByText(/asignar operadores/i)).toBeInTheDocument();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
       });
     });
   });

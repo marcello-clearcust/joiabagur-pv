@@ -170,13 +170,16 @@
 ### Key Entities
 - **Product**: SKU (unique), name, description, price, collection (optional)
 - **ProductPhoto**: Multiple reference photos per product for ML training
-- **PointOfSale**: Store locations with assigned operators and payment methods
+- **PointOfSale**: Store locations with assigned operators, payment methods, and manual price edit policy (`AllowManualPriceEdit`)
 - **User**: Admin (full access) or Operator (restricted to assigned locations)
-- **Sale**: Transaction with price snapshot, payment method, optional photo
+- **Sale**: Transaction with price snapshot (official or manual override), payment method, optional photo, override audit fields (`PriceWasOverridden`, `OriginalProductPrice`)
 - **Inventory**: Stock quantity per product per location
 - **InventoryMovement**: Full audit trail (Sale, Return, Adjustment, Import)
 - **PaymentMethod**: Efectivo, Bizum, Transferencia, Tarjeta TPV propio, Tarjeta TPV punto de venta, PayPal
 - **Return**: Linked to original sale, auto-updates inventory
+- **ProductComponent**: Master table of jewelry components (materials, labor) with optional cost/sale prices
+- **ProductComponentAssignment**: Component assigned to product with quantity and override prices
+- **ComponentTemplate**: Reusable template of components for quick product setup
 
 ### Business Rules
 1. Operators can only access assigned points of sale
@@ -185,6 +188,7 @@
 4. Price in Sale is a snapshot (not reference to current product price)
 5. Products need at least one photo for image recognition
 6. Only one photo can be marked as primary per product
+7. Manual sale price edits are only allowed when the POS has `AllowManualPriceEdit = true`; overrides are audited with `PriceWasOverridden` and `OriginalProductPrice`
 
 ---
 

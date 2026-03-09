@@ -66,12 +66,9 @@ public class SalesControllerTests : IAsyncLifetime
             .WithAddress("Test Address")
             .CreateAsync();
 
-        // Create Payment Method
-        _testPaymentMethod = await mother.PaymentMethod()
-            .WithCode("CASH")
-            .WithName("Cash")
-            .WithDescription("Cash payment")
-            .CreateAsync();
+        // Use pre-seeded CASH payment method instead of creating a duplicate
+        _testPaymentMethod = await mother.Context.PaymentMethods
+            .FirstAsync(pm => pm.Code == "CASH");
 
         // Associate payment method with POS
         mother.Context.PointOfSalePaymentMethods.Add(new PointOfSalePaymentMethod
@@ -647,6 +644,179 @@ public class SalesControllerTests : IAsyncLifetime
         
         // Inventory should never be negative
         finalInventory.Quantity.Should().BeGreaterThanOrEqualTo(0, "inventory cannot be negative");
+    }
+
+    #endregion
+
+    #region Manual Price Edit Tests
+
+    [Fact]
+    public async Task CreateSale_WithManualPrice_WhenPosAllows_ShouldUseManualPrice()
+    {
+        // Arrange - Enable manual price edit on test POS
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var pos = await context.PointOfSales.FirstAsync(p => p.Id == _testPos.Id);
+            pos.AllowManualPriceEdit = true;
+            await context.SaveChangesAsync();
+        }
+
+        var createRequest = new CreateSaleRequest
+        {
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Quantity = 1,
+            Price = 75.00m
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales", createRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sale = await verifyContext.Sales.OrderByDescending(s => s.CreatedAt).FirstAsync();
+        sale.Price.Should().Be(75.00m);
+        sale.PriceWasOverridden.Should().BeTrue();
+        sale.OriginalProductPrice.Should().Be(100.00m);
+    }
+
+    [Fact]
+    public async Task CreateSale_WithManualPrice_WhenPosDisallows_ShouldReturnBadRequest()
+    {
+        // Arrange - POS has AllowManualPriceEdit = false (default)
+        var createRequest = new CreateSaleRequest
+        {
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Quantity = 1,
+            Price = 75.00m
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales", createRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("Manual price editing is not allowed");
+    }
+
+    [Fact]
+    public async Task CreateSale_WithoutManualPrice_WhenPosAllows_ShouldUseOfficialPrice()
+    {
+        // Arrange - Enable manual price edit but don't send price
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var pos = await context.PointOfSales.FirstAsync(p => p.Id == _testPos.Id);
+            pos.AllowManualPriceEdit = true;
+            await context.SaveChangesAsync();
+        }
+
+        var createRequest = new CreateSaleRequest
+        {
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Quantity = 1
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales", createRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sale = await verifyContext.Sales.OrderByDescending(s => s.CreatedAt).FirstAsync();
+        sale.Price.Should().Be(100.00m);
+        sale.PriceWasOverridden.Should().BeFalse();
+        sale.OriginalProductPrice.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateSale_WithSamePriceAsOfficial_ShouldNotMarkAsOverridden()
+    {
+        // Arrange
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var pos = await context.PointOfSales.FirstAsync(p => p.Id == _testPos.Id);
+            pos.AllowManualPriceEdit = true;
+            await context.SaveChangesAsync();
+        }
+
+        var createRequest = new CreateSaleRequest
+        {
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Quantity = 1,
+            Price = 100.00m // Same as product price
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales", createRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sale = await verifyContext.Sales.OrderByDescending(s => s.CreatedAt).FirstAsync();
+        sale.Price.Should().Be(100.00m);
+        sale.PriceWasOverridden.Should().BeFalse();
+        sale.OriginalProductPrice.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetSaleById_WithOverriddenPrice_ShouldIncludeOverrideFields()
+    {
+        // Arrange - Create a sale with overridden price
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var pos = await context.PointOfSales.FirstAsync(p => p.Id == _testPos.Id);
+            pos.AllowManualPriceEdit = true;
+            await context.SaveChangesAsync();
+        }
+
+        var createRequest = new CreateSaleRequest
+        {
+            ProductId = _testProduct.Id,
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Quantity = 1,
+            Price = 50.00m
+        };
+
+        var createResponse = await _operatorClient!.PostAsJsonAsync("/api/sales", createRequest);
+        createResponse.EnsureSuccessStatusCode();
+
+        using var doc = await System.Text.Json.JsonDocument.ParseAsync(await createResponse.Content.ReadAsStreamAsync());
+        var saleId = doc.RootElement.GetProperty("sale").GetProperty("id").GetGuid();
+
+        // Act
+        var response = await _operatorClient!.GetAsync($"/api/sales/{saleId}");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var sale = await response.Content.ReadFromJsonAsync<SaleDto>();
+        sale.Should().NotBeNull();
+        sale!.PriceWasOverridden.Should().BeTrue();
+        sale.OriginalProductPrice.Should().Be(100.00m);
+        sale.Price.Should().Be(50.00m);
     }
 
     #endregion

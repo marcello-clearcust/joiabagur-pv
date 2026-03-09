@@ -36,6 +36,12 @@ public class PointOfSale : BaseEntity
     public bool IsActive { get; set; } = true;
 
     /// <summary>
+    /// Whether operators can manually edit sale prices at this point of sale.
+    /// Only configurable by administrators.
+    /// </summary>
+    public bool AllowManualPriceEdit { get; set; } = false;
+
+    /// <summary>
     /// Navigation property for operator assignments.
     /// </summary>
     public ICollection<UserPointOfSale> OperatorAssignments { get; set; } = new List<UserPointOfSale>();

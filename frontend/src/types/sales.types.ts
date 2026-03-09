@@ -10,6 +10,7 @@ export interface CreateSaleRequest {
   pointOfSaleId: string;
   paymentMethodId: string;
   quantity: number;
+  price?: number;
   notes?: string;
   photoBase64?: string;
   photoFileName?: string;
@@ -42,6 +43,8 @@ export interface Sale {
   price: number;
   quantity: number;
   total: number;
+  priceWasOverridden: boolean;
+  originalProductPrice?: number;
   notes?: string;
   hasPhoto: boolean;
   saleDate: string;

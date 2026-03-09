@@ -29,4 +29,9 @@ public class UpdatePointOfSaleRequest
     /// Whether the point of sale is active.
     /// </summary>
     public bool IsActive { get; set; }
+
+    /// <summary>
+    /// Whether operators can manually edit sale prices at this point of sale.
+    /// </summary>
+    public bool AllowManualPriceEdit { get; set; }
 }

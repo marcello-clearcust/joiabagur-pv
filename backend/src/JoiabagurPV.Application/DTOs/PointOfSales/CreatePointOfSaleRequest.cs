@@ -29,4 +29,10 @@ public class CreatePointOfSaleRequest
     /// The contact email (optional).
     /// </summary>
     public string? Email { get; set; }
+
+    /// <summary>
+    /// Whether operators can manually edit sale prices at this point of sale.
+    /// Defaults to false.
+    /// </summary>
+    public bool AllowManualPriceEdit { get; set; } = false;
 }

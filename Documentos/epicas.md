@@ -76,9 +76,10 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 - Validación de stock disponible antes de venta
 - Validación de método de pago asignado al punto de venta
 - Registro de usuario operador que realiza la venta
+- Edición manual de precio de venta cuando el punto de venta lo permite, con trazabilidad de precios modificados
 
 **Entidades del modelo de datos relacionadas:**
-- `Sale` (venta con precio snapshot, cantidad, método de pago, fecha)
+- `Sale` (venta con precio snapshot, cantidad, método de pago, fecha, indicador de precio modificado)
 - `SalePhoto` (foto opcional asociada a la venta)
 - `InventoryMovement` (movimiento automático generado por la venta)
 - `PaymentMethod` y `PointOfSalePaymentMethod` (validación de métodos disponibles)
@@ -87,6 +88,7 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 **User Stories:**
 - [HU-EP3-001: Registrar venta con reconocimiento de imagen](Historias/HU-EP3-001.md) *(incluye validación de stock y selección de método de pago)*
 - [HU-EP3-002: Registrar venta manual (sin foto)](Historias/HU-EP3-002.md) *(incluye validación de stock y selección de método de pago)*
+- [HU-EP3-003: Registrar venta con precio manual modificado](Historias/HU-EP3-003.md) *(edición de precio cuando el POS lo permite, auditoría de precios modificados)*
 
 ---
 
@@ -212,9 +214,10 @@ Permite crear, editar y gestionar los puntos de venta del sistema, incluyendo as
 - Asignación de métodos de pago a puntos de venta
 - Activación/desactivación de puntos de venta
 - Visualización de puntos de venta disponibles según rol
+- Configuración de política de edición manual de precio por punto de venta
 
 **Entidades del modelo de datos relacionadas:**
-- `PointOfSale` (información del punto de venta)
+- `PointOfSale` (información del punto de venta, incluye `AllowManualPriceEdit`)
 - `UserPointOfSale` (asignación de operadores)
 - `PointOfSalePaymentMethod` (asignación de métodos de pago)
 
@@ -223,6 +226,7 @@ Permite crear, editar y gestionar los puntos de venta del sistema, incluyendo as
 - [HU-EP8-002: Editar punto de venta existente](Historias/HU-EP8-002.md)
 - [HU-EP8-003: Activar/desactivar punto de venta](Historias/HU-EP8-003.md)
 - [HU-EP8-004: Visualizar puntos de venta disponibles](Historias/HU-EP8-004.md)
+- [HU-EP8-005: Configurar edición manual de precio por punto de venta](Historias/HU-EP8-005.md)
 
 ---
 
@@ -322,15 +326,15 @@ Permite gestionar los componentes que constituyen las joyas (materiales, mano de
 |-------|-------------------|------------------------|
 | **EP1** | Gestión de Productos | 7 |
 | **EP2** | Gestión de Inventario | 6 |
-| **EP3** | Registro de Ventas | 2 |
+| **EP3** | Registro de Ventas | 3 |
 | **EP4** | Reconocimiento de Imágenes con IA | 1 |
 | **EP5** | Gestión de Devoluciones | 3 |
 | **EP6** | Gestión de Métodos de Pago | 3 |
 | **EP7** | Autenticación y Gestión de Usuarios | 6 |
-| **EP8** | Gestión de Puntos de Venta | 4 |
+| **EP8** | Gestión de Puntos de Venta | 5 |
 | **EP9** | Consultas y Reportes | 4 |
 | **EP10** | Gestión de Componentes de Joyas | 8 |
-| **TOTAL** | | **44** |
+| **TOTAL** | | **46** |
 
 ---
 

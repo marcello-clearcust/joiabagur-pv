@@ -162,13 +162,13 @@ El Backend API está organizado en servicios de dominio, controladores REST, rep
 
 - **Inventory Service**: Gestión de stock por punto de venta, importación de stock desde Excel, ajustes manuales, validación de stock disponible, generación de movimientos de inventario.
 
-- **Sale Service**: Registro de ventas, validación de stock y métodos de pago, actualización automática de inventario, generación de movimientos de inventario.
+- **Sale Service**: Registro de ventas, validación de stock y métodos de pago, resolución de precio (oficial o manual según política del POS), persistencia de campos de auditoría de precio (`PriceWasOverridden`, `OriginalProductPrice`), actualización automática de inventario, generación de movimientos de inventario.
 
 - **Return Service**: Gestión de devoluciones, asociación con venta original, incremento automático de stock, generación de movimientos de inventario.
 
 - **Payment Method Service**: Gestión de métodos de pago disponibles, asignación de métodos a puntos de venta, validación de métodos asignados.
 
-- **Point of Sale Service**: Gestión de puntos de venta (crear, editar, activar/desactivar), validación de asignaciones de operadores.
+- **Point of Sale Service**: Gestión de puntos de venta (crear, editar, activar/desactivar), configuración de política de edición manual de precio (`AllowManualPriceEdit`), validación de asignaciones de operadores.
 
 - **Report Service**: Consultas de historial de ventas con filtros, consultas de inventario, consultas de movimientos de stock, generación de reportes.
 
@@ -268,7 +268,7 @@ El Frontend está organizado en módulos funcionales, servicios y componentes co
 
 - **Inventory Module**: Visualización de stock por punto de venta, vista centralizada de inventario, ajustes manuales de inventario, historial de movimientos.
 
-- **Sale Module**: Componentes para registro de ventas (manual y con reconocimiento), selección de método de pago, validación de stock, confirmación de venta.
+- **Sale Module**: Componentes para registro de ventas (manual y con reconocimiento), selección de método de pago, validación de stock, edición manual de precio cuando el POS lo permite, indicador de precio modificado en historial/detalle, confirmación de venta.
 
 - **Image Recognition Module**: Captura de fotos desde cámara móvil, integración con TensorFlow.js/ONNX.js, procesamiento de imágenes, visualización de sugerencias, manejo de errores de reconocimiento.
 
@@ -276,7 +276,7 @@ El Frontend está organizado en módulos funcionales, servicios y componentes co
 
 - **Payment Method Module**: Gestión de métodos de pago disponibles (solo admin), asignación de métodos a puntos de venta, activación/desactivación.
 
-- **Point of Sale Module**: Gestión de puntos de venta (solo admin), creación, edición, activación/desactivación, asignación de operadores.
+- **Point of Sale Module**: Gestión de puntos de venta (solo admin), creación, edición, activación/desactivación, configuración de edición manual de precio, asignación de operadores.
 
 - **User Module**: Gestión de usuarios (solo admin), creación, edición, asignación a puntos de venta, control de roles.
 
@@ -497,12 +497,16 @@ C4Component
 - **Frontend**: Auth Module, User Module, API Client
 
 ### EP8: Gestión de Puntos de Venta
-- **Backend**: Point of Sale Service
-- **Frontend**: Point of Sale Module, API Client
+- **Backend**: Point of Sale Service (incluye configuración de `AllowManualPriceEdit`)
+- **Frontend**: Point of Sale Module (incluye switch de edición manual de precio), API Client
 
 ### EP9: Consultas y Reportes
 - **Backend**: Report Service
 - **Frontend**: Report Module, API Client
+
+### EP10: Gestión de Componentes de Joyas
+- **Backend**: Component Service, Component Assignment Service, Component Template Service
+- **Frontend**: Product Module (subsección de componentes, reportes de márgenes), API Client
 
 ---
 

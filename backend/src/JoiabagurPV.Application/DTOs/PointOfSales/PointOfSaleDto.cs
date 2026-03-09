@@ -41,6 +41,11 @@ public class PointOfSaleDto
     public bool IsActive { get; set; }
 
     /// <summary>
+    /// Whether operators can manually edit sale prices at this point of sale.
+    /// </summary>
+    public bool AllowManualPriceEdit { get; set; }
+
+    /// <summary>
     /// When the point of sale was created.
     /// </summary>
     public DateTime CreatedAt { get; set; }

@@ -42,6 +42,13 @@ erDiagram
     Return ||--o{ InventoryMovement : "genera movimiento"
     
     Inventory ||--o{ InventoryMovement : "tiene movimientos"
+
+    Product ||--o{ ProductComponentAssignment : "tiene componentes"
+    ProductComponent ||--o{ ProductComponentAssignment : "asignado a"
+    ProductComponent ||--o{ ComponentTemplateItem : "en plantilla"
+    ComponentTemplate ||--o{ ComponentTemplateItem : "tiene items"
+    User ||--o{ RefreshToken : "tiene tokens"
+    User ||--o{ ModelTrainingJob : "inicia entrenamiento"
     
     User {
         uuid Id PK
@@ -65,6 +72,7 @@ erDiagram
         string? Phone
         string? Email
         bool IsActive
+        bool AllowManualPriceEdit "default false"
         datetime CreatedAt
         datetime UpdatedAt
     }
@@ -76,7 +84,9 @@ erDiagram
         datetime AssignedAt
         datetime? UnassignedAt
         bool IsActive
-        unique(UserId, PointOfSaleId)
+        datetime CreatedAt
+        datetime UpdatedAt
+        unique(UserId, PointOfSaleId, IsActive) "filtered: IsActive=true"
     }
     
     Collection {
@@ -102,13 +112,11 @@ erDiagram
     ProductPhoto {
         uuid Id PK
         uuid ProductId FK
-        string FilePath "S3/blob path"
-        string FileName
-        int FileSize "bytes"
-        string MimeType
+        string FileName "nombre del archivo almacenado"
         int DisplayOrder "para ordenar múltiples fotos"
         bool IsPrimary "foto principal"
         datetime CreatedAt
+        datetime UpdatedAt
         indexed(ProductId, DisplayOrder)
     }
     
@@ -138,9 +146,11 @@ erDiagram
         uuid PointOfSaleId FK
         uuid UserId FK "operador que realizó la venta"
         uuid PaymentMethodId FK
-        decimal Price "precio al momento de la venta"
+        decimal Price "precio efectivo de la venta"
         int Quantity "default 1"
         string? Notes "notas adicionales"
+        bool PriceWasOverridden "default false"
+        decimal? OriginalProductPrice "precio oficial cuando hubo override"
         datetime SaleDate
         datetime CreatedAt
         indexed(PointOfSaleId, SaleDate)
@@ -154,9 +164,10 @@ erDiagram
         uuid SaleId FK
         string FilePath "S3/blob path"
         string FileName
-        int FileSize "bytes"
+        long FileSize "bytes"
         string MimeType
         datetime CreatedAt
+        datetime UpdatedAt
     }
     
     Return {
@@ -190,9 +201,10 @@ erDiagram
         uuid ReturnId FK
         string FilePath "S3/blob path"
         string FileName
-        int FileSize "bytes"
+        long FileSize "bytes"
         string MimeType
         datetime CreatedAt
+        datetime UpdatedAt
     }
     
     Inventory {
@@ -201,9 +213,9 @@ erDiagram
         uuid PointOfSaleId FK
         int Quantity "stock actual"
         bool IsActive "true=asignado, false=desasignado"
-        int? MinimumThreshold "para alertas futuras (Fase 2)"
         datetime LastUpdatedAt
         datetime CreatedAt
+        datetime UpdatedAt
         unique(ProductId, PointOfSaleId)
         indexed(PointOfSaleId, Quantity)
         indexed(ProductId)
@@ -223,10 +235,94 @@ erDiagram
         string? Reason "motivo del ajuste"
         datetime MovementDate
         datetime CreatedAt
+        datetime UpdatedAt
+        indexed(InventoryId)
+        indexed(MovementDate)
         indexed(InventoryId, MovementDate)
-        indexed(SaleId)
-        indexed(ReturnId)
-        indexed(UserId, MovementDate)
+    }
+
+    RefreshToken {
+        uuid Id PK
+        string Token UK "unique"
+        uuid UserId FK
+        datetime ExpiresAt
+        bool IsRevoked "default false"
+        datetime? RevokedAt
+        string? CreatedByIp
+        string? RevokedByIp
+        string? ReplacedByToken
+        datetime CreatedAt
+        datetime UpdatedAt
+    }
+
+    ProductComponent {
+        uuid Id PK
+        string Description UK "unique, max 35 chars"
+        decimal? CostPrice "precision 18,4"
+        decimal? SalePrice "precision 18,4"
+        bool IsActive "default true"
+        datetime CreatedAt
+        datetime UpdatedAt
+    }
+
+    ProductComponentAssignment {
+        uuid Id PK
+        uuid ProductId FK
+        uuid ComponentId FK
+        decimal Quantity "precision 18,4"
+        decimal CostPrice "precision 18,4"
+        decimal SalePrice "precision 18,4"
+        int DisplayOrder "default 0"
+        datetime CreatedAt
+        datetime UpdatedAt
+        unique(ProductId, ComponentId)
+    }
+
+    ComponentTemplate {
+        uuid Id PK
+        string Name "max 100 chars"
+        string? Description "max 500 chars"
+        datetime CreatedAt
+        datetime UpdatedAt
+    }
+
+    ComponentTemplateItem {
+        uuid Id PK
+        uuid TemplateId FK
+        uuid ComponentId FK
+        decimal Quantity "precision 18,4"
+        datetime CreatedAt
+        datetime UpdatedAt
+        unique(TemplateId, ComponentId)
+    }
+
+    ModelMetadata {
+        uuid Id PK
+        string Version UK "unique"
+        datetime TrainedAt
+        string ModelPath
+        string? AccuracyMetrics "JSON"
+        int TotalPhotosUsed
+        int TotalProductsUsed
+        bool IsActive "default false"
+        string? Notes
+        datetime CreatedAt
+        datetime UpdatedAt
+    }
+
+    ModelTrainingJob {
+        uuid Id PK
+        uuid InitiatedBy FK "User"
+        string Status "Queued, InProgress, Completed, Failed"
+        int ProgressPercentage "default 0"
+        string? CurrentStage
+        datetime? StartedAt
+        datetime? CompletedAt
+        string? ErrorMessage
+        string? ResultModelVersion
+        int? DurationSeconds
+        datetime CreatedAt
+        datetime UpdatedAt
     }
 ```
 
@@ -261,6 +357,7 @@ Representa los diferentes puntos de venta donde se realizan las transacciones (t
 - `Name`: Nombre del punto de venta
 - `Code`: Código único para identificación rápida
 - `IsActive`: Flag para habilitar/deshabilitar puntos de venta
+- `AllowManualPriceEdit`: Indica si los operadores pueden modificar el precio de venta al registrar transacciones en este punto de venta (default `false`, solo configurable por administradores)
 
 **Consideraciones Fase 2:**
 - Campos `Address`, `Phone`, `Email` preparados para reportes y contactos
@@ -320,12 +417,11 @@ Fotos de referencia de productos para el reconocimiento de imágenes. Múltiples
 
 **Campos Clave:**
 - `ProductId`: Referencia al producto
-- `FilePath`: Ruta en S3/Blob Storage
-- `FileName`: Nombre original del archivo
-- `FileSize`: Tamaño en bytes
-- `MimeType`: Tipo MIME de la imagen
+- `FileName`: Nombre del archivo almacenado (la ruta se construye en runtime desde la configuración del storage service)
 - `DisplayOrder`: Orden de visualización
 - `IsPrimary`: Indica si es la foto principal
+
+**Nota:** A diferencia de `SalePhoto` y `ReturnPhoto`, esta entidad no almacena `FilePath`, `FileSize` ni `MimeType` directamente. El path completo se resuelve en tiempo de ejecución a través de `IFileStorageService`.
 
 **Optimizaciones:**
 - Índice compuesto en `(ProductId, DisplayOrder)` para ordenamiento eficiente
@@ -378,14 +474,23 @@ Registro de todas las ventas realizadas en el sistema.
 - `PointOfSaleId`: Punto de venta donde se realizó la venta
 - `UserId`: Operador que realizó la venta
 - `PaymentMethodId`: Método de pago utilizado
-- `Price`: Precio al momento de la venta (snapshot, no referencia al precio actual)
+- `Price`: Precio efectivo de la venta (precio oficial del producto o precio manual si fue modificado)
 - `Quantity`: Cantidad vendida (default 1)
 - `SaleDate`: Fecha y hora de la venta
 - `Notes`: Notas adicionales opcionales
+- `PriceWasOverridden`: Indica si el precio fue modificado manualmente por el operador (default `false`)
+- `OriginalProductPrice`: Precio oficial del producto al momento de la venta, solo se almacena cuando `PriceWasOverridden = true` (nullable)
 
 **Consideraciones:**
-- `Price` es un snapshot para mantener integridad histórica
+- `Price` es un snapshot para mantener integridad histórica; puede ser el precio oficial del producto o un precio manual si el POS lo permite
+- Cuando `PriceWasOverridden = true`, `OriginalProductPrice` contiene el precio oficial del catálogo como referencia de auditoría
 - Múltiples índices compuestos para consultas frecuentes por punto de venta, producto, usuario y método de pago
+
+**Reglas de resolución de precio:**
+1. Si el POS no permite edición manual (`AllowManualPriceEdit = false`): se rechaza cualquier precio manual enviado
+2. Si el POS permite edición y no se envía precio: se usa el precio oficial del producto
+3. Si el POS permite edición y se envía un precio igual al oficial: `PriceWasOverridden = false`
+4. Si el POS permite edición y se envía un precio diferente: `PriceWasOverridden = true`, `OriginalProductPrice` = precio oficial
 
 **Consideraciones Fase 2:**
 - Campo `Notes` puede evolucionar para incluir información de promociones/descuentos
@@ -489,9 +594,11 @@ Stock actual de cada producto en cada punto de venta. **La presencia de un regis
 - `PointOfSaleId`: Referencia al punto de venta
 - `Quantity`: Cantidad actual en stock (**puede ser 0, el producto sigue asignado al POS si IsActive = true**)
 - `IsActive`: Indica si el producto está asignado (true) o desasignado (false) - permite soft delete
-- `MinimumThreshold`: Umbral mínimo para alertas (preparado para Fase 2)
 - `LastUpdatedAt`: Última actualización del stock
 - `CreatedAt`: Fecha de creación del registro
+
+**Campos Fase 2 (no implementados aún):**
+- `MinimumThreshold`: Umbral mínimo para alertas de stock bajo (se añadirá cuando se implementen alertas)
 
 **Restricción:** Constraint único en `(ProductId, PointOfSaleId)` para garantizar un solo registro por combinación producto-punto de venta.
 
@@ -537,8 +644,100 @@ Historial completo y trazable de todos los movimientos de inventario (ventas, de
 - Los campos `QuantityBefore` y `QuantityAfter` permiten validar integridad
 
 **Optimizaciones:**
-- Múltiples índices para consultas por inventario, venta, devolución y usuario
-- Índice compuesto en `(InventoryId, MovementDate)` para historial ordenado
+- Índices en `InventoryId`, `MovementDate` y compuesto `(InventoryId, MovementDate)` para historial ordenado
+
+---
+
+### RefreshToken (Tokens de Refresco)
+
+Tokens de sesión almacenados en base de datos para permitir revocación y rotación de tokens JWT.
+
+**Campos Clave:**
+- `Token`: Valor único del token (string base64)
+- `UserId`: Referencia al usuario propietario
+- `ExpiresAt`: Fecha de expiración
+- `IsRevoked`: Si el token fue revocado
+- `RevokedAt`: Timestamp de revocación
+- `CreatedByIp` / `RevokedByIp`: IPs de auditoría
+- `ReplacedByToken`: Token sustituto (en rotación)
+
+---
+
+### ProductComponent (Componentes de Joyas - Tabla Maestra)
+
+Tabla maestra de componentes (materiales, mano de obra, etc.) que pueden asignarse a productos. Solo visible para administradores.
+
+**Campos Clave:**
+- `Description`: Descripción única del componente (máx 35 caracteres)
+- `CostPrice`: Precio de coste por defecto (opcional, precisión 18,4)
+- `SalePrice`: Precio de venta por defecto (opcional, precisión 18,4)
+- `IsActive`: Componentes inactivos no pueden asignarse a nuevos productos pero los ya asignados mantienen su asignación
+
+---
+
+### ProductComponentAssignment (Asignación Componente-Producto)
+
+Asigna un componente de la tabla maestra a un producto concreto, con cantidad y precios override.
+
+**Campos Clave:**
+- `ProductId`: Referencia al producto
+- `ComponentId`: Referencia al componente maestro
+- `Quantity`: Cantidad del componente (precisión 18,4)
+- `CostPrice`: Precio de coste override para esta asignación (precisión 18,4)
+- `SalePrice`: Precio de venta override para esta asignación (precisión 18,4)
+- `DisplayOrder`: Orden de visualización (drag-and-drop)
+
+**Restricción:** Constraint único en `(ProductId, ComponentId)` para evitar duplicados.
+
+---
+
+### ComponentTemplate (Plantillas de Componentes)
+
+Plantillas reutilizables que definen conjuntos de componentes con cantidades para configuración rápida de productos.
+
+**Campos Clave:**
+- `Name`: Nombre de la plantilla (máx 100 caracteres)
+- `Description`: Descripción opcional (máx 500 caracteres)
+
+---
+
+### ComponentTemplateItem (Items de Plantilla)
+
+Componente individual dentro de una plantilla, define componente y cantidad (los precios se cargan desde la tabla maestra al aplicar).
+
+**Campos Clave:**
+- `TemplateId`: Referencia a la plantilla
+- `ComponentId`: Referencia al componente maestro
+- `Quantity`: Cantidad del componente (precisión 18,4)
+
+**Restricción:** Constraint único en `(TemplateId, ComponentId)` para evitar duplicados.
+
+---
+
+### ModelMetadata (Metadatos de Modelos IA)
+
+Metadatos de las versiones del modelo de reconocimiento de imágenes. Solo un modelo puede estar activo a la vez.
+
+**Campos Clave:**
+- `Version`: Identificador de versión único (ej: "v2_20260111")
+- `ModelPath`: Ruta a los archivos del modelo en storage
+- `AccuracyMetrics`: Métricas de precisión en formato JSON
+- `TotalPhotosUsed` / `TotalProductsUsed`: Datos de entrenamiento
+- `IsActive`: Solo un modelo activo simultáneamente
+
+---
+
+### ModelTrainingJob (Trabajos de Entrenamiento)
+
+Registra el estado y progreso de operaciones de entrenamiento del modelo de IA.
+
+**Campos Clave:**
+- `InitiatedBy`: Usuario que inició el entrenamiento
+- `Status`: Estado actual (Queued, InProgress, Completed, Failed)
+- `ProgressPercentage`: Progreso 0-100
+- `CurrentStage`: Etapa actual descriptiva
+- `StartedAt` / `CompletedAt`: Timestamps de ejecución
+- `ResultModelVersion`: Versión del modelo generado (si exitoso)
 
 ---
 
@@ -564,6 +763,12 @@ Historial completo y trazable de todos los movimientos de inventario (ventas, de
 | **Sale** | genera movimiento | **InventoryMovement** | 1:1 | Cada venta genera un movimiento de inventario |
 | **Return** | genera movimiento | **InventoryMovement** | 1:1 | Cada devolución genera un movimiento de inventario |
 | **Inventory** | tiene movimientos | **InventoryMovement** | 1:N | Un inventario tiene múltiples movimientos históricos |
+| **Product** | tiene componentes | **ProductComponentAssignment** | 1:N | Un producto puede tener múltiples componentes asignados |
+| **ProductComponent** | asignado a | **ProductComponentAssignment** | 1:N | Un componente puede asignarse a múltiples productos |
+| **ProductComponent** | en plantilla | **ComponentTemplateItem** | 1:N | Un componente puede estar en múltiples plantillas |
+| **ComponentTemplate** | tiene items | **ComponentTemplateItem** | 1:N | Una plantilla tiene múltiples items de componentes |
+| **User** | tiene tokens | **RefreshToken** | 1:N | Un usuario tiene múltiples refresh tokens |
+| **User** | inicia entrenamiento | **ModelTrainingJob** | 1:N | Un usuario puede iniciar múltiples entrenamientos |
 
 ### Reglas de Negocio Implícitas
 
@@ -593,6 +798,9 @@ Historial completo y trazable de todos los movimientos de inventario (ventas, de
 6. **Ventas:**
    - El precio en `Sale` es un snapshot (no referencia al precio actual del producto)
    - Una venta debe tener un método de pago válido para el punto de venta
+   - Si el POS tiene `AllowManualPriceEdit = true`, el operador puede enviar un precio manual; en caso contrario, el sistema rechaza cualquier precio manual
+   - Cuando el precio es modificado, se almacena `PriceWasOverridden = true` y `OriginalProductPrice` con el precio oficial del catálogo
+   - El historial y detalle de ventas muestra un indicador visual cuando el precio fue modificado
 
 7. **Devoluciones:**
    - Una devolución debe asociarse a una o más ventas existentes (vía ReturnSale)
@@ -622,8 +830,14 @@ Todas las entidades utilizan `Id` (UUID) como clave primaria con índice automá
 | `Product` | `SKU` | Código único para matching en importaciones |
 | `PaymentMethod` | `Code` | Código único del método de pago |
 | `Inventory` | `(ProductId, PointOfSaleId)` | Un solo registro por combinación |
-| `UserPointOfSale` | `(UserId, PointOfSaleId)` | Evitar asignaciones duplicadas |
+| `UserPointOfSale` | `(UserId, PointOfSaleId, IsActive)` filtro `IsActive=true` | Una sola asignación activa por par usuario-POS |
 | `PointOfSalePaymentMethod` | `(PointOfSaleId, PaymentMethodId)` | Evitar métodos duplicados |
+| `ProductComponent` | `Description` | Descripción única de componente |
+| `ProductComponentAssignment` | `(ProductId, ComponentId)` | Un componente por producto |
+| `ComponentTemplateItem` | `(TemplateId, ComponentId)` | Un componente por plantilla |
+| `RefreshToken` | `Token` | Token único |
+| `ModelMetadata` | `Version` | Versión de modelo única |
+| `ReturnSale` | `(ReturnId, SaleId)` | Evitar duplicados de asociación |
 
 ### Índices Compuestos para Consultas Frecuentes
 
@@ -642,12 +856,11 @@ Todas las entidades utilizan `Id` (UUID) como clave primaria con índice automá
 
 | Índice | Campos | Propósito | Casos de Uso |
 |--------|--------|-----------|--------------|
-| `IX_InventoryMovement_Inventory_MovementDate` | `(InventoryId, MovementDate DESC)` | Historial de movimientos por inventario | Trazabilidad de stock |
-| `IX_InventoryMovement_Sale` | `(SaleId)` | Búsqueda rápida de movimientos por venta | Validación y auditoría |
-| `IX_InventoryMovement_Return` | `(ReturnId)` | Búsqueda rápida de movimientos por devolución | Validación y auditoría |
-| `IX_InventoryMovement_User_MovementDate` | `(UserId, MovementDate DESC)` | Movimientos por usuario | Auditoría de operaciones |
+| `IX_InventoryMovement_Inventory` | `(InventoryId)` | Búsqueda de movimientos por inventario | Trazabilidad de stock |
+| `IX_InventoryMovement_MovementDate` | `(MovementDate)` | Consultas por fecha | Reportes temporales |
+| `IX_InventoryMovement_Inventory_MovementDate` | `(InventoryId, MovementDate)` | Historial de movimientos por inventario ordenado | Trazabilidad de stock |
 
-**Justificación:** La tabla `InventoryMovement` crecerá rápidamente y necesita índices para consultas de historial y auditoría.
+**Justificación:** La tabla `InventoryMovement` crecerá rápidamente y necesita índices para consultas de historial y auditoría. Los índices por `SaleId`, `ReturnId` y `(UserId, MovementDate)` se resuelven a través de las relaciones FK configuradas en EF Core.
 
 #### Tabla: Inventory
 
@@ -825,7 +1038,8 @@ Se utiliza UUID como clave primaria para:
 ### Normalización
 
 El modelo sigue 3NF (Tercera Forma Normal) con las siguientes excepciones intencionales:
-- `Sale.Price`: Snapshot del precio (redundante pero necesario para integridad histórica)
+- `Sale.Price`: Snapshot del precio efectivo de venta (redundante pero necesario para integridad histórica)
+- `Sale.OriginalProductPrice`: Precio oficial del catálogo al momento de la venta cuando hubo override (redundante pero necesario para auditoría)
 - `Return.ProductId`: Redundante pero útil para consultas sin join
 
 ### Constraints y Validaciones

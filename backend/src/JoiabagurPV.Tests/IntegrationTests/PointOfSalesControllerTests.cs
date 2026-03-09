@@ -843,4 +843,105 @@ public class PointOfSalesControllerTests : IAsyncLifetime
     }
 
     #endregion
+
+    #region AllowManualPriceEdit Tests
+
+    [Fact]
+    public async Task Create_WithAllowManualPriceEdit_ShouldPersistFlag()
+    {
+        // Arrange
+        var request = new CreatePointOfSaleRequest
+        {
+            Name = "Manual Price Edit Store",
+            Code = "MPE-001",
+            AllowManualPriceEdit = true
+        };
+
+        // Act
+        var response = await _adminClient!.PostAsJsonAsync("/api/point-of-sales", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var pointOfSale = await response.Content.ReadFromJsonAsync<PointOfSaleDto>();
+        pointOfSale.Should().NotBeNull();
+        pointOfSale!.AllowManualPriceEdit.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Create_WithoutAllowManualPriceEdit_ShouldDefaultToFalse()
+    {
+        // Arrange
+        var request = new CreatePointOfSaleRequest
+        {
+            Name = "Default Price Edit Store",
+            Code = "DPE-001"
+        };
+
+        // Act
+        var response = await _adminClient!.PostAsJsonAsync("/api/point-of-sales", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var pointOfSale = await response.Content.ReadFromJsonAsync<PointOfSaleDto>();
+        pointOfSale.Should().NotBeNull();
+        pointOfSale!.AllowManualPriceEdit.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Update_AllowManualPriceEdit_ShouldUpdateFlag()
+    {
+        // Arrange
+        var createRequest = new CreatePointOfSaleRequest
+        {
+            Name = "Update MPE Store",
+            Code = "UMPE-001"
+        };
+        var createResponse = await _adminClient!.PostAsJsonAsync("/api/point-of-sales", createRequest);
+        var createdPos = await createResponse.Content.ReadFromJsonAsync<PointOfSaleDto>();
+
+        var updateRequest = new UpdatePointOfSaleRequest
+        {
+            Name = "Update MPE Store",
+            IsActive = true,
+            AllowManualPriceEdit = true
+        };
+
+        // Act
+        var response = await _adminClient!.PutAsJsonAsync($"/api/point-of-sales/{createdPos!.Id}", updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var pointOfSale = await response.Content.ReadFromJsonAsync<PointOfSaleDto>();
+        pointOfSale.Should().NotBeNull();
+        pointOfSale!.AllowManualPriceEdit.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetById_ShouldIncludeAllowManualPriceEdit()
+    {
+        // Arrange
+        var createRequest = new CreatePointOfSaleRequest
+        {
+            Name = "Get MPE Store",
+            Code = "GMPE-001",
+            AllowManualPriceEdit = true
+        };
+        var createResponse = await _adminClient!.PostAsJsonAsync("/api/point-of-sales", createRequest);
+        var createdPos = await createResponse.Content.ReadFromJsonAsync<PointOfSaleDto>();
+
+        // Act
+        var response = await _adminClient!.GetAsync($"/api/point-of-sales/{createdPos!.Id}");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var pointOfSale = await response.Content.ReadFromJsonAsync<PointOfSaleDto>();
+        pointOfSale.Should().NotBeNull();
+        pointOfSale!.AllowManualPriceEdit.Should().BeTrue();
+    }
+
+    #endregion
 }

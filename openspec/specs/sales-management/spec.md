@@ -5,7 +5,7 @@ TBD - created by archiving change add-sales-and-image-recognition. Update Purpos
 ## Requirements
 ### Requirement: Sales Registration with Dual Entry Methods
 
-The system SHALL allow operators to register sales using two methods: AI-assisted image recognition (with photo attached) or manual product selection (with optional photo). Both methods validate stock availability, payment method assignment, and operator authorization before creating sale records.
+The system SHALL allow operators to register sales using two methods: AI-assisted image recognition (with photo attached) or manual product selection (with optional photo). Both methods validate stock availability, payment method assignment, operator authorization, and point-of-sale price policy before creating sale records.
 
 #### Scenario: Create sale with image recognition successfully
 
@@ -14,7 +14,7 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 - **AND** enters quantity (>= 1)
 - **AND** selects payment method assigned to point of sale
 - **AND** product has sufficient stock at point of sale
-- **THEN** system creates Sale record with price snapshot from current Product.Price
+- **THEN** system creates Sale record using effective sale price rules (official Product.Price by default, optional override only if POS allows manual price edit)
 - **AND** creates SalePhoto record with compressed photo (JPEG 80%, <= 2MB)
 - **AND** creates InventoryMovement record with type "Sale" (via inventory-management integration)
 - **AND** updates Inventory.Quantity atomically in same transaction
@@ -26,7 +26,7 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 - **AND** enters quantity (>= 1)
 - **AND** selects payment method assigned to point of sale
 - **AND** product has sufficient stock at point of sale
-- **THEN** system creates Sale record with price snapshot
+- **THEN** system creates Sale record using effective sale price rules
 - **AND** SalePhoto is null (no photo attached)
 - **AND** creates InventoryMovement and updates stock atomically
 - **AND** returns success with sale ID
@@ -37,7 +37,7 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 - **AND** optionally attaches photo (e.g., for documentation purposes)
 - **AND** enters quantity and selects payment method
 - **AND** product has sufficient stock
-- **THEN** system creates Sale with price snapshot
+- **THEN** system creates Sale using effective sale price rules
 - **AND** creates SalePhoto with compressed photo
 - **AND** creates InventoryMovement and updates stock atomically
 
@@ -94,6 +94,19 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 - **AND** provides error message indicating unauthorized access
 - **NOTE**: Uses access-control integration
 
+#### Scenario: Reject manual price when POS disallows overrides
+
+- **WHEN** operator submits a sale request with explicit price
+- **AND** selected point of sale has AllowManualPriceEdit = false
+- **THEN** system returns 400 Bad Request with validation error
+- **AND** does not create sale record
+
+#### Scenario: Validate manual price is positive when provided
+
+- **WHEN** operator submits a sale request with manual price <= 0
+- **THEN** system returns 400 Bad Request with validation error
+- **AND** does not create sale record
+
 #### Scenario: Low stock warning after sale
 
 - **WHEN** sale is created successfully
@@ -112,9 +125,11 @@ The system SHALL allow operators to register sales using two methods: AI-assiste
 #### Scenario: Price snapshot on sale creation
 
 - **WHEN** sale is created
-- **THEN** system captures current Product.Price at time of sale
-- **AND** stores price in Sale.Price field (immutable snapshot)
-- **AND** subsequent product price changes do not affect historical Sale.Price
+- **THEN** system captures current Product.Price at time of sale as official price reference
+- **AND** stores effective price in Sale.Price
+- **AND** stores PriceWasOverridden = true and OriginalProductPrice = official Product.Price when override is applied
+- **AND** stores PriceWasOverridden = false and OriginalProductPrice = null when override is not applied
+- **AND** subsequent product price changes do not affect historical sale pricing fields
 
 ### Requirement: Transaction-Based Stock Updates
 
@@ -327,4 +342,22 @@ The system SHALL enforce role-based access and point-of-sale assignment restrict
 - **WHEN** operator requests sales history
 - **THEN** system filters results to UserPointOfSale assignments
 - **AND** operator cannot view sales from unassigned points of sale
+
+### Requirement: Sales Override Indicator in History and Details
+
+The system SHALL expose and display a clear indicator when a sale used a manually overridden price.
+
+#### Scenario: Override badge in sales history list
+
+- **WHEN** user requests sales history
+- **AND** a returned sale has PriceWasOverridden = true
+- **THEN** API response includes the override flag
+- **AND** frontend shows a visible indicator such as "Precio modificado" for that sale row
+
+#### Scenario: Override details in sale detail view
+
+- **WHEN** user requests a specific sale detail
+- **AND** the sale has PriceWasOverridden = true
+- **THEN** API response includes PriceWasOverridden and OriginalProductPrice
+- **AND** frontend shows the overridden sale price and original product price reference
 

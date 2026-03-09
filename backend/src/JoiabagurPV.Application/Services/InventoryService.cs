@@ -20,7 +20,7 @@ public class InventoryService : IInventoryService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<InventoryService> _logger;
 
-    private const int MaxPageSize = 50;
+    private const int MaxPageSize = 100;
 
     public InventoryService(
         IInventoryRepository inventoryRepository,

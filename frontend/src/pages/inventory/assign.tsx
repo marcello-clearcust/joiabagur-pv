@@ -2,9 +2,9 @@
  * Inventory Assignment Page
  * Allows administrators to assign products to points of sale
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Package, Check, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Package, Check, X, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -56,6 +57,8 @@ export function InventoryAssignPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [productToUnassign, setProductToUnassign] = useState<Inventory | null>(null);
   const [assignedInventories, setAssignedInventories] = useState<Inventory[]>([]);
+  const [unassignedSearch, setUnassignedSearch] = useState('');
+  const [assignedSearch, setAssignedSearch] = useState('');
 
   // Load initial data
   useEffect(() => {
@@ -89,7 +92,9 @@ export function InventoryAssignPage() {
       const assignedIds = new Set(result.items.map((i) => i.productId));
       setAssignedProducts(assignedIds);
       setAssignedInventories(result.items);
-      setSelectedProducts(new Set()); // Reset selection
+      setSelectedProducts(new Set());
+      setUnassignedSearch('');
+      setAssignedSearch('');
     } catch (error) {
       toast.error('Error al cargar productos asignados');
       console.error(error);
@@ -112,10 +117,8 @@ export function InventoryAssignPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const unassignedIds = products
-        .filter((p) => !assignedProducts.has(p.id))
-        .map((p) => p.id);
-      setSelectedProducts(new Set(unassignedIds));
+      const ids = filteredUnassignedProducts.map((p) => p.id);
+      setSelectedProducts(new Set(ids));
     } else {
       setSelectedProducts(new Set());
     }
@@ -183,6 +186,22 @@ export function InventoryAssignPage() {
   };
 
   const unassignedProducts = products.filter((p) => !assignedProducts.has(p.id));
+
+  const filteredUnassignedProducts = useMemo(() => {
+    if (!unassignedSearch.trim()) return unassignedProducts;
+    const term = unassignedSearch.trim().toLowerCase();
+    return unassignedProducts.filter(
+      (p) => p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term)
+    );
+  }, [unassignedProducts, unassignedSearch]);
+
+  const filteredAssignedInventories = useMemo(() => {
+    if (!assignedSearch.trim()) return assignedInventories;
+    const term = assignedSearch.trim().toLowerCase();
+    return assignedInventories.filter(
+      (i) => i.productName.toLowerCase().includes(term) || i.productSku.toLowerCase().includes(term)
+    );
+  }, [assignedInventories, assignedSearch]);
 
   if (loading) {
     return (
@@ -257,7 +276,7 @@ export function InventoryAssignPage() {
             )}
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {unassignedProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Package className="mb-4 h-12 w-12 text-muted-foreground" />
@@ -266,43 +285,60 @@ export function InventoryAssignPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={
-                        unassignedProducts.length > 0 &&
-                        selectedProducts.size === unassignedProducts.length
-                      }
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Precio</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {unassignedProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedProducts.has(product.id)}
-                        onCheckedChange={(checked) =>
-                          handleProductSelect(product.id, checked as boolean)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {product.sku}
-                    </TableCell>
-                    <TableCell>{product.name}</TableCell>
-                    <TableCell>€{product.price.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre o SKU..."
+                  value={unassignedSearch}
+                  onChange={(e) => setUnassignedSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {filteredUnassignedProducts.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No se encontraron productos para &quot;{unassignedSearch}&quot;
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={
+                            filteredUnassignedProducts.length > 0 &&
+                            filteredUnassignedProducts.every((p) => selectedProducts.has(p.id))
+                          }
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Precio</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUnassignedProducts.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedProducts.has(product.id)}
+                            onCheckedChange={(checked) =>
+                              handleProductSelect(product.id, checked as boolean)
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {product.sku}
+                        </TableCell>
+                        <TableCell>{product.name}</TableCell>
+                        <TableCell>€{product.price.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -315,7 +351,7 @@ export function InventoryAssignPage() {
             {assignedInventories.length} productos asignados a este punto de venta
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {assignedInventories.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Package className="mb-4 h-12 w-12 text-muted-foreground" />
@@ -324,44 +360,61 @@ export function InventoryAssignPage() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead className="w-24"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assignedInventories.map((inventory) => (
-                  <TableRow key={inventory.id}>
-                    <TableCell className="font-mono text-sm">
-                      {inventory.productSku}
-                    </TableCell>
-                    <TableCell>{inventory.productName}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {inventory.quantity}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleUnassignClick(inventory)}
-                        disabled={inventory.quantity > 0}
-                        title={
-                          inventory.quantity > 0
-                            ? 'Ajuste el stock a 0 antes de desasignar'
-                            : 'Desasignar producto'
-                        }
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <>
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre o SKU..."
+                  value={assignedSearch}
+                  onChange={(e) => setAssignedSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {filteredAssignedInventories.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No se encontraron productos para &quot;{assignedSearch}&quot;
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead className="text-right">Cantidad</TableHead>
+                      <TableHead className="w-24"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAssignedInventories.map((inventory) => (
+                      <TableRow key={inventory.id}>
+                        <TableCell className="font-mono text-sm">
+                          {inventory.productSku}
+                        </TableCell>
+                        <TableCell>{inventory.productName}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {inventory.quantity}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUnassignClick(inventory)}
+                            disabled={inventory.quantity > 0}
+                            title={
+                              inventory.quantity > 0
+                                ? 'Ajuste el stock a 0 antes de desasignar'
+                                : 'Desasignar producto'
+                            }
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

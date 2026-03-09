@@ -75,16 +75,25 @@ export const productService = {
    * @deprecated Use getCatalog for paginated list views
    */
   getProducts: async (includeInactive = true): Promise<Product[]> => {
-    // For backwards compatibility, fetch all pages
-    const response = await apiClient.get<PaginatedResult<ProductListItem>>(
-      PRODUCT_ENDPOINTS.PRODUCTS,
-      { params: { includeInactive, pageSize: 1000 } }
-    );
-    // Convert to Product[] format by fetching full details
-    // Note: This is inefficient, consider updating consumers to use getCatalog
-    const productIds = response.data.items.map(item => item.id);
+    const allProductIds: string[] = [];
+    let page = 1;
+    const pageSize = 100;
+
+    // Fetch all pages to ensure no products are truncated
+    while (true) {
+      const response = await apiClient.get<PaginatedResult<ProductListItem>>(
+        PRODUCT_ENDPOINTS.PRODUCTS,
+        { params: { includeInactive, page, pageSize } }
+      );
+      const ids = response.data.items.map(item => item.id);
+      allProductIds.push(...ids);
+
+      if (allProductIds.length >= response.data.totalCount) break;
+      page++;
+    }
+
     const products: Product[] = [];
-    for (const id of productIds) {
+    for (const id of allProductIds) {
       try {
         const product = await productService.getProduct(id);
         products.push(product);

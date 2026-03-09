@@ -85,20 +85,36 @@ export const inventoryService = {
   },
 
   /**
-   * Get products assigned to a point of sale
+   * Get products assigned to a point of sale (fetches all pages)
    */
   getAssignedProducts: async (
     pointOfSaleId: string,
     page = 1,
-    pageSize = 50
+    pageSize = 100
   ): Promise<PaginatedInventoryResult> => {
-    const response = await apiClient.get<PaginatedInventoryResult>(
-      INVENTORY_ENDPOINTS.ASSIGNED,
-      {
-        params: { pointOfSaleId, page, pageSize },
-      }
-    );
-    return response.data;
+    const allItems: Inventory[] = [];
+    let currentPage = page;
+
+    while (true) {
+      const response = await apiClient.get<PaginatedInventoryResult>(
+        INVENTORY_ENDPOINTS.ASSIGNED,
+        {
+          params: { pointOfSaleId, page: currentPage, pageSize },
+        }
+      );
+      allItems.push(...response.data.items);
+
+      if (allItems.length >= response.data.totalCount) break;
+      currentPage++;
+    }
+
+    return {
+      items: allItems,
+      totalCount: allItems.length,
+      page: 1,
+      pageSize: allItems.length,
+      totalPages: 1,
+    };
   },
 
   // ==================== Stock View Operations ====================

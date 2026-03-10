@@ -37,18 +37,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { inventoryService } from '@/services/inventory.service';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
 import { productService } from '@/services/product.service';
 import { PointOfSale } from '@/types/point-of-sale.types';
-import { Product } from '@/types/product.types';
+import { ProductListItem } from '@/types/product.types';
 import { Inventory } from '@/types/inventory.types';
 import { ROUTES } from '@/routing/routes';
 
 export function InventoryAssignPage() {
   const [pointsOfSale, setPointsOfSale] = useState<PointOfSale[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductListItem[]>([]);
   const [selectedPosId, setSelectedPosId] = useState<string>('');
   const [assignedProducts, setAssignedProducts] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
@@ -64,12 +65,24 @@ export function InventoryAssignPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [posData, productsData] = await Promise.all([
-          pointOfSaleService.getPointsOfSale(false),
-          productService.getProducts(false), // Only active products
-        ]);
+        const posData = await pointOfSaleService.getPointsOfSale(false);
+
+        const allProducts: ProductListItem[] = [];
+        let page = 1;
+        const pageSize = 100;
+        while (true) {
+          const result = await productService.getCatalog({
+            page,
+            pageSize,
+            includeInactive: false,
+          });
+          allProducts.push(...result.items);
+          if (allProducts.length >= result.totalCount) break;
+          page++;
+        }
+
         setPointsOfSale(posData);
-        setProducts(productsData);
+        setProducts(allProducts);
         if (posData.length > 0) {
           setSelectedPosId(posData[0].id);
         }
@@ -395,19 +408,27 @@ export function InventoryAssignPage() {
                           {inventory.quantity}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleUnassignClick(inventory)}
-                            disabled={inventory.quantity > 0}
-                            title={
-                              inventory.quantity > 0
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUnassignClick(inventory)}
+                                className={
+                                  inventory.quantity > 0
+                                    ? 'text-muted-foreground'
+                                    : 'text-destructive hover:text-destructive'
+                                }
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {inventory.quantity > 0
                                 ? 'Ajuste el stock a 0 antes de desasignar'
-                                : 'Desasignar producto'
-                            }
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                                : 'Desasignar producto'}
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}

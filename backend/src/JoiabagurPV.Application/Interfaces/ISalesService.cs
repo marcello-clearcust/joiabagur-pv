@@ -50,4 +50,10 @@ public interface ISalesService
     /// <param name="saleId">The sale ID.</param>
     /// <returns>The file stream and content type if photo exists, null otherwise.</returns>
     Task<(Stream Stream, string ContentType, string FileName)?> GetSalePhotoStreamAsync(Guid saleId);
+
+    /// <summary>
+    /// Creates multiple sales atomically in a single transaction.
+    /// All lines must use the same point of sale and payment method.
+    /// </summary>
+    Task<CreateBulkSalesResult> CreateBulkSalesAsync(CreateBulkSalesRequest request, Guid userId, bool isAdmin);
 }

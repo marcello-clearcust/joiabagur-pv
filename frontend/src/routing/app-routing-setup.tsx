@@ -21,6 +21,7 @@ const InventoryCentralizedPage = lazy(() => import('@/pages/inventory/centralize
 const SalesPage = lazy(() => import('@/pages/sales'));
 const ManualSalesPage = lazy(() => import('@/pages/sales/new'));
 const ImageRecognitionSalesPage = lazy(() => import('@/pages/sales/new-image'));
+const SalesCartPage = lazy(() => import('@/pages/sales/cart'));
 const SalesHistoryPage = lazy(() => import('@/pages/sales/history'));
 const ReturnsPage = lazy(() => import('@/pages/returns'));
 const NewReturnPage = lazy(() => import('@/pages/returns/new'));
@@ -72,6 +73,7 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.SALES.ROOT} element={<SalesPage />} />
             <Route path={ROUTES.SALES.NEW} element={<ManualSalesPage />} />
             <Route path={ROUTES.SALES.NEW_IMAGE} element={<ImageRecognitionSalesPage />} />
+            <Route path={ROUTES.SALES.CART} element={<SalesCartPage />} />
             <Route path={ROUTES.SALES.HISTORY} element={<SalesHistoryPage />} />
             <Route path={ROUTES.RETURNS.ROOT} element={<ReturnsPage />} />
             <Route path={ROUTES.RETURNS.NEW} element={<NewReturnPage />} />

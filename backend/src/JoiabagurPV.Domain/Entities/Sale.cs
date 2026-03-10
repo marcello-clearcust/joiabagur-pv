@@ -55,6 +55,12 @@ public class Sale : BaseEntity
     public decimal? OriginalProductPrice { get; set; }
 
     /// <summary>
+    /// Groups sales created together in a single bulk checkout operation.
+    /// Null for sales created individually.
+    /// </summary>
+    public Guid? BulkOperationId { get; set; }
+
+    /// <summary>
     /// When the sale occurred.
     /// </summary>
     public DateTime SaleDate { get; set; }

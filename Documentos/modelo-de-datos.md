@@ -151,12 +151,14 @@ erDiagram
         string? Notes "notas adicionales"
         bool PriceWasOverridden "default false"
         decimal? OriginalProductPrice "precio oficial cuando hubo override"
+        uuid? BulkOperationId "agrupa ventas de un checkout masivo"
         datetime SaleDate
         datetime CreatedAt
         indexed(PointOfSaleId, SaleDate)
         indexed(ProductId, SaleDate)
         indexed(UserId, SaleDate)
         indexed(PaymentMethodId, SaleDate)
+        indexed(BulkOperationId)
     }
     
     SalePhoto {
@@ -480,11 +482,13 @@ Registro de todas las ventas realizadas en el sistema.
 - `Notes`: Notas adicionales opcionales
 - `PriceWasOverridden`: Indica si el precio fue modificado manualmente por el operador (default `false`)
 - `OriginalProductPrice`: Precio oficial del producto al momento de la venta, solo se almacena cuando `PriceWasOverridden = true` (nullable)
+- `BulkOperationId`: UUID que agrupa ventas creadas juntas en un checkout masivo (nullable). Las ventas individuales tienen este campo en `null`
 
 **Consideraciones:**
 - `Price` es un snapshot para mantener integridad histórica; puede ser el precio oficial del producto o un precio manual si el POS lo permite
 - Cuando `PriceWasOverridden = true`, `OriginalProductPrice` contiene el precio oficial del catálogo como referencia de auditoría
-- Múltiples índices compuestos para consultas frecuentes por punto de venta, producto, usuario y método de pago
+- `BulkOperationId` comparte un mismo UUID entre todas las ventas creadas en una misma operación de checkout masivo, permitiendo trazabilidad y agrupación
+- Múltiples índices compuestos para consultas frecuentes por punto de venta, producto, usuario, método de pago y operación masiva
 
 **Reglas de resolución de precio:**
 1. Si el POS no permite edición manual (`AllowManualPriceEdit = false`): se rechaza cualquier precio manual enviado

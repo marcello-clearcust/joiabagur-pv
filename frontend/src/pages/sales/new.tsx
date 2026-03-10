@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, Search, ShoppingCart, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Search, ShoppingCart, AlertTriangle, CheckCircle2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 import { useAuth } from '@/providers/auth-provider';
+import { useCart } from '@/providers/cart-provider';
 import { getImageUrl } from '@/lib/image-url';
 import { salesService } from '@/services/sales.service';
 import { productService } from '@/services/product.service';
@@ -53,6 +54,7 @@ export function ManualSalesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { addLine, lineCount } = useCart();
   
   // Get pre-selected product from image recognition
   const locationState = location.state as LocationState | null;
@@ -283,6 +285,38 @@ export function ManualSalesPage() {
       toast.error(errorMessage);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (!selectedProduct || !isFormValid) return;
+    const selectedPos = pointsOfSale.find((pos) => pos.id === selectedPosId);
+    const selectedPaymentMethod = paymentMethods.find(
+      (m) => m.id === selectedPaymentMethodId,
+    );
+    if (!selectedPos || !selectedPaymentMethod) return;
+
+    const added = addLine({
+      productId: selectedProduct.id,
+      productSku: selectedProduct.sku,
+      productName: selectedProduct.name,
+      productPrice: selectedProduct.price,
+      quantity,
+      price: isPriceOverridden ? effectivePrice : undefined,
+      pointOfSaleId: selectedPosId,
+      pointOfSaleName: selectedPos.name,
+      paymentMethodId: selectedPaymentMethodId,
+      paymentMethodName: selectedPaymentMethod.name,
+    });
+
+    if (added) {
+      toast.success(`"${selectedProduct.name}" agregado al carrito`);
+      setSelectedProduct(null);
+      setProductSearch('');
+      setQuantity(1);
+      setManualPrice('');
+      setNotes('');
+      setAvailableStock(null);
     }
   };
 
@@ -552,7 +586,7 @@ export function ManualSalesPage() {
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit Buttons */}
             <Button 
               className="w-full" 
               size="lg"
@@ -562,6 +596,31 @@ export function ManualSalesPage() {
               <ShoppingCart className="mr-2 h-5 w-5" />
               Registrar Venta
             </Button>
+
+            <Button
+              className="w-full"
+              size="lg"
+              variant="outline"
+              disabled={!isFormValid}
+              onClick={handleAddToCart}
+            >
+              <Plus className="mr-2 h-5 w-5" />
+              Añadir al carrito
+            </Button>
+
+            {lineCount > 0 && (
+              <Button
+                className="w-full"
+                size="sm"
+                variant="secondary"
+                asChild
+              >
+                <Link to={ROUTES.SALES.CART}>
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Ver carrito ({lineCount})
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

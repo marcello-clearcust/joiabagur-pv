@@ -53,6 +53,9 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.UpdatedAt)
             .IsRequired();
 
+        builder.Property(s => s.BulkOperationId);
+        builder.HasIndex(s => s.BulkOperationId);
+
         // Indexes as defined in data model
         builder.HasIndex(s => new { s.PointOfSaleId, s.SaleDate });
         builder.HasIndex(s => new { s.ProductId, s.SaleDate });

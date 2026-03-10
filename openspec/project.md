@@ -157,6 +157,19 @@
 - **User Stories**: `Documentos/Historias/HU-EP[X]-[NNN].md`
 - **Work Tickets**: `Tickets/EP[X]/HU-EP[X]-[NNN]/T-EP[X]-[NNN]-[MMM].md`
 
+#### Post-Implementation Documentation Update
+
+After completing an OpenSpec change implementation (e.g., via `openspec-apply`), update the project documentation to reflect the new or modified capability. Review each file below and update only those affected by the change:
+
+| File | Update when... |
+|------|---------------|
+| `Documentos/epicas.md` | Epic scope, user story list, or story counts changed |
+| `Documentos/Historias/HU-EP[X]-[NNN].md` | A new user story is needed for the capability |
+| `Documentos/modelo-de-datos.md` | Entity fields, relationships, or indexes changed |
+| `Documentos/modelo-c4.md` | New components, containers, or integration points added |
+| `Documentos/arquitectura.md` | Architectural patterns, layers, or cross-cutting concerns changed |
+| `Documentos/Guias/*.md` | User-facing flows, validations, or FAQ entries affected |
+
 ---
 
 ## Domain Context

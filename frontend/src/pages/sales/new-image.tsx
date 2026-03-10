@@ -16,6 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { getImageUrl } from '@/lib/image-url';
 
 import { useAuth } from '@/providers/auth-provider';
+import { useCart } from '@/providers/cart-provider';
 import { imageRecognitionInferenceService } from '@/services/image-recognition.service';
 import { ROUTES } from '@/routing/routes';
 import type { ProductSuggestion } from '@/types/sales.types';
@@ -23,6 +24,7 @@ import type { ProductSuggestion } from '@/types/sales.types';
 export function ImageRecognitionSalesPage() {
   const navigate = useNavigate();
   useAuth();
+  const { lineCount } = useCart();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,18 +305,28 @@ export function ImageRecognitionSalesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to={ROUTES.SALES.ROOT}>
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reconocimiento de Imagen</h1>
-          <p className="text-muted-foreground">
-            Toma una foto del producto para identificarlo
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to={ROUTES.SALES.ROOT}>
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Reconocimiento de Imagen</h1>
+            <p className="text-muted-foreground">
+              Toma una foto del producto para identificarlo
+            </p>
+          </div>
         </div>
+        {lineCount > 0 && (
+          <Button variant="outline" size="sm" asChild>
+            <Link to={ROUTES.SALES.CART}>
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              Ver carrito ({lineCount})
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Camera / Photo Capture */}

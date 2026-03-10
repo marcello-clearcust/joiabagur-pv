@@ -7,6 +7,8 @@ import apiClient from './api.service';
 import type {
   CreateSaleRequest,
   CreateSaleResponse,
+  CreateBulkSalesRequest,
+  CreateBulkSalesResponse,
   Sale,
   SalesHistoryFilterRequest,
   SalesHistoryResponse,
@@ -64,6 +66,25 @@ export const salesService = {
    */
   getSalePhotoUrl: (saleId: string): string => {
     return `${apiClient.defaults.baseURL}${SALES_ENDPOINT}/${saleId}/photo/file`;
+  },
+
+  /**
+   * Creates bulk sales from cart lines.
+   */
+  createBulkSales: async (
+    request: CreateBulkSalesRequest,
+    idempotencyKey?: string,
+  ): Promise<CreateBulkSalesResponse> => {
+    const headers: Record<string, string> = {};
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+    const response = await apiClient.post<CreateBulkSalesResponse>(
+      `${SALES_ENDPOINT}/bulk`,
+      request,
+      { headers },
+    );
+    return response.data;
   },
 };
 

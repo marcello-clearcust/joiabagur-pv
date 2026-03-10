@@ -1,4 +1,5 @@
 using FluentValidation;
+using JoiabagurPV.API.Infrastructure;
 using JoiabagurPV.Application.DTOs.Sales;
 using JoiabagurPV.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,7 @@ public class SalesController : ControllerBase
     private readonly IImageCompressionService _imageCompressionService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IValidator<CreateSaleRequest> _createValidator;
+    private readonly IValidator<CreateBulkSalesRequest> _createBulkValidator;
     private readonly ILogger<SalesController> _logger;
 
     public SalesController(
@@ -25,12 +27,14 @@ public class SalesController : ControllerBase
         IImageCompressionService imageCompressionService,
         ICurrentUserService currentUserService,
         IValidator<CreateSaleRequest> createValidator,
+        IValidator<CreateBulkSalesRequest> createBulkValidator,
         ILogger<SalesController> logger)
     {
         _salesService = salesService;
         _imageCompressionService = imageCompressionService;
         _currentUserService = currentUserService;
         _createValidator = createValidator;
+        _createBulkValidator = createBulkValidator;
         _logger = logger;
     }
 
@@ -109,6 +113,96 @@ public class SalesController : ControllerBase
         };
 
         return CreatedAtAction(nameof(GetSaleById), new { id = result.Sale!.Id }, response);
+    }
+
+    /// <summary>
+    /// Creates multiple sales atomically in a single transaction.
+    /// Supports an optional Idempotency-Key header to prevent duplicate submissions.
+    /// </summary>
+    [HttpPost("bulk")]
+    [ProducesResponseType(typeof(CreateBulkSalesResult), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CreateBulkSalesResult>> CreateBulkSales(
+        [FromBody] CreateBulkSalesRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey)
+    {
+        var validationResult = await _createBulkValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(new { errors = validationResult.Errors.Select(e => e.ErrorMessage) });
+        }
+
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Unauthorized(new { message = "User not authenticated." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var (exists, previousResult) = IdempotencyStore.TryGet(idempotencyKey);
+            if (exists)
+            {
+                if (previousResult != null)
+                {
+                    return Ok(previousResult);
+                }
+                return Conflict(new { message = "A request with this idempotency key is already being processed." });
+            }
+            IdempotencyStore.Reserve(idempotencyKey);
+        }
+
+        foreach (var line in request.Lines)
+        {
+            if (!string.IsNullOrEmpty(line.PhotoBase64))
+            {
+                try
+                {
+                    var photoBytes = Convert.FromBase64String(line.PhotoBase64);
+                    var (isValid, errorMessage) = await _imageCompressionService.ValidateImageAsync(photoBytes);
+                    if (!isValid)
+                    {
+                        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+                            IdempotencyStore.Remove(idempotencyKey);
+                        return BadRequest(new { message = errorMessage });
+                    }
+                    var compressedBytes = await _imageCompressionService.CompressImageAsync(photoBytes);
+                    line.PhotoBase64 = Convert.ToBase64String(compressedBytes);
+                }
+                catch (ArgumentException ex)
+                {
+                    if (!string.IsNullOrWhiteSpace(idempotencyKey))
+                        IdempotencyStore.Remove(idempotencyKey);
+                    return BadRequest(new { message = ex.Message });
+                }
+                catch (Exception ex)
+                {
+                    if (!string.IsNullOrWhiteSpace(idempotencyKey))
+                        IdempotencyStore.Remove(idempotencyKey);
+                    _logger.LogError(ex, "Failed to process bulk sale photo");
+                    return BadRequest(new { message = "Failed to process photo. Please try again." });
+                }
+            }
+        }
+
+        var userId = _currentUserService.UserId.Value;
+        var result = await _salesService.CreateBulkSalesAsync(request, userId, _currentUserService.IsAdmin);
+
+        if (!result.Success)
+        {
+            if (!string.IsNullOrWhiteSpace(idempotencyKey))
+            {
+                IdempotencyStore.Remove(idempotencyKey);
+            }
+            return BadRequest(new { message = result.ErrorMessage });
+        }
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            IdempotencyStore.Store(idempotencyKey, result);
+        }
+
+        return CreatedAtAction(nameof(GetSaleById), new { id = result.Sales.FirstOrDefault()?.Id }, result);
     }
 
     /// <summary>

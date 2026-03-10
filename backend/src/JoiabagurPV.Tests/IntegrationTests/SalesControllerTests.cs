@@ -64,6 +64,7 @@ public class SalesControllerTests : IAsyncLifetime
             .WithCode("TEST-POS")
             .WithName("Test Point of Sale")
             .WithAddress("Test Address")
+            .WithPhone("600123456")
             .CreateAsync();
 
         // Use pre-seeded CASH payment method instead of creating a duplicate
@@ -817,6 +818,280 @@ public class SalesControllerTests : IAsyncLifetime
         sale!.PriceWasOverridden.Should().BeTrue();
         sale.OriginalProductPrice.Should().Be(100.00m);
         sale.Price.Should().Be(50.00m);
+    }
+
+    #endregion
+
+    #region Bulk Sales Tests
+
+    [Fact]
+    public async Task CreateBulkSales_ValidRequest_CreatesAllSalesAtomically()
+    {
+        // Arrange
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = _testProduct.Id, Quantity = 1 },
+                new() { ProductId = _testProduct.Id, Quantity = 1 },
+                new() { ProductId = _testProduct.Id, Quantity = 1 }
+            }
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales/bulk", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var result = await response.Content.ReadFromJsonAsync<CreateBulkSalesResult>();
+        result.Should().NotBeNull();
+        result!.BulkOperationId.Should().NotBeNull().And.NotBe(Guid.Empty);
+        result.Sales.Should().HaveCount(3);
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sales = await context.Sales
+            .Where(s => s.BulkOperationId == result.BulkOperationId)
+            .ToListAsync();
+        sales.Should().HaveCount(3);
+
+        var inventory = await context.Inventories
+            .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
+        inventory.Quantity.Should().Be(7); // 10 - 3
+    }
+
+    [Fact]
+    public async Task CreateBulkSales_InsufficientStock_RollsBackAllLines()
+    {
+        // Arrange - total 13 > 10 available
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = _testProduct.Id, Quantity = 8 },
+                new() { ProductId = _testProduct.Id, Quantity = 5 }
+            }
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales/bulk", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sales = await context.Sales.ToListAsync();
+        sales.Should().BeEmpty("all lines should have been rolled back");
+
+        var inventory = await context.Inventories
+            .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
+        inventory.Quantity.Should().Be(10, "inventory should remain unchanged after rollback");
+    }
+
+    [Fact]
+    public async Task CreateBulkSales_EmptyLines_ReturnsBadRequest()
+    {
+        // Arrange
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Lines = new List<BulkSaleLineRequest>()
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales/bulk", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateBulkSales_Unauthenticated_ReturnsUnauthorized()
+    {
+        // Arrange
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = _testProduct.Id, Quantity = 1 }
+            }
+        };
+
+        // Act - use a fresh client with no cookies to simulate unauthenticated access
+        var unauthClient = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            HandleCookies = false
+        });
+        var response = await unauthClient.PostAsJsonAsync("/api/sales/bulk", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task CreateBulkSales_OperatorNotAssignedToPOS_ReturnsBadRequest()
+    {
+        // Arrange - Create another POS without assigning operator
+        using var mother = new TestDataMother(_factory.Services);
+        var otherPos = await mother.PointOfSale()
+            .WithCode("BULK-OTHER-POS")
+            .WithName("Other Bulk POS")
+            .WithAddress("Other Address")
+            .WithPhone("600987654")
+            .CreateAsync();
+
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = otherPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = _testProduct.Id, Quantity = 1 }
+            }
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales/bulk", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateBulkSales_GlobalNote_PropagatedToAllSales()
+    {
+        // Arrange
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Notes = "Bulk sale note",
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = _testProduct.Id, Quantity = 1 },
+                new() { ProductId = _testProduct.Id, Quantity = 1 }
+            }
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales/bulk", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sales = await context.Sales.ToListAsync();
+        sales.Should().HaveCount(2);
+        sales.Should().AllSatisfy(s => s.Notes.Should().Be("Bulk sale note"));
+    }
+
+    [Fact]
+    public async Task CreateBulkSales_WithIdempotencyKey_PreventsDuplicate()
+    {
+        // Arrange
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = _testProduct.Id, Quantity = 1 },
+                new() { ProductId = _testProduct.Id, Quantity = 1 }
+            }
+        };
+
+        // Act - First request
+        var firstMessage = new HttpRequestMessage(HttpMethod.Post, "/api/sales/bulk");
+        firstMessage.Content = JsonContent.Create(request);
+        firstMessage.Headers.Add("Idempotency-Key", "test-key-123");
+        var firstResponse = await _operatorClient!.SendAsync(firstMessage);
+
+        // Act - Second request with same idempotency key
+        var secondMessage = new HttpRequestMessage(HttpMethod.Post, "/api/sales/bulk");
+        secondMessage.Content = JsonContent.Create(request);
+        secondMessage.Headers.Add("Idempotency-Key", "test-key-123");
+        var secondResponse = await _operatorClient!.SendAsync(secondMessage);
+
+        // Assert
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var sales = await context.Sales.ToListAsync();
+        sales.Should().HaveCount(2, "only the first request should create sales");
+    }
+
+    [Fact]
+    public async Task CreateBulkSales_WithMultipleProducts_CreatesCorrectInventoryMovements()
+    {
+        // Arrange - Create a second product with its own inventory
+        using var mother = new TestDataMother(_factory.Services);
+        var secondProduct = await mother.Product()
+            .WithSku("TEST-SKU-002")
+            .WithName("Second Product")
+            .WithDescription("Second product for bulk sales")
+            .WithPrice(50.00m)
+            .CreateAsync();
+
+        await mother.Inventory()
+            .WithProduct(secondProduct.Id)
+            .WithPointOfSale(_testPos.Id)
+            .WithQuantity(20)
+            .CreateAsync();
+
+        var request = new CreateBulkSalesRequest
+        {
+            PointOfSaleId = _testPos.Id,
+            PaymentMethodId = _testPaymentMethod.Id,
+            Lines = new List<BulkSaleLineRequest>
+            {
+                new() { ProductId = _testProduct.Id, Quantity = 2 },
+                new() { ProductId = secondProduct.Id, Quantity = 3 }
+            }
+        };
+
+        // Act
+        var response = await _operatorClient!.PostAsJsonAsync("/api/sales/bulk", request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var result = await response.Content.ReadFromJsonAsync<CreateBulkSalesResult>();
+        result.Should().NotBeNull();
+        result!.Sales.Should().HaveCount(2);
+
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var firstInventory = await context.Inventories
+            .FirstAsync(i => i.ProductId == _testProduct.Id && i.PointOfSaleId == _testPos.Id);
+        firstInventory.Quantity.Should().Be(8); // 10 - 2
+
+        var secondInventory = await context.Inventories
+            .FirstAsync(i => i.ProductId == secondProduct.Id && i.PointOfSaleId == _testPos.Id);
+        secondInventory.Quantity.Should().Be(17); // 20 - 3
+
+        var sales = await context.Sales
+            .Where(s => s.BulkOperationId == result.BulkOperationId)
+            .ToListAsync();
+        sales.Should().HaveCount(2);
+        sales.Select(s => s.BulkOperationId).Distinct().Should().HaveCount(1,
+            "all sales should share the same BulkOperationId");
     }
 
     #endregion

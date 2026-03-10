@@ -7,9 +7,13 @@ import { Camera, PenLine, History, ShoppingCart } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useCart } from '@/providers/cart-provider';
 import { ROUTES } from '@/routing/routes';
 
 export function SalesPage() {
+  const { lineCount } = useCart();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -20,12 +24,25 @@ export function SalesPage() {
             Registra ventas en punto de venta
           </p>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link to={ROUTES.SALES.HISTORY}>
-            <History className="mr-2 h-4 w-4" />
-            Historial
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          {lineCount > 0 && (
+            <Button variant="default" size="sm" asChild>
+              <Link to={ROUTES.SALES.CART}>
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Carrito
+                <Badge variant="secondary" className="ml-2">
+                  {lineCount}
+                </Badge>
+              </Link>
+            </Button>
+          )}
+          <Button variant="outline" size="sm" asChild>
+            <Link to={ROUTES.SALES.HISTORY}>
+              <History className="mr-2 h-4 w-4" />
+              Historial
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Registration Options */}

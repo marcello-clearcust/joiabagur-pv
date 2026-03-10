@@ -194,3 +194,66 @@ export interface ProductSuggestion {
   confidence: number;
   photoUrl: string;
 }
+
+/**
+ * A line item in the sales cart.
+ */
+export interface CartLine {
+  id: string;
+  productId: string;
+  productSku: string;
+  productName: string;
+  productPrice: number;
+  quantity: number;
+  price?: number;
+  pointOfSaleId: string;
+  pointOfSaleName: string;
+  paymentMethodId: string;
+  paymentMethodName: string;
+  photoBase64?: string;
+  photoFileName?: string;
+  addedAt: string;
+}
+
+/**
+ * Request to create bulk sales.
+ */
+export interface CreateBulkSalesRequest {
+  pointOfSaleId: string;
+  paymentMethodId: string;
+  notes?: string;
+  lines: BulkSaleLineRequest[];
+}
+
+/**
+ * Individual line in a bulk sale request.
+ */
+export interface BulkSaleLineRequest {
+  productId: string;
+  quantity: number;
+  price?: number;
+  photoBase64?: string;
+  photoFileName?: string;
+}
+
+/**
+ * Response from bulk sale creation.
+ */
+export interface CreateBulkSalesResponse {
+  success: boolean;
+  bulkOperationId?: string;
+  sales: Sale[];
+  errorMessage?: string;
+  warnings: BulkSaleLineWarning[];
+}
+
+/**
+ * Warning for a specific line in bulk sale.
+ */
+export interface BulkSaleLineWarning {
+  lineIndex: number;
+  productName: string;
+  message: string;
+  isLowStock: boolean;
+  remainingStock: number;
+}

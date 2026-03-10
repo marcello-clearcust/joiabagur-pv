@@ -443,6 +443,197 @@ public class SalesService : ISalesService
         return (result.Value.Stream, result.Value.ContentType, photo.FileName);
     }
 
+    /// <inheritdoc/>
+    public async Task<CreateBulkSalesResult> CreateBulkSalesAsync(CreateBulkSalesRequest request, Guid userId, bool isAdmin)
+    {
+        try
+        {
+            if (request.Lines.Count == 0)
+            {
+                return new CreateBulkSalesResult { Success = false, ErrorMessage = "At least one sale line is required." };
+            }
+
+            if (!isAdmin)
+            {
+                var isAssigned = await _userPointOfSaleRepository
+                    .GetAll()
+                    .AnyAsync(ups => ups.UserId == userId &&
+                                    ups.PointOfSaleId == request.PointOfSaleId &&
+                                    ups.IsActive);
+                if (!isAssigned)
+                {
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = "Operator is not assigned to this point of sale." };
+                }
+            }
+
+            var pointOfSale = await _pointOfSaleRepository.GetByIdAsync(request.PointOfSaleId);
+            if (pointOfSale == null)
+            {
+                return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Point of sale with ID {request.PointOfSaleId} not found." };
+            }
+
+            try
+            {
+                await _paymentMethodValidationService.ValidatePaymentMethodAsync(request.PaymentMethodId, request.PointOfSaleId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return new CreateBulkSalesResult { Success = false, ErrorMessage = ex.Message };
+            }
+
+            var products = new Dictionary<Guid, Product>();
+            for (int i = 0; i < request.Lines.Count; i++)
+            {
+                var line = request.Lines[i];
+
+                var product = await _productRepository.GetByIdAsync(line.ProductId);
+                if (product == null)
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Product with ID {line.ProductId} not found." };
+                if (!product.IsActive)
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Product '{product.Name}' is not active." };
+                if (line.Price.HasValue && !pointOfSale.AllowManualPriceEdit)
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Manual price editing is not allowed for this point of sale." };
+
+                if (line.Quantity <= 0)
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Quantity must be greater than zero." };
+
+                products[line.ProductId] = product;
+
+                var stockValidation = await _stockValidationService.ValidateStockAvailabilityAsync(line.ProductId, request.PointOfSaleId, line.Quantity);
+                if (!stockValidation.IsValid)
+                    return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: {stockValidation.ErrorMessage ?? "Insufficient stock."}" };
+            }
+
+            var bulkOperationId = Guid.NewGuid();
+            var createdSales = new List<SaleDto>();
+            var warnings = new List<BulkSaleLineWarning>();
+
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                for (int i = 0; i < request.Lines.Count; i++)
+                {
+                    var line = request.Lines[i];
+                    var product = products[line.ProductId];
+
+                    var finalStockValidation = await _stockValidationService.ValidateStockAvailabilityAsync(line.ProductId, request.PointOfSaleId, line.Quantity);
+                    if (!finalStockValidation.IsValid)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: Stock changed. Available: {finalStockValidation.AvailableQuantity}, Requested: {line.Quantity}" };
+                    }
+
+                    var officialPrice = product.Price;
+                    decimal effectivePrice;
+                    bool priceWasOverridden;
+                    decimal? originalProductPrice;
+
+                    if (pointOfSale.AllowManualPriceEdit && line.Price.HasValue && line.Price.Value != officialPrice)
+                    {
+                        effectivePrice = line.Price.Value;
+                        priceWasOverridden = true;
+                        originalProductPrice = officialPrice;
+                    }
+                    else
+                    {
+                        effectivePrice = officialPrice;
+                        priceWasOverridden = false;
+                        originalProductPrice = null;
+                    }
+
+                    var sale = new Sale
+                    {
+                        ProductId = line.ProductId,
+                        PointOfSaleId = request.PointOfSaleId,
+                        UserId = userId,
+                        PaymentMethodId = request.PaymentMethodId,
+                        Price = effectivePrice,
+                        Quantity = line.Quantity,
+                        PriceWasOverridden = priceWasOverridden,
+                        OriginalProductPrice = originalProductPrice,
+                        Notes = request.Notes,
+                        BulkOperationId = bulkOperationId,
+                        SaleDate = DateTime.UtcNow
+                    };
+
+                    sale = await _saleRepository.AddAsync(sale);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    if (!string.IsNullOrEmpty(line.PhotoBase64))
+                    {
+                        try
+                        {
+                            var photoBytes = Convert.FromBase64String(line.PhotoBase64);
+                            var fileName = $"sale_{sale.Id}_{DateTime.UtcNow:yyyyMMddHHmmss}.jpg";
+                            using var photoStream = new MemoryStream(photoBytes);
+                            var storedFileName = await _fileStorageService.UploadAsync(photoStream, fileName, "image/jpeg", $"sales/{sale.Id}");
+
+                            var salePhoto = new SalePhoto
+                            {
+                                SaleId = sale.Id,
+                                FilePath = storedFileName,
+                                FileName = line.PhotoFileName ?? fileName,
+                                FileSize = photoBytes.Length,
+                                MimeType = "image/jpeg"
+                            };
+                            await _salePhotoRepository.AddAsync(salePhoto);
+                            await _unitOfWork.SaveChangesAsync();
+                        }
+                        catch (Exception)
+                        {
+                            // Photo save failed but don't fail the entire bulk operation
+                        }
+                    }
+
+                    var movementResult = await _inventoryService.CreateSaleMovementAsync(line.ProductId, request.PointOfSaleId, sale.Id, line.Quantity, userId);
+                    if (!movementResult.Success)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return new CreateBulkSalesResult { Success = false, ErrorMessage = $"Line {i + 1}: {movementResult.ErrorMessage ?? "Failed to create inventory movement."}" };
+                    }
+
+                    var saleWithDetails = await _saleRepository.GetByIdWithDetailsAsync(sale.Id);
+                    createdSales.Add(MapToDto(saleWithDetails!));
+
+                    if (finalStockValidation.IsLowStock)
+                    {
+                        warnings.Add(new BulkSaleLineWarning
+                        {
+                            LineIndex = i,
+                            ProductName = product.Name,
+                            Message = finalStockValidation.WarningMessage ?? "Low stock",
+                            IsLowStock = true,
+                            RemainingStock = movementResult.QuantityAfter
+                        });
+                    }
+                }
+
+                await _unitOfWork.CommitTransactionAsync();
+
+                return new CreateBulkSalesResult
+                {
+                    Success = true,
+                    BulkOperationId = bulkOperationId,
+                    Sales = createdSales,
+                    Warnings = warnings
+                };
+            }
+            catch (Exception)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            return new CreateBulkSalesResult
+            {
+                Success = false,
+                ErrorMessage = $"An error occurred during bulk sale creation: {ex.Message}"
+            };
+        }
+    }
+
     /// <summary>
     /// Maps a Sale entity to a SaleDto.
     /// </summary>

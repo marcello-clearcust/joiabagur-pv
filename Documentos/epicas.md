@@ -77,9 +77,12 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 - Validación de método de pago asignado al punto de venta
 - Registro de usuario operador que realiza la venta
 - Edición manual de precio de venta cuando el punto de venta lo permite, con trazabilidad de precios modificados
+- Carrito de ventas con persistencia local y checkout masivo atómico (`POST /api/sales/bulk`)
+- Agrupación de ventas creadas en checkout masivo mediante `BulkOperationId`
+- Prevención de envíos duplicados mediante clave de idempotencia
 
 **Entidades del modelo de datos relacionadas:**
-- `Sale` (venta con precio snapshot, cantidad, método de pago, fecha, indicador de precio modificado)
+- `Sale` (venta con precio snapshot, cantidad, método de pago, fecha, indicador de precio modificado, `BulkOperationId` opcional)
 - `SalePhoto` (foto opcional asociada a la venta)
 - `InventoryMovement` (movimiento automático generado por la venta)
 - `PaymentMethod` y `PointOfSalePaymentMethod` (validación de métodos disponibles)
@@ -89,6 +92,7 @@ Permite registrar ventas en los puntos de venta, con actualización automática 
 - [HU-EP3-001: Registrar venta con reconocimiento de imagen](Historias/HU-EP3-001.md) *(incluye validación de stock y selección de método de pago)*
 - [HU-EP3-002: Registrar venta manual (sin foto)](Historias/HU-EP3-002.md) *(incluye validación de stock y selección de método de pago)*
 - [HU-EP3-003: Registrar venta con precio manual modificado](Historias/HU-EP3-003.md) *(edición de precio cuando el POS lo permite, auditoría de precios modificados)*
+- [HU-EP3-004: Carrito de ventas y checkout masivo](Historias/HU-EP3-004.md) *(carrito persistente, checkout atómico multi-línea, idempotencia)*
 
 ---
 
@@ -326,7 +330,7 @@ Permite gestionar los componentes que constituyen las joyas (materiales, mano de
 |-------|-------------------|------------------------|
 | **EP1** | Gestión de Productos | 7 |
 | **EP2** | Gestión de Inventario | 6 |
-| **EP3** | Registro de Ventas | 3 |
+| **EP3** | Registro de Ventas | 4 |
 | **EP4** | Reconocimiento de Imágenes con IA | 1 |
 | **EP5** | Gestión de Devoluciones | 3 |
 | **EP6** | Gestión de Métodos de Pago | 3 |
@@ -334,7 +338,7 @@ Permite gestionar los componentes que constituyen las joyas (materiales, mano de
 | **EP8** | Gestión de Puntos de Venta | 5 |
 | **EP9** | Consultas y Reportes | 4 |
 | **EP10** | Gestión de Componentes de Joyas | 8 |
-| **TOTAL** | | **46** |
+| **TOTAL** | | **47** |
 
 ---
 

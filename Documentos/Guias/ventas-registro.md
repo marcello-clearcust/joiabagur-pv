@@ -2,12 +2,13 @@
 
 ## Descripción General
 
-El sistema ofrece dos métodos para registrar ventas:
+El sistema ofrece tres métodos para registrar ventas:
 
 1. **Registro Manual**: Selección directa de productos por SKU o nombre
 2. **Reconocimiento de Imágenes con IA**: Captura de foto del producto para identificación automática
+3. **Carrito de Ventas**: Composición de múltiples productos con checkout masivo atómico
 
-Ambos métodos comparten el mismo flujo de validación y confirmación.
+Los métodos individuales (1 y 2) comparten el mismo flujo de validación y confirmación. Desde el registro manual se puede añadir productos al carrito para luego confirmarlos todos juntos.
 
 ---
 
@@ -127,6 +128,71 @@ Esta advertencia es informativa y no bloquea la operación.
 
 ---
 
+## Carrito de Ventas y Checkout Masivo
+
+### Descripción
+
+El carrito permite componer una lista de productos para registrar múltiples ventas en una sola operación atómica. Todas las líneas comparten el mismo punto de venta y método de pago, y se envían al backend como una única transacción: si alguna línea falla, ninguna se registra.
+
+### Acceso
+- Desde **Ventas** → **Carrito** (visible cuando hay líneas en el carrito) o directamente en `/sales/cart`
+- El botón de carrito con badge de cantidad aparece en `/sales`, `/sales/new` y `/sales/new/image`
+
+### Añadir Productos al Carrito
+
+1. Navegue a **Ventas** → **Nueva Venta** (`/sales/new`)
+2. Seleccione el producto, cantidad, punto de venta y método de pago como de costumbre
+3. Pulse **"Añadir al carrito"** en lugar de confirmar la venta directamente
+4. El producto se añade al carrito y puede seguir añadiendo más productos
+5. El carrito muestra un badge con el número de líneas en la cabecera
+
+> **Nota:** Si añade una línea con un punto de venta o método de pago diferente al de las líneas existentes, el carrito se vacía y comienza con la nueva configuración. Se muestra un aviso al operador.
+
+### Gestión del Carrito
+
+En la página del carrito (`/sales/cart`) puede:
+
+- **Ver** todas las líneas añadidas con producto, cantidad y precio
+- **Eliminar** líneas individuales que no procedan
+- **Ver el resumen** con total, punto de venta y método de pago
+- **Vaciar** el carrito completo
+
+### Checkout Masivo
+
+1. Revise las líneas en el carrito
+2. Opcionalmente, introduzca una **nota global** que se aplicará a todas las ventas
+3. El sistema **revalida el stock** de cada producto antes de habilitar el botón de checkout
+4. Pulse **"Confirmar checkout"**
+5. Se muestra un diálogo de confirmación con el resumen completo
+6. Al confirmar, todas las ventas se crean atómicamente
+
+### Persistencia y Caducidad
+
+| Característica | Valor |
+|----------------|-------|
+| Almacenamiento | `localStorage` del navegador |
+| Caducidad (TTL) | 10 horas de inactividad |
+| Renovación | Se renueva con cada interacción (añadir, eliminar) |
+| Supervivencia | Persiste al recargar la página y cerrar/abrir el navegador |
+
+### Comportamiento Transaccional
+
+- **Todo o nada:** Si cualquier línea falla la validación de stock dentro de la transacción, todas las ventas se revierten
+- **Idempotencia:** El frontend envía un header `Idempotency-Key` para prevenir duplicados en caso de reintentos por fallos de red
+- **Agrupación:** Todas las ventas creadas comparten un `BulkOperationId` para trazabilidad en el historial
+
+### Validaciones
+
+| Validación | Mensaje de Error |
+|------------|------------------|
+| Carrito vacío | "Debe añadir al menos una línea" |
+| Stock insuficiente (pre-checkout) | Botón de checkout deshabilitado, stock en rojo |
+| Stock insuficiente (en transacción) | "Línea X: Stock cambió. Disponible: N, Solicitado: M" |
+| Operador no asignado al POS | "Operator is not assigned to this point of sale" |
+| POS o método de pago diferente | El carrito se vacía y se inicia con la nueva configuración |
+
+---
+
 ## Historial de Ventas
 
 ### Acceso
@@ -192,6 +258,15 @@ El sistema usa doble validación de stock:
 
 Si el stock cambia entre ambas validaciones, se muestra el error:
 > "Stock cambió. Disponible: X, Solicitado: Y"
+
+### ¿Qué pasa si cierro el navegador con productos en el carrito?
+El carrito se almacena en `localStorage` y persiste al cerrar y reabrir el navegador. Caduca automáticamente tras 10 horas sin actividad.
+
+### ¿Qué pasa si el stock cambia mientras tengo productos en el carrito?
+Al abrir la página del carrito, el sistema revalida el stock de todos los productos. Si alguno no tiene stock suficiente, el botón de checkout se deshabilita y se muestra el stock en rojo. Además, el backend realiza una segunda validación dentro de la transacción para prevenir carreras de concurrencia.
+
+### ¿Puedo mezclar diferentes puntos de venta en el carrito?
+No. Todas las líneas deben pertenecer al mismo punto de venta y método de pago. Si añade una línea con un POS o método diferente, el carrito se vacía y comienza con la nueva configuración.
 
 ### ¿Cómo mejoro la precisión del reconocimiento de imágenes?
 - Capture fotos con buena iluminación

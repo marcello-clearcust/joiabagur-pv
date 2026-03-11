@@ -56,6 +56,10 @@ public static class ServiceCollectionExtensions
         // Register returns management services
         services.AddScoped<IReturnService, ReturnService>();
 
+        // Register dashboard services
+        services.AddMemoryCache();
+        services.AddScoped<IDashboardService, DashboardService>();
+
         // Register component management services (EP10)
         services.AddScoped<IProductComponentService, ProductComponentService>();
         services.AddScoped<IComponentAssignmentService, ComponentAssignmentService>();

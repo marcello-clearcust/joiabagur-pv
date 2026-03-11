@@ -334,6 +334,7 @@ public class AuthenticationServiceTests
         result.LastName.Should().Be(user.LastName);
         result.Email.Should().Be(user.Email);
         result.Role.Should().Be(user.Role.ToString());
+        result.AssignedPointOfSales.Should().NotBeNull().And.BeEmpty();
     }
 
     [Fact]
@@ -341,12 +342,16 @@ public class AuthenticationServiceTests
     {
         // Arrange
         var user = TestDataGenerator.CreateUser(UserRole.Operator, isActive: true);
-        var assignedPosIds = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
+        var pos1 = new PointOfSale { Id = Guid.NewGuid(), Name = "Tienda 1", Code = "T1" };
+        var pos2 = new PointOfSale { Id = Guid.NewGuid(), Name = "Tienda 2", Code = "T2" };
+        user.PointOfSaleAssignments = new List<UserPointOfSale>
+        {
+            new() { PointOfSaleId = pos1.Id, PointOfSale = pos1, IsActive = true, AssignedAt = DateTime.UtcNow },
+            new() { PointOfSaleId = pos2.Id, PointOfSale = pos2, IsActive = true, AssignedAt = DateTime.UtcNow },
+        };
 
         _userRepositoryMock.Setup(x => x.GetWithAssignmentsAsync(user.Id))
             .ReturnsAsync(user);
-        _userPointOfSaleRepositoryMock.Setup(x => x.GetAssignedPointOfSaleIdsAsync(user.Id))
-            .ReturnsAsync(assignedPosIds);
 
         // Act
         var result = await _sut.GetCurrentUserAsync(user.Id);
@@ -354,6 +359,29 @@ public class AuthenticationServiceTests
         // Assert
         result.AssignedPointOfSales.Should().NotBeNull();
         result.AssignedPointOfSales.Should().HaveCount(2);
+        result.AssignedPointOfSales[0].PointOfSaleId.Should().Be(pos1.Id);
+        result.AssignedPointOfSales[0].Name.Should().Be("Tienda 1");
+        result.AssignedPointOfSales[0].IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetCurrentUserAsync_WithAdministratorRole_ShouldReturnEmptyAssignedPointOfSalesEvenWhenAssignmentsExist()
+    {
+        // Arrange: Administrator with assignments (e.g. legacy data) must still get empty list
+        var user = TestDataGenerator.CreateUser(UserRole.Administrator, isActive: true);
+        var pos1 = new PointOfSale { Id = Guid.NewGuid(), Name = "Tienda 1", Code = "T1" };
+        user.PointOfSaleAssignments = new List<UserPointOfSale>
+        {
+            new() { PointOfSaleId = pos1.Id, PointOfSale = pos1, IsActive = true, AssignedAt = DateTime.UtcNow },
+        };
+        _userRepositoryMock.Setup(x => x.GetWithAssignmentsAsync(user.Id))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _sut.GetCurrentUserAsync(user.Id);
+
+        // Assert
+        result.AssignedPointOfSales.Should().NotBeNull().And.BeEmpty();
     }
 
     [Fact]

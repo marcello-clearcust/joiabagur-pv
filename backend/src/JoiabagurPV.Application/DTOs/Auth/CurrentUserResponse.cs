@@ -49,7 +49,7 @@ public class AssignedPointOfSaleDto
     /// <summary>
     /// The point of sale ID.
     /// </summary>
-    public Guid Id { get; set; }
+    public Guid PointOfSaleId { get; set; }
 
     /// <summary>
     /// The point of sale name.
@@ -60,4 +60,14 @@ public class AssignedPointOfSaleDto
     /// The point of sale code.
     /// </summary>
     public required string Code { get; set; }
+
+    /// <summary>
+    /// Whether this assignment is currently active.
+    /// </summary>
+    public bool IsActive { get; set; }
+
+    /// <summary>
+    /// When the user was assigned to this point of sale.
+    /// </summary>
+    public DateTime AssignedAt { get; set; }
 }

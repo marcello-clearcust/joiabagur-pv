@@ -10,6 +10,7 @@ public class DashboardService : IDashboardService
 {
     private readonly ISaleRepository _saleRepository;
     private readonly IReturnRepository _returnRepository;
+    private readonly IInventoryRepository _inventoryRepository;
     private readonly IUserPointOfSaleRepository _userPointOfSaleRepository;
     private readonly IMemoryCache _cache;
 
@@ -20,11 +21,13 @@ public class DashboardService : IDashboardService
     public DashboardService(
         ISaleRepository saleRepository,
         IReturnRepository returnRepository,
+        IInventoryRepository inventoryRepository,
         IUserPointOfSaleRepository userPointOfSaleRepository,
         IMemoryCache cache)
     {
         _saleRepository = saleRepository ?? throw new ArgumentNullException(nameof(saleRepository));
         _returnRepository = returnRepository ?? throw new ArgumentNullException(nameof(returnRepository));
+        _inventoryRepository = inventoryRepository ?? throw new ArgumentNullException(nameof(inventoryRepository));
         _userPointOfSaleRepository = userPointOfSaleRepository ?? throw new ArgumentNullException(nameof(userPointOfSaleRepository));
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
     }
@@ -181,5 +184,38 @@ public class DashboardService : IDashboardService
         });
 
         return result;
+    }
+
+    public async Task<PaginatedLowStockResult> GetLowStockAsync(int page, int pageSize, int maxQuantity = 2)
+    {
+        var query = _inventoryRepository.GetAll()
+            .Include(i => i.Product)
+            .Include(i => i.PointOfSale)
+            .Where(i => i.IsActive && i.Quantity <= maxQuantity)
+            .OrderBy(i => i.Quantity)
+            .ThenBy(i => i.Product.Name);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(i => new LowStockItemDto
+            {
+                ProductName = i.Product.Name,
+                Sku = i.Product.SKU,
+                PointOfSaleName = i.PointOfSale.Name,
+                Stock = i.Quantity
+            })
+            .ToListAsync();
+
+        return new PaginatedLowStockResult
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+        };
     }
 }

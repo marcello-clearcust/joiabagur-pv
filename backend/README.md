@@ -161,7 +161,7 @@ sequenceDiagram
 - **SameSite strict**: Prevents CSRF attacks
 - **Token rotation**: Refresh tokens are rotated on each use
 - **Token revocation**: Refresh tokens can be revoked immediately
-- **Rate limiting**: Login endpoint is rate-limited (5 attempts per 15 minutes per IP)
+- **Rate limiting**: Login endpoint is rate-limited (30 attempts per 10 minutes per IP)
 
 ## Authorization
 
@@ -406,7 +406,7 @@ Swagger/OpenAPI documentation is available at `/swagger` when running in develop
 
 Login endpoint is rate limited to prevent brute force attacks:
 
-- **Limit**: 5 requests per 15 minutes per IP
+- **Limit**: 30 requests per 10 minutes per IP
 - **Response**: 429 Too Many Requests
 
 ## Database Migrations

@@ -62,9 +62,9 @@ public class RateLimitingTests : IAsyncLifetime
         // Create a fresh client for this test to avoid IP-based rate limit state from other tests
         var testClient = _factory.CreateClient();
 
-        // Act - Make more requests than allowed (limit is 5 per 15 minutes per IP)
+        // Act - Make more requests than allowed (limit is 30 per 10 minutes per IP)
         var responses = new List<HttpResponseMessage>();
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 35; i++)
         {
             var response = await testClient.PostAsJsonAsync("/api/auth/login", invalidRequest);
             responses.Add(response);
@@ -72,7 +72,7 @@ public class RateLimitingTests : IAsyncLifetime
 
         // Assert - Later requests should be rate limited
         var rateLimitedResponses = responses.Where(r => r.StatusCode == HttpStatusCode.TooManyRequests);
-        rateLimitedResponses.Should().NotBeEmpty("Rate limiting should kick in after 5 requests");
+        rateLimitedResponses.Should().NotBeEmpty("Rate limiting should kick in after 30 requests");
     }
 
     [Fact]
@@ -93,12 +93,12 @@ public class RateLimitingTests : IAsyncLifetime
         // Create a fresh client for this test
         var testClient = _factory.CreateClient();
 
-        // Act - Mix of successful and failed logins
-        await testClient.PostAsJsonAsync("/api/auth/login", validRequest);
-        await testClient.PostAsJsonAsync("/api/auth/login", invalidRequest);
-        await testClient.PostAsJsonAsync("/api/auth/login", validRequest);
-        await testClient.PostAsJsonAsync("/api/auth/login", invalidRequest);
-        await testClient.PostAsJsonAsync("/api/auth/login", invalidRequest);
+        // Act - Mix of successful and failed logins (total must exceed 30 to trigger rate limit)
+        for (int i = 0; i < 15; i++)
+        {
+            await testClient.PostAsJsonAsync("/api/auth/login", validRequest);
+            await testClient.PostAsJsonAsync("/api/auth/login", invalidRequest);
+        }
 
         // Make more requests to trigger rate limit
         var responses = new List<HttpResponseMessage>();
@@ -201,9 +201,9 @@ public class RateLimitingTests : IAsyncLifetime
         // Create a fresh client
         var testClient = _factory.CreateClient();
 
-        // Act - Exhaust rate limit
+        // Act - Exhaust rate limit (30 per 10 minutes)
         HttpResponseMessage? rateLimitedResponse = null;
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 35; i++)
         {
             var response = await testClient.PostAsJsonAsync("/api/auth/login", request);
             if (response.StatusCode == HttpStatusCode.TooManyRequests)

@@ -163,6 +163,44 @@ describe('LoginPage', () => {
         expect(screen.getByText(/credenciales incorrectas/i)).toBeInTheDocument();
       });
     });
+
+    it('should show rate limit message when API returns 429', async () => {
+      const rateLimitError = Object.assign(
+        new Error('Too Many Requests'),
+        { isAxiosError: true, response: { status: 429 } }
+      );
+      mockLogin.mockRejectedValueOnce(rateLimitError);
+      const user = userEvent.setup();
+      renderLoginPage();
+
+      await user.type(getUsernameInput(), 'testuser');
+      await user.type(getPasswordInput(), 'password123');
+      await user.click(getSubmitButton());
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/demasiados intentos de acceso.*10 minutos/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('should show backend error message on 401 when provided', async () => {
+      const backendError = Object.assign(new Error('Unauthorized'), {
+        isAxiosError: true,
+        response: { status: 401, data: { error: 'Usuario desactivado' } },
+      });
+      mockLogin.mockRejectedValueOnce(backendError);
+      const user = userEvent.setup();
+      renderLoginPage();
+
+      await user.type(getUsernameInput(), 'testuser');
+      await user.type(getPasswordInput(), 'wrongpassword');
+      await user.click(getSubmitButton());
+
+      await waitFor(() => {
+        expect(screen.getByText('Usuario desactivado')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Password Visibility Toggle', () => {

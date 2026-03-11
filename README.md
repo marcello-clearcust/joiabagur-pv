@@ -1,391 +1,394 @@
 # Sistema de Gestión de Puntos de Venta para Joyería
 
-## Descripción General del Proyecto
+## Índice
 
-Sistema de gestión integral para una joyería que opera en múltiples puntos de venta (propios y de terceros como hoteles y otras tiendas). La aplicación permite gestionar inventario, registrar ventas y facilitar la identificación de productos mediante reconocimiento de imágenes con inteligencia artificial.
-
-### Características Principales
-
-**Gestión de Productos e Inventario:**
-- Catálogo centralizado de productos con información detallada (SKU, precio, descripción, colección)
-- Gestión de stock por punto de venta con vista centralizada
-- Importación y actualización de datos desde archivos Excel
-- Edición manual de productos e inventario desde la plataforma web
-- Asociación de fotos de referencia a cada producto para reconocimiento de imágenes
-
-**Registro de Ventas:** ✅ **IMPLEMENTADO**
-- Captura de ventas por punto de venta (manual o con IA)
-- Asociación automática de fotos a cada transacción
-- Registro de método de pago por cada venta
-- Historial completo de ventas con trazabilidad
-- Validación de stock en tiempo real antes de confirmar venta
-- Actualización automática e inventario en transacción atómica
-- Alertas de stock bajo (no bloqueantes)
-
-**Reconocimiento de Productos con IA:** ✅ **IMPLEMENTADO**
-- **Inferencia client-side** con TensorFlow.js (sin costos de servidor)
-- Identificación de productos mediante cámara móvil en el punto de venta
-- Generación de 3-5 sugerencias ordenadas por confianza (umbral 40%)
-- Validación manual del operador antes de confirmar la venta
-- Fallback automático a entrada manual si confianza baja
-- Reducción de errores en la clasificación de productos vendidos
-
-**Entrenamiento del Modelo de IA:** ✅ **INNOVACIÓN**
-- **Entrenamiento en navegador** usando TensorFlow.js (sin Python)
-- Un clic desde el dashboard de administración
-- Aceleración GPU mediante WebGL 2.0
-- Métricas de salud del modelo con alertas automáticas
-- Progreso en tiempo real (epoch por epoch)
-- Costo: $0 (usa GPU del administrador, no del servidor)
-
-**Gestión de Métodos de Pago:**
-- Lista general de métodos de pago disponibles (Efectivo, Bizum, Transferencia bancaria, Tarjeta TPV propio, Tarjeta TPV punto de venta, PayPal)
-- Asignación de métodos de pago específicos a cada punto de venta
-- Registro de método de pago en cada transacción
-
-**Gestión de Usuarios:**
-- Sistema de roles: Administradores (acceso completo) y Operadores (asociados a puntos de venta específicos)
-- Autenticación mediante usuario y contraseña
-
-**Funcionalidades Adicionales:**
-- Gestión de devoluciones
-- Ajustes manuales de inventario
-- Historial detallado de ventas y movimientos de stock
-
-### Arquitectura Técnica
-
-- **Backend**: .NET 10 con Entity Framework Core, PostgreSQL
-- **Frontend**: React 19 + TypeScript + Vite + TensorFlow.js
-- **Despliegue en AWS** optimizado para free-tier (App Runner, RDS PostgreSQL, S3, CloudFront)
-- **CI/CD automatizado** con GitHub Actions
-- **Machine Learning**: TensorFlow.js con MobileNetV2 (transfer learning)
-- **Entrenamiento**: Browser-based (0 dependencias Python, GPU via WebGL)
-- **Gestión segura de secretos** con AWS Secrets Manager
-- **Backups automáticos** de base de datos con retención de 7 días
-- **Optimizado para móviles** - Cámara, gestos táctiles, inferencia local
-- **Responsive** para administradores en cualquier dispositivo
-- **Testing**: xUnit + Testcontainers (backend), Vitest + React Testing Library (frontend)
-- **Moneda**: Euro (EUR, €) con formato español (es-ES)
+0. [Ficha del proyecto](#0-ficha-del-proyecto)
+1. [Descripción general del producto](#1-descripción-general-del-producto)
+2. [Arquitectura del sistema](#2-arquitectura-del-sistema)
+3. [Modelo de datos](#3-modelo-de-datos)
+4. [Especificación de la API](#4-especificación-de-la-api)
+5. [Historias de usuario](#5-historias-de-usuario)
+6. [Tickets de trabajo](#6-tickets-de-trabajo)
 
 ---
 
-## 🚀 Estado de Implementación
+## 0. Ficha del proyecto
 
-### ✅ Funcionalidades Implementadas (MVP Complete)
+### 0.1. Tu nombre completo
 
-#### Gestión de Productos e Inventario
-- ✅ Catálogo de productos con fotos de referencia
-- ✅ Importación desde Excel
-- ✅ Gestión de stock por punto de venta
-- ✅ Vista centralizada de inventario
-- ✅ Ajustes manuales de stock
+Marcello Orrico
 
-#### Registro de Ventas
-- ✅ **Venta Manual** (`/sales/new`)
-  - Búsqueda de productos por SKU/nombre
-  - Validación de stock en tiempo real
-  - Selección de método de pago
-  - Actualización automática de inventario
-  - Foto opcional
-  
-- ✅ **Venta con IA** (`/sales/new/image`)
-  - Captura de foto desde cámara móvil
-  - Inferencia TensorFlow.js (client-side)
-  - 3-5 sugerencias con % de confianza
-  - Fallback automático a manual si confianza <40%
-  - Validación de foto (dimensiones, brillo, ratio)
+### 0.2. Nombre del proyecto
 
-- ✅ **Historial de Ventas** (`/sales/history`)
-  - Filtros: fecha, POS, producto, método de pago
-  - Paginación (50 items/página)
-  - Visualizador de fotos
-  - Control de acceso por rol
+Sistema de Gestión de Puntos de Venta para Joyería (Joiabagur PV)
 
-#### Reconocimiento de Imágenes con IA
-- ✅ **Dashboard de Modelo** (`/admin/ai-model` - Admin only)
-  - Métricas de salud del modelo
-  - Alertas de reentrenamiento (🔴 CRITICAL, 🟠 HIGH, 🟡 RECOMMENDED)
-  - Historial de versiones
-  - Estadísticas de catálogo y fotos
+### 0.3. Descripción breve del proyecto
 
-- ✅ **Entrenamiento en Navegador**
-  - Un clic para entrenar
-  - Descarga automática de fotos de productos
-  - Transfer learning con MobileNetV2
-  - Progreso en tiempo real (epoch/accuracy/loss)
-  - Subida automática a servidor
-  - Duración: 15-60 min (según GPU)
+Sistema de gestión integral para una joyería que opera en múltiples puntos de venta (propios y de terceros). Permite gestionar inventario, registrar ventas y facilitar la identificación de productos mediante reconocimiento de imágenes con IA (inferencia y entrenamiento en el navegador con TensorFlow.js).
 
-#### Gestión de Usuarios y Métodos de Pago
-- ✅ Sistema de autenticación JWT
-- ✅ Roles: Administrator y Operator
-- ✅ Control de acceso por punto de venta
-- ✅ Gestión de métodos de pago por POS
+### 0.4. URL del proyecto
 
-### 📊 Métricas de Calidad
+https://pv.joiabagur.com
 
-- **Tests Backend**: 17/17 integration tests passing ✅
-- **Cobertura Backend**: Critical paths 100% tested
-- **Tests Frontend**: Manual testing complete, unit tests in progress
-- **Documentación**: Implementation summary, OpenSpec docs, code comments
+### 0.5. URL o archivo comprimido del repositorio
 
-### 🔜 En Desarrollo
-
-- Unit tests para servicios frontend
-- E2E tests con Playwright
-- CSV export para historial de ventas
-- Checkpoint recovery para entrenamiento
-- Documentación de usuario detallada
+https://github.com/marcello-clearcust/joiabagur-pv
 
 ---
 
-## Índice de Documentación
+## 1. Descripción general del producto
 
-Esta sección proporciona acceso rápido a toda la documentación técnica del proyecto.
+### 1.1. Objetivo
 
-### Documentación Principal
+El producto tiene como propósito ofrecer una solución integral de gestión para una joyería con varios puntos de venta (tiendas propias y ubicaciones de terceros como hoteles). Aporta valor al centralizar el catálogo de productos, el inventario por ubicación, el registro de ventas con método de pago y la identificación de productos mediante IA en el punto de venta, reduciendo errores y agilizando el proceso. Está dirigido a administradores (gestión completa) y operadores (registro de ventas e inventario en sus puntos asignados).
 
-- **[Épicas del MVP](Documentos/epicas.md)**: Descripción detallada de las épicas principales del MVP, incluyendo User Stories, orden de implementación y dependencias entre épicas.
+### 1.2. Características y funcionalidades principales
 
-- **[Arquitectura del Sistema](Documentos/arquitectura.md)**: Documentación completa de la arquitectura técnica, incluyendo stack tecnológico, configuración de desarrollo y producción, flujos de datos principales y consideraciones de seguridad.
+- **Gestión de productos e inventario:** Catálogo centralizado (SKU, precio, descripción, colección), gestión de stock por punto de venta con vista centralizada, importación y actualización desde Excel, edición manual de productos e inventario, asociación de fotos de referencia para reconocimiento de imágenes.
+- **Registro de ventas:** Captura de ventas por punto de venta (manual o con IA), foto opcional por transacción, registro de método de pago, historial con trazabilidad, validación de stock en tiempo real, actualización atómica de inventario, alertas de stock bajo no bloqueantes.
+- **Reconocimiento de productos con IA:** Inferencia en el cliente con TensorFlow.js, identificación mediante cámara en el punto de venta, 3–5 sugerencias ordenadas por confianza (umbral 40%), validación manual del operador, fallback a entrada manual si la confianza es baja.
+- **Entrenamiento del modelo de IA:** Entrenamiento en el navegador con TensorFlow.js (sin Python), un clic desde el panel de administración, aceleración GPU vía WebGL 2.0, métricas de salud del modelo y progreso en tiempo real.
+- **Gestión de métodos de pago:** Lista general (Efectivo, Bizum, Transferencia, Tarjeta TPV propio/punto de venta, PayPal), asignación por punto de venta y registro del método en cada venta.
+- **Gestión de usuarios:** Roles Administrador y Operador, autenticación con usuario y contraseña, operadores asociados a puntos de venta concretos.
+- **Otras funcionalidades:** Devoluciones, ajustes manuales de inventario, historial de ventas y movimientos de stock, dashboard con estadísticas y stock crítico.
 
-- **[Modelo de Datos](Documentos/modelo-de-datos.md)**: Especificación completa del modelo de datos, incluyendo diagramas ER, descripción de entidades, relaciones, índices y optimizaciones para free-tier.
+### 1.3. Diseño y experiencia de usuario
 
-- **[Modelo C4](Documentos/modelo-c4.md)**: Arquitectura del sistema utilizando el modelo C4, proporcionando diferentes niveles de abstracción desde el contexto general hasta los componentes internos del backend y frontend.
+El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashboard (estadísticas globales para administradores o por punto de venta para operadores). Desde la navegación puede: registrar ventas de forma manual (`/sales/new`) o con reconocimiento por imagen (`/sales/new/image`), consultar historial de ventas con filtros y paginación, gestionar productos e inventario (catálogo, importación Excel, stock por POS, ajustes), configurar puntos de venta y métodos de pago, y (solo administradores) acceder al dashboard de modelo de IA y al listado de stock crítico con paginación. La interfaz está optimizada para uso en móvil en el punto de venta (cámara, gestos) y es responsive para administradores. La moneda es euro (EUR) con formato español.
 
-- **[Testing Backend](Documentos/testing-backend.md)**: Guía completa de testing para el backend .NET 10 (xUnit, Moq, FluentAssertions), incluyendo tests unitarios, integración, CI/CD y guías detalladas por tema.
+*Se añadirá un videotutorial en esta sección.*
 
-- **[Testing Frontend](Documentos/testing-frontend.md)**: Guía completa de testing para el frontend React 19 + TypeScript + Vite (Vitest, React Testing Library, MSW, Playwright), incluyendo tests unitarios, de componentes, E2E y guías detalladas por tema.
+### 1.4. Instrucciones de instalación
 
-### Procedimientos
+**Requisitos previos**
 
-Documentación de procedimientos y metodologías de trabajo del proyecto:
+- Backend: .NET 10 SDK, PostgreSQL 14+ (o Docker para desarrollo).
+- Frontend: Node.js 20+ y npm, navegador moderno (Chrome 90+, Edge 90+, Safari 14+).
 
-- **[Procedimiento de User Stories](Documentos/Procedimientos/Procedimiento-UserStories.md)**: Metodología y formato para la creación y gestión de User Stories.
+**Pasos**
 
-- **[Procedimiento de Tickets de Trabajo](Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md)**: Proceso para la creación, asignación y seguimiento de tickets de trabajo.
+1. **Backend**
+   ```bash
+   cd backend/src/JoiabagurPV.API
+   dotnet restore
+   dotnet run
+   ```
+   La API queda disponible en `http://localhost:5000`. Configurar la cadena de conexión a PostgreSQL (por ejemplo en `appsettings.Development.json` o variables de entorno). Si se usan migraciones EF Core, ejecutar `dotnet ef database update` desde el proyecto API o el de Infrastructure según la estructura del proyecto.
 
-### Propuestas
+2. **Frontend**
+   ```bash
+   cd frontend
+   npm install --legacy-peer-deps
+   npm run dev
+   ```
+   La UI queda disponible en `http://localhost:5173`. Configurar `VITE_API_BASE_URL` si la API no está en `http://localhost:5000/api`.
 
-Documentos de propuestas técnicas y análisis:
+3. **Usuario por defecto (desarrollo)**  
+   Usuario: `admin`. Contraseña: `Admin123!`. Cambiar la contraseña tras el primer acceso.
 
-- **[Aclaraciones Técnicas](Documentos/Propuestas/aclaraciones-tecnicas.md)**: Aclaraciones y decisiones técnicas importantes del proyecto.
+4. **Tests**
+   - Backend: `cd backend/src/JoiabagurPV.Tests` y `dotnet test`.
+   - Frontend: `cd frontend` y `npm run test`.
 
-- **[Análisis de Metronic Frontend](Documentos/Propuestas/analisis-metronic-frontend.md)**: Análisis y evaluación del framework Metronic para el frontend.
-
-- **[Análisis y Migración Swagger a Scalar](Documentos/Propuestas/analisis-swagger.md)**: Análisis técnico y migración exitosa de Swagger/Swashbuckle a Scalar por incompatibilidad con .NET 10.
-
-- **[Arquitecturas Propuestas](Documentos/Propuestas/arquitecturas-propuestas.md)**: Diferentes propuestas arquitectónicas evaluadas para el proyecto.
-
-- **[Comparación AWS vs Azure](Documentos/Propuestas/comparacion-aws-azure-deploy.md)**: Análisis detallado de ambas plataformas cloud para el deploy de producción, con pros/contras, costos estimados y recomendación final.
-
-### Guías de Implementación
-
-Guías paso a paso para configuración y despliegue:
-
-- **[Guía de Deploy AWS](Documentos/Guias/deploy-aws-production.md)**: Instrucciones completas para desplegar la aplicación en AWS (App Runner, RDS PostgreSQL, S3, CloudFront), incluyendo configuración de backups, CI/CD con GitHub Actions, y gestión de secretos.
-
-- **[Resumen de Implementación](OPENSPEC_IMPLEMENTATION_SUMMARY.md)**: Resumen completo de la implementación de Ventas y Reconocimiento de Imágenes, incluyendo decisiones arquitectónicas, estado actual y siguientes pasos.
+Para despliegue en AWS (App Runner, RDS, S3, CloudFront) y CI/CD con GitHub Actions, ver [Documentos/Guias/deploy-aws-production.md](Documentos/Guias/deploy-aws-production.md).
 
 ---
 
-## 🚀 Quick Start
+## 2. Arquitectura del sistema
 
-### Requisitos Previos
+### 2.1. Diagrama de arquitectura
 
-**Backend:**
-- .NET 10 SDK
-- PostgreSQL 14+
-- Docker (opcional, para desarrollo)
+La aplicación sigue una arquitectura monolítica simple con backend y frontend separados, desplegados en contenedores y servicios cloud en régimen free-tier. Se eligió este enfoque para reducir complejidad operativa, mantener un único despliegue y optimizar costes; el sacrificio es menor escalado independiente por componente.
 
-**Frontend:**
-- Node.js 20+ y npm
-- Navegador moderno (Chrome 90+, Edge 90+, Safari 14+)
-
-### Instalación y Ejecución
-
-**1. Backend:**
-```bash
-cd backend/src/JoiabagurPV.API
-dotnet restore
-dotnet run
-```
-API disponible en: `http://localhost:5000`
-
-**2. Frontend:**
-```bash
-cd frontend
-npm install --legacy-peer-deps  # Due to React 19 compatibility
-npm run dev
-```
-UI disponible en: `http://localhost:5173`
-
-**3. Usuario por defecto:**
-- Usuario: `admin`
-- Contraseña: `Admin123!`
-- ⚠️ Cambiar contraseña después del primer login
-
-### Primeros Pasos
-
-1. **Subir fotos de productos** (`/products`)
-   - Necesitas al menos 3-5 fotos por producto
-   - Fotos claras desde diferentes ángulos
-   
-2. **Entrenar modelo de IA** (`/admin/ai-model`)
-   - Clic en "Entrenar Modelo"
-   - Mantén la pestaña abierta (15-60 min)
-   - Verás progreso en tiempo real
-
-3. **Registrar primera venta**
-   - Opción 1: `/sales/new` (manual)
-   - Opción 2: `/sales/new/image` (con IA)
-
-### Testing
-
-**Backend:**
-```bash
-cd backend/src/JoiabagurPV.Tests
-dotnet test
+```mermaid
+flowchart TB
+    subgraph Cliente["CLIENTE"]
+        Browser["Navegador Web"]
+        SPA["React SPA"]
+        ML["Modelo ML TensorFlow.js"]
+        Browser --> SPA
+        SPA --> ML
+    end
+    CDN["CDN / CloudFront"]
+    Gateway["API Gateway / Load Balancer"]
+    subgraph Backend["BACKEND API .NET 10"]
+        API["ASP.NET Core Web API"]
+        EF["Entity Framework Core"]
+        API --> EF
+    end
+    DB["PostgreSQL"]
+    Storage["Object Storage S3/Blob"]
+    Cliente -->|HTTPS| CDN
+    CDN -->|HTTPS| Gateway
+    Gateway -->|HTTPS| Backend
+    Backend --> DB
+    Backend --> Storage
 ```
 
-**Frontend:**
-```bash
-cd frontend
-npm run test
+### 2.2. Descripción de componentes principales
+
+- **Backend:** ASP.NET Core Web API (.NET 10), C#, Entity Framework Core, PostgreSQL 15+, JWT para autenticación, Serilog para logging, patrón Repository y capa de servicios. Documentación de API con Scalar.
+- **Frontend:** React 19, TypeScript, Vite, Metronic React (Layout 8), Radix UI, Tailwind CSS, React Hook Form + Zod, TensorFlow.js para inferencia y entrenamiento en el navegador.
+- **Base de datos:** PostgreSQL con índices para ventas, inventario y productos; connection pooling y paginación (máx. 50 ítems por página).
+- **Almacenamiento:** Servicio de ficheros abstracto (local en desarrollo, S3/Blob en producción) para fotos de productos, ventas y devoluciones.
+
+### 2.3. Descripción de alto nivel del proyecto y estructura de ficheros
+
+- `backend/`: Solución .NET en capas (Domain, Infrastructure, Application, API). Controllers en `JoiabagurPV.API/Controllers`, servicios y DTOs en `JoiabagurPV.Application`, entidades e interfaces de dominio en `JoiabagurPV.Domain`, repositorios y DbContext en `JoiabagurPV.Infrastructure`. Tests en `JoiabagurPV.Tests`.
+- `frontend/`: SPA React; `src/pages` por módulo (dashboard, sales, products, inventory, etc.), `src/services` para llamadas API, `src/components` para UI y layouts.
+- `Documentos/`: Arquitectura, modelo de datos, épicas, historias de usuario, guías de deploy y testing.
+- `openspec/`: Especificaciones (specs) y cambios (changes) según metodología OpenSpec (spec-driven development).
+
+### 2.4. Infraestructura y despliegue
+
+En producción (AWS): CloudFront para el frontend, Application Load Balancer, ECS Fargate o App Runner para el backend, RDS PostgreSQL, S3 para almacenamiento de archivos, GitHub Actions para CI/CD. Secretos gestionados con AWS Secrets Manager. Backups automáticos de base de datos (retención 7 días). Detalle en [Documentos/Guias/deploy-aws-production.md](Documentos/Guias/deploy-aws-production.md).
+
+### 2.5. Seguridad
+
+- Autenticación JWT (stateless) y refresh tokens para renovación de sesión.
+- Contraseñas con BCrypt y salt.
+- Control de acceso por roles (Administrator / Operator) y por punto de venta (operadores solo acceden a sus POS asignados).
+- CORS configurado por origen permitido; en producción solo dominios de la aplicación.
+- HTTPS en producción; secretos en servicios gestionados (AWS Secrets Manager).
+- Uso de EF Core para evitar inyección SQL; sanitización de entradas frente a XSS.
+
+### 2.6. Tests
+
+- **Backend:** xUnit, Moq, FluentAssertions; tests unitarios de servicios y validadores; tests de integración con Testcontainers (PostgreSQL). Nomenclatura tipo `Method_Scenario_ExpectedResult`. Los controladores críticos (por ejemplo ventas) tienen tests de integración que cubren creación, validación de stock, método de pago y permisos.
+- **Frontend:** Vitest, React Testing Library, MSW para simular API; pruebas de componentes y de flujos; E2E con Playwright (en progreso). Documentación en [Documentos/testing-backend.md](Documentos/testing-backend.md) y [Documentos/testing-frontend.md](Documentos/testing-frontend.md).
+
+---
+
+## 3. Modelo de datos
+
+### 3.1. Diagrama del modelo de datos
+
+El modelo está optimizado para PostgreSQL 15+ y Entity Framework Core. A continuación se muestra el diagrama de entidades principales (relaciones resumidas).
+
+```mermaid
+erDiagram
+    User ||--o{ UserPointOfSale : "asignado a"
+    User ||--o{ Sale : "realiza"
+    PointOfSale ||--o{ UserPointOfSale : "tiene asignados"
+    PointOfSale ||--o{ Sale : "registra ventas"
+    PointOfSale ||--o{ Inventory : "tiene stock"
+    Product ||--o{ ProductPhoto : "tiene fotos"
+    Product ||--o{ Sale : "se vende"
+    Product ||--o{ Inventory : "en stock"
+    Product ||--o{ InventoryMovement : "movimiento"
+    Sale ||--o{ SalePhoto : "tiene foto"
+    Sale ||--o{ InventoryMovement : "genera movimiento"
+    Inventory ||--o{ InventoryMovement : "tiene movimientos"
+    PaymentMethod ||--o{ Sale : "usado en"
+    Return ||--o{ InventoryMovement : "genera movimiento"
+    User { uuid Id PK string Username UK string PasswordHash enum Role }
+    PointOfSale { uuid Id PK string Name string Code UK bool AllowManualPriceEdit }
+    Product { uuid Id PK string SKU UK decimal Price }
+    Sale { uuid Id PK uuid ProductId FK uuid PointOfSaleId FK uuid PaymentMethodId FK decimal Price int Quantity }
+    Inventory { uuid Id PK uuid ProductId FK uuid PointOfSaleId FK int Quantity bool IsActive }
+    InventoryMovement { uuid Id PK uuid InventoryId FK enum MovementType int QuantityChange }
+```
+
+Descripción completa y resto de entidades (Return, ReturnSale, Collection, etc.) en [Documentos/modelo-de-datos.md](Documentos/modelo-de-datos.md).
+
+### 3.2. Descripción de entidades principales
+
+- **User:** Id (UUID), Username (único), Email (opcional), PasswordHash (BCrypt), Role (Admin/Operator), IsActive. Relación con UserPointOfSale (asignación a POS) y con Sale.
+- **PointOfSale:** Id, Name, Code (único), Address/Phone/Email opcionales, IsActive, AllowManualPriceEdit. Relación con Inventory, Sale, UserPointOfSale, PointOfSalePaymentMethod.
+- **Product:** Id, SKU (único, indexado), Name, Description, Price, CollectionId (opcional), IsActive. Relación con ProductPhoto, Sale, Inventory, InventoryMovement.
+- **Sale:** Id, ProductId, PointOfSaleId, UserId (operador), PaymentMethodId, Price (snapshot), Quantity, Notes, PriceWasOverridden, OriginalProductPrice, BulkOperationId (opcional), SaleDate. Índices por POS, producto, usuario, fecha. Relación con SalePhoto e InventoryMovement.
+- **Inventory:** Id, ProductId, PointOfSaleId, Quantity, IsActive (asignado/desasignado). Unique(ProductId, PointOfSaleId). La presencia de registro activo determina visibilidad del producto para operadores en ese POS.
+- **InventoryMovement:** Id, InventoryId, SaleId/ReturnId (opcionales), UserId, MovementType (Sale, Return, Adjustment, Import), QuantityChange, QuantityBefore, QuantityAfter, Reason (ajustes), MovementDate. Trazabilidad completa de movimientos.
+
+Otras entidades (ProductPhoto, PaymentMethod, PointOfSalePaymentMethod, Return, ReturnSale, Collection, etc.) se describen con detalle en [Documentos/modelo-de-datos.md](Documentos/modelo-de-datos.md).
+
+---
+
+## 4. Especificación de la API
+
+A continuación se describen tres endpoints principales en formato OpenAPI (resumen). La API base es `/api` y requiere cabecera `Authorization: Bearer <token>` para endpoints protegidos.
+
+### POST /api/sales — Crear venta
+
+Crea una venta validando stock, método de pago asignado al POS y que el usuario esté asignado al punto de venta (o sea administrador). Actualiza inventario en la misma transacción.
+
+**Request (application/json)**
+
+| Campo            | Tipo    | Requerido | Descripción                                      |
+|------------------|---------|-----------|--------------------------------------------------|
+| productId        | uuid    | Sí        | ID del producto                                  |
+| pointOfSaleId    | uuid    | Sí        | ID del punto de venta                            |
+| paymentMethodId  | uuid    | Sí        | ID del método de pago                            |
+| quantity         | integer | Sí        | Cantidad (mayor que 0)                            |
+| price            | number  | No        | Override de precio (solo si POS permite edición) |
+| notes            | string  | No        | Notas (máx. 500 caracteres)                      |
+| photoBase64      | string  | No        | Foto en Base64 (opcional)                         |
+| photoFileName    | string  | No        | Nombre original del archivo de la foto           |
+
+**Responses**
+
+- **201 Created:** Cuerpo con `sale` (objeto con id, productId, pointOfSaleId, etc.), `warning` (opcional), `isLowStock` (boolean), `remainingStock` (número).
+- **400 Bad Request:** Validación fallida o stock insuficiente / método de pago no disponible / producto no asignado al POS. Cuerpo con `message` o `errors`.
+- **401 Unauthorized:** No autenticado.
+- **403 Forbidden:** Operador no asignado al punto de venta.
+
+**Ejemplo de petición**
+
+```json
+POST /api/sales
+{
+  "productId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "pointOfSaleId": "3fa85f64-5717-4562-b3fc-2c963f66afa7",
+  "paymentMethodId": "3fa85f64-5717-4562-b3fc-2c963f66afa8",
+  "quantity": 1,
+  "notes": "Venta con foto"
+}
 ```
 
 ---
 
-## Casos de Uso - MVP (Fase 1)
+### GET /api/sales — Historial de ventas
 
-### Gestión de Productos
+Devuelve ventas paginadas. Los administradores ven todas; los operadores solo las de sus puntos de venta asignados.
 
-1. **Importar productos desde Excel**
-   - Cargar archivo Excel con listado de productos
-   - Actualizar productos existentes haciendo match por SKU
-   - Crear nuevos productos para SKUs no existentes
-   - Validar datos antes de confirmar importación
-   - **Asociar fotos a productos**: Después de la importación, permitir subir fotos de referencia para cada producto (esencial para el reconocimiento de imágenes)
-   - Posibilidad de subir múltiples fotos por producto para mejorar la precisión del reconocimiento
+**Query parameters**
 
-2. **Crear/Editar producto manualmente**
-   - Agregar nuevo producto con SKU, precio, descripción, colección
-   - **Subir y asociar fotos de referencia** al producto (obligatorio para poder usar reconocimiento de imágenes)
-   - Editar información de productos existentes
-   - Gestionar fotos asociadas: agregar, eliminar o reemplazar fotos de productos existentes
-   - Visualizar catálogo completo de productos con sus fotos asociadas
+| Parámetro      | Tipo   | Descripción                    |
+|----------------|--------|--------------------------------|
+| startDate      | date   | Fecha inicio (inclusive)       |
+| endDate        | date   | Fecha fin (inclusive)          |
+| pointOfSaleId  | uuid   | Filtrar por POS                |
+| productId      | uuid   | Filtrar por producto           |
+| userId         | uuid   | Filtrar por usuario            |
+| paymentMethodId| uuid   | Filtrar por método de pago    |
+| page           | int    | Página (por defecto 1)         |
+| pageSize       | int    | Tamaño de página (p. ej. 20)  |
 
-3. **Gestionar stock por punto de venta**
-   - Importar stock desde Excel (sumar a cantidades existentes)
-   - Visualizar stock actual por punto de venta
-   - Vista centralizada de stock total y por ubicación
-   - Realizar ajustes manuales de inventario
+**Response 200 OK**
 
-4. **Gestionar métodos de pago por punto de venta**
-   - Configurar métodos de pago disponibles desde lista general (Efectivo, Bizum, Transferencia bancaria, Tarjeta TPV propio, Tarjeta TPV punto de venta, PayPal)
-   - Asignar métodos de pago específicos a cada punto de venta
-   - Cada punto de venta solo mostrará los métodos de pago asignados al registrar ventas
+- `sales`: array de objetos venta (id, productId, pointOfSaleId, paymentMethodId, price, quantity, saleDate, hasPhoto, etc.).
+- `totalCount`, `page`, `pageSize`, `totalPages` (según implementación en `SalesHistoryResponse`).
 
-### Gestión de Ventas
-
-5. **Registrar venta con reconocimiento de imagen**
-   - Operador toma foto del producto vendido
-   - Sistema genera 3-5 sugerencias de productos ordenadas por precisión
-   - Operador selecciona el producto correcto
-   - Operador selecciona método de pago (de los disponibles para ese punto de venta)
-   - Sistema registra venta con: punto de venta, SKU, precio, foto, método de pago, usuario que realizó la venta
-   - Actualización automática de stock
-
-6. **Registrar venta manual (sin foto)**
-   - Operador busca producto por SKU o descripción
-   - Selecciona producto
-   - Operador selecciona método de pago (de los disponibles para ese punto de venta)
-   - Sistema registra venta con: punto de venta, SKU, precio, método de pago, usuario que realizó la venta
-   - Actualización de stock correspondiente
-
-7. **Gestionar devoluciones**
-   - Registrar devolución de producto vendido
-   - Incrementar stock al punto de venta correspondiente
-   - Asociar devolución a venta original
-
-### Gestión de Usuarios y Puntos de Venta
-
-8. **Autenticación de usuarios**
-   - Login con usuario y contraseña
-   - Diferentes permisos según rol (admin/operador)
-   - Operadores asociados a puntos de venta específicos
-
-9. **Gestionar puntos de venta**
-   - Crear/editar puntos de venta
-   - Asignar operadores a puntos de venta
-   - **Asignar métodos de pago disponibles a cada punto de venta** (solo administradores)
-   - Administradores pueden acceder a todos los puntos de venta
-
-### Consultas y Reportes
-
-10. **Consultar historial de ventas**
-    - Filtrar ventas por punto de venta, fecha, producto, método de pago
-    - Visualizar detalles de cada venta (foto, SKU, precio, método de pago, fecha, operador)
-    - Ver historial de movimientos de stock
-
-11. **Consultar inventario**
-    - Vista de stock por punto de venta
-    - Vista centralizada de stock total
-    - Búsqueda de productos en catálogo
+**401 Unauthorized** si no hay token válido.
 
 ---
 
-## Casos de Uso - Segunda Fase (Fase 2)
+### GET /api/dashboard/low-stock — Stock bajo (administradores)
 
-### Reportes Avanzados
+Devuelve productos con stock bajo (por defecto cantidad ≤ 2) paginados. Solo rol Administrator.
 
-12. **Exportar reportes**
-    - Generar reportes de ventas en formato Excel/PDF
-    - Reportes de inventario por punto de venta
-    - Reportes de productos más vendidos
-    - Reportes por método de pago
-    - Reportes personalizados con filtros avanzados
+**Query parameters**
 
-### Alertas y Notificaciones
+| Parámetro | Tipo | Descripción                          |
+|-----------|------|--------------------------------------|
+| page      | int  | Página (por defecto 1)               |
+| pageSize  | int  | Tamaño de página (entre 1 y 50)      |
 
-13. **Alertas de stock bajo**
-    - Configurar umbrales mínimos de stock por producto
-    - Notificaciones automáticas cuando el stock está bajo
-    - Alertas por punto de venta o centralizadas
+**Response 200 OK**
 
-### Mejoras en Reconocimiento de Imágenes
+- `items`: array de `{ productName, sku, pointOfSaleName, stock }`.
+- `totalCount`, `page`, `pageSize`, `totalPages`.
 
-14. **Mejora continua del modelo de IA**
-    - Entrenamiento incremental con nuevas fotos
-    - Feedback del usuario para mejorar precisión
-    - Análisis de productos con baja precisión en reconocimiento
+**401 Unauthorized** / **403 Forbidden** si no autenticado o no administrador.
 
-### Funcionalidades Adicionales
+---
 
-15. **Gestión de colecciones**
-    - Agrupar productos por colección
-    - Reportes por colección
-    - Filtros y búsquedas por colección
+## 5. Historias de usuario
 
-16. **Gestión de precios**
-    - Historial de cambios de precio
-    - Precios diferentes por punto de venta (si aplica)
-    - Promociones y descuentos
+Se documentan tres historias principales del desarrollo.
 
-17. **Dashboard analítico**
-    - Gráficos de ventas por período
-    - Productos más vendidos
-    - Rendimiento por punto de venta
-    - Análisis de ventas por método de pago
-    - Métricas de precisión del reconocimiento de imágenes
+### Historia de Usuario 1 — Registrar venta con reconocimiento de imagen
 
-18. **Sincronización offline**
-    - Modo offline para operadores
-    - Sincronización automática cuando hay conexión
-    - Prevención de pérdida de datos
+**Como** operador, **quiero** registrar una venta usando reconocimiento de imagen **para** agilizar el proceso y reducir errores en la identificación del producto.
 
-19. **API para integraciones**
-    - API REST para integraciones futuras
-    - Webhooks para eventos importantes
-    - Integración con sistemas de contabilidad
+**Descripción:** Registrar una venta capturando una foto del producto, procesándola con IA para obtener sugerencias, seleccionando el producto correcto, validando stock, eligiendo método de pago y confirmando. Incluye validación de stock y método de pago.
 
+**Criterios de aceptación (resumidos):** Venta exitosa con foto y sugerencias de IA; rechazo si stock insuficiente; rechazo si método de pago no asignado al POS; rechazo si operador no asignado al POS; si la IA no ofrece correspondencia fiable (< 60 %), ofrecer otra foto o venta manual. Detalle completo en [Documentos/Historias/HU-EP3-001.md](Documentos/Historias/HU-EP3-001.md).
+
+---
+
+### Historia de Usuario 2 — Crear producto manualmente
+
+**Como** administrador, **quiero** crear productos manualmente en el sistema **para** agregar productos individuales al catálogo sin importar desde Excel.
+
+**Descripción:** Crear productos con SKU, nombre, descripción, precio y colección (opcional). El producto se crea activo por defecto.
+
+**Criterios de aceptación (resumidos):** Creación correcta con SKU único y precio > 0; error si el SKU ya existe; validación de campos obligatorios. Detalle en [Documentos/Historias/HU-EP1-002.md](Documentos/Historias/HU-EP1-002.md).
+
+---
+
+### Historia de Usuario 3 — Reconocimiento de productos mediante imagen
+
+**Como** operador, **quiero** identificar productos mediante reconocimiento de imágenes con IA **para** obtener sugerencias a partir de una foto capturada.
+
+**Descripción:** Flujo de captura de foto, preprocesado en cliente, inferencia con TensorFlow.js/ONNX.js, generación de 3 sugerencias ordenadas por confianza, visualización con fotos de referencia y selección. Si la confianza es < 60 %, ofrecer otra foto o venta manual.
+
+**Criterios de aceptación (resumidos):** Reconocimiento exitoso con sugerencias y fotos; baja confianza con redirección a manual; visualización de sugerencias con SKU, nombre y porcentaje; captura desde cámara en móvil y procesamiento local. Detalle en [Documentos/Historias/HU-EP4-001.md](Documentos/Historias/HU-EP4-001.md).
+
+---
+
+## 6. Tickets de trabajo
+
+Se documentan tres tickets principales a partir de las especificaciones OpenSpec del proyecto: uno de backend, uno de frontend y uno de bases de datos/dominio.
+
+### Ticket 1 (Backend) — Registro de ventas con doble vía de entrada
+
+**Objetivo:** Permitir a los operadores registrar ventas mediante dos métodos (reconocimiento por imagen con foto adjunta o selección manual de producto con foto opcional), validando stock, método de pago, autorización del operador y política de precio del punto de venta.
+
+**Requisitos clave (spec: sales-management):**
+
+- Crear registro Sale aplicando reglas de precio efectivo (precio oficial del producto por defecto; override solo si el POS tiene AllowManualPriceEdit).
+- Crear SalePhoto con foto comprimida (JPEG 80 %, ≤ 2 MB) cuando se envía foto.
+- Crear InventoryMovement tipo "Sale" y actualizar Inventory.Quantity en la misma transacción.
+- Validación doble de stock (previa en formulario y justo antes del commit) para seguridad ante concurrencia.
+- Rechazar con 400 si stock insuficiente, producto no asignado al POS, método de pago no disponible o operador no autorizado para el POS.
+- Rechazar override de precio manual si el POS no lo permite; validar cantidad > 0.
+- Devolver aviso de stock bajo (no bloqueante) cuando el stock restante quede por debajo del umbral configurado.
+
+**Tareas (derivadas de la spec):** Implementar endpoint POST /api/sales con validadores (FluentValidation); integrar IStockValidationService e IPaymentMethodValidationService; ejecutar venta + movimiento de inventario en transacción; devolver sale, warning, isLowStock y remainingStock en la respuesta; tests de integración para escenarios de éxito, stock insuficiente, método de pago inválido y operador no asignado.
+
+**Referencia:** [openspec/specs/sales-management/spec.md](openspec/specs/sales-management/spec.md).
+
+---
+
+### Ticket 2 (Frontend) — Reconocimiento de imágenes con inferencia en cliente
+
+**Objetivo:** Ejecutar la inferencia de ML en el navegador/dispositivo con TensorFlow.js y presentar 3–5 sugerencias de productos con puntuación de confianza para que el operador seleccione el producto correcto.
+
+**Requisitos clave (spec: image-recognition):**
+
+- Descargar el modelo desde GET /api/image-recognition/model en el primer uso; mostrar progreso; cachear en IndexedDB.
+- Comprobar versión del modelo (GET /api/image-recognition/model/metadata) y actualizar caché si hay nueva versión; en offline, usar modelo en caché sin comprobación.
+- Preprocesar imagen (redimensionar 224x224, normalizar), ejecutar model.predict() en cliente y devolver 3–5 productos ordenados por confianza (umbral 40 %); inferencia < 500 ms en dispositivo móvil.
+- Mostrar sugerencias con foto de referencia, SKU, nombre y porcentaje de confianza; permitir seleccionar una para continuar al flujo de venta.
+- Si falla la descarga del modelo, mostrar error y redirigir a entrada manual (degradación controlada).
+
+**Tareas (derivadas de la spec):** Componente de captura de foto (cámara en móvil); integración con TensorFlow.js (carga de modelo, preprocesado, predict); componente de lista de sugerencias con fotos y confianza; umbral 40 % y máximo 5 sugerencias; notificación cuando el modelo está desactualizado (> 7 días) y botón "Actualizar modelo"; tests de componente y flujo. Referencia: [openspec/specs/image-recognition/spec.md](openspec/specs/image-recognition/spec.md).
+
+---
+
+### Ticket 3 (Bases de datos / dominio) — Gestión de inventario y asignación a puntos de venta
+
+**Objetivo:** Gestionar la asignación de productos a puntos de venta (registros Inventory), la importación de stock desde Excel, la visualización de stock por POS y los movimientos de inventario con trazabilidad, garantizando reglas de negocio sobre visibilidad y cantidad.
+
+**Requisitos clave (spec: inventory-management):**
+
+- Asignación: el administrador asigna productos del catálogo a un POS creando registros Inventory con Quantity = 0 e IsActive = true. La existencia de un Inventory activo determina que el producto sea visible para los operadores de ese POS. Evitar asignación duplicada; no asignar productos inactivos. Reasignar reactivando registro existente (IsActive = true) preservando cantidad.
+- Desasignación: soft delete (IsActive = false) solo cuando Quantity = 0; error explícito si hay stock.
+- Importación Excel: columnas SKU y Quantity; punto de venta elegido en la UI. Sumar a cantidades existentes o crear Inventory (asignación implícita) si no existe. Crear InventoryMovement tipo "Import". Validar SKUs en catálogo y formato antes de importar; ofrecer plantilla de descarga.
+- Visualización: administradores ven stock de cualquier POS; operadores solo de sus POS asignados. Incluir productos con cantidad 0.
+- Ajustes manuales: crear InventoryMovement tipo "Adjustment" con QuantityChange, Reason y usuario; actualizar Inventory.Quantity y LastUpdatedAt. No permitir stock negativo.
+
+**Tareas (derivadas de la spec):** Modelo de datos Inventory (ProductId, PointOfSaleId, Quantity, IsActive) e InventoryMovement (MovementType, QuantityChange, QuantityBefore, QuantityAfter, Reason, UserId, SaleId/ReturnId opcionales); repositorios y servicios de asignación/desasignación; endpoint de importación Excel con validación y plantilla; endpoints de consulta de stock por POS con control de acceso; tests unitarios e integración para asignación, desasignación con stock > 0 e importación. Referencia: [openspec/specs/inventory-management/spec.md](openspec/specs/inventory-management/spec.md).
+
+---
+
+## Documentación adicional
+
+- [Épicas del MVP](Documentos/epicas.md): épicas, user stories y orden de implementación.
+- [Arquitectura del sistema](Documentos/arquitectura.md): stack, diagramas, entornos y seguridad.
+- [Modelo de datos](Documentos/modelo-de-datos.md): diagramas ER completos y descripción de entidades.
+- [Modelo C4](Documentos/modelo-c4.md): niveles de contexto y componentes.
+- [Testing Backend](Documentos/testing-backend.md) y [Testing Frontend](Documentos/testing-frontend.md).
+- [Guía de deploy AWS](Documentos/Guias/deploy-aws-production.md).
+- [Procedimiento de User Stories](Documentos/Procedimientos/Procedimiento-UserStories.md) y [Procedimiento de Tickets de Trabajo](Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md).

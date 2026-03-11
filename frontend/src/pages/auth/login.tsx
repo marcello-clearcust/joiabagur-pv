@@ -3,6 +3,7 @@
  * Authentication form with username and password
  */
 
+import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -74,10 +75,27 @@ export function LoginPage() {
         password: data.password,
       });
     } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : 'Credenciales incorrectas. Por favor, intente de nuevo.';
+      let errorMessage: string;
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        errorMessage =
+          'Demasiados intentos de acceso. Espere unos 10 minutos e intente de nuevo.';
+      } else if (
+        axios.isAxiosError(err) &&
+        err.response?.status === 401 &&
+        typeof err.response?.data?.error === 'string' &&
+        err.response.data.error.length > 0
+      ) {
+        errorMessage = err.response.data.error;
+      } else if (
+        axios.isAxiosError(err) &&
+        err.response?.status === 401
+      ) {
+        errorMessage = 'Credenciales incorrectas. Por favor, intente de nuevo.';
+      } else if (err instanceof Error && err.message) {
+        errorMessage = err.message;
+      } else {
+        errorMessage = 'Credenciales incorrectas. Por favor, intente de nuevo.';
+      }
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);

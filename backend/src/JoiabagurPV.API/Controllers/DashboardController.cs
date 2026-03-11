@@ -55,4 +55,20 @@ public class DashboardController : ControllerBase
             return Forbid();
         }
     }
+
+    [HttpGet("low-stock")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(typeof(PaginatedLowStockResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PaginatedLowStockResult>> GetLowStock(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        pageSize = Math.Clamp(pageSize, 1, 50);
+        page = Math.Max(1, page);
+
+        var result = await _dashboardService.GetLowStockAsync(page, pageSize);
+        return Ok(result);
+    }
 }

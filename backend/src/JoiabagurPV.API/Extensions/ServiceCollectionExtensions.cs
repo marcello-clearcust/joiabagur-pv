@@ -97,8 +97,8 @@ public static class ServiceCollectionExtensions
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         // Use high limit for tests, normal limit for production
-                        PermitLimit = isTestingEnvironment ? 1000 : 5,
-                        Window = TimeSpan.FromMinutes(15),
+                        PermitLimit = isTestingEnvironment ? 1000 : 30,
+                        Window = TimeSpan.FromMinutes(10),
                         QueueLimit = 0
                     }));
         });

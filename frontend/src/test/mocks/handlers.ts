@@ -64,7 +64,7 @@ const userHandlers = [
   // Get user by ID
   http.get(`${API_BASE}/users/:id`, ({ params }) => {
     return HttpResponse.json(
-      createMockUser({ id: params.id as string })
+      createMockUser({ userId: params.id as string })
     );
   }),
 ];
@@ -231,12 +231,12 @@ const productHandlers = [
   }),
 
   // Set primary photo - T-EP1-004 (Task 16.10)
-  http.put(`${API_BASE}/products/:productId/photos/:photoId/primary`, ({ params }) => {
+  http.put(`${API_BASE}/products/:productId/photos/:photoId/primary`, () => {
     return new HttpResponse(null, { status: 204 });
   }),
 
   // Delete product photo - T-EP1-004 (Task 16.10)
-  http.delete(`${API_BASE}/products/:productId/photos/:photoId`, ({ params }) => {
+  http.delete(`${API_BASE}/products/:productId/photos/:photoId`, () => {
     return new HttpResponse(null, { status: 204 });
   }),
 

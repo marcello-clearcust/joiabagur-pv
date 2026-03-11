@@ -26,3 +26,20 @@ public class ReturnCategoryDistributionDto
     public string Category { get; set; } = string.Empty;
     public int Count { get; set; }
 }
+
+public class LowStockItemDto
+{
+    public string ProductName { get; set; } = string.Empty;
+    public string Sku { get; set; } = string.Empty;
+    public string PointOfSaleName { get; set; } = string.Empty;
+    public int Stock { get; set; }
+}
+
+public class PaginatedLowStockResult
+{
+    public List<LowStockItemDto> Items { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages { get; set; }
+}

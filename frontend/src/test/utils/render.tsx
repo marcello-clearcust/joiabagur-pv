@@ -88,7 +88,7 @@ function AllProviders({
  * 
  * // With authenticated user
  * render(<MyComponent />, {
- *   authUser: createMockUser({ role: 'Admin' })
+ *   authUser: createMockUser({ role: 'Administrator' })
  * });
  * 
  * // With initial route

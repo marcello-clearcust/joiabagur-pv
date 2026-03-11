@@ -13,7 +13,7 @@
  * const user = createMockUser();
  * 
  * // With overrides
- * const admin = createMockUser({ role: 'Admin', name: 'Admin User' });
+ * const admin = createMockUser({ role: 'Administrator', firstName: 'Admin' });
  * 
  * // Create multiple items
  * const products = createMockProductList(5);
@@ -22,6 +22,7 @@
 
 import type { AuthUser } from '@/types/auth.types';
 import type { UserListItem } from '@/types/user.types';
+import type { UserRole } from '@/types/common.types';
 import type { Product, ProductListItem } from '@/types/product.types';
 import type { PaymentMethod } from '@/types/payment-method.types';
 
@@ -34,10 +35,12 @@ import type { PaymentMethod } from '@/types/payment-method.types';
  */
 export function createMockUser(overrides: Partial<AuthUser> = {}): AuthUser {
   return {
-    id: '1',
+    userId: '1',
+    username: 'admin',
+    firstName: 'Test',
+    lastName: 'Admin',
     email: 'admin@test.com',
-    name: 'Test Admin',
-    role: 'Admin',
+    role: 'Administrator',
     ...overrides,
   };
 }
@@ -48,11 +51,12 @@ export function createMockUser(overrides: Partial<AuthUser> = {}): AuthUser {
 export function createMockUserListItem(overrides: Partial<UserListItem> = {}): UserListItem {
   return {
     id: '1',
+    username: 'testuser',
+    firstName: 'Test',
+    lastName: 'User',
     email: 'user@test.com',
-    name: 'Test User',
     role: 'Operator',
     isActive: true,
-    createdAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -64,9 +68,11 @@ export function createMockUserList(count: number = 3): UserListItem[] {
   return Array.from({ length: count }, (_, i) => 
     createMockUserListItem({
       id: String(i + 1),
+      username: `user${i + 1}`,
+      firstName: `Test`,
+      lastName: `User ${i + 1}`,
       email: `user${i + 1}@test.com`,
-      name: `Test User ${i + 1}`,
-      role: i === 0 ? 'Admin' : 'Operator',
+      role: i === 0 ? 'Administrator' : 'Operator',
     })
   );
 }
@@ -257,12 +263,22 @@ export class UserBuilder {
     return this;
   }
 
-  withName(name: string): UserBuilder {
-    this.user.name = name;
+  withUsername(username: string): UserBuilder {
+    this.user.username = username;
     return this;
   }
 
-  withRole(role: 'Admin' | 'Operator'): UserBuilder {
+  withFirstName(firstName: string): UserBuilder {
+    this.user.firstName = firstName;
+    return this;
+  }
+
+  withLastName(lastName: string): UserBuilder {
+    this.user.lastName = lastName;
+    return this;
+  }
+
+  withRole(role: UserRole): UserBuilder {
     this.user.role = role;
     return this;
   }

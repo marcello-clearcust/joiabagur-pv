@@ -61,6 +61,7 @@ public class UserRepository : Repository<User>, IUserRepository
     {
         return await _context.Users
             .Include(u => u.PointOfSaleAssignments.Where(a => a.IsActive))
+                .ThenInclude(a => a.PointOfSale)
             .FirstOrDefaultAsync(u => u.Id == userId);
     }
 

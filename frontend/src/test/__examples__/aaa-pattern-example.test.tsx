@@ -16,7 +16,6 @@ import { render, screen, waitFor } from '@/test/utils';
 import { userEvent } from '@testing-library/user-event';
 import { 
   createMockProduct, 
-  createMockUser,
   ProductBuilder 
 } from '@/test/utils/test-data';
 

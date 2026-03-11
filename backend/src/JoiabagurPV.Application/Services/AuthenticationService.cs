@@ -1,6 +1,7 @@
 using JoiabagurPV.Application.DTOs.Auth;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Exceptions;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.Extensions.Configuration;
@@ -185,22 +186,20 @@ public class AuthenticationService : IAuthenticationService
             FirstName = user.FirstName,
             LastName = user.LastName,
             Email = user.Email,
-            Role = user.Role.ToString()
+            Role = user.Role.ToString(),
+            AssignedPointOfSales = user.Role == UserRole.Operator
+                ? user.PointOfSaleAssignments
+                    .Select(a => new AssignedPointOfSaleDto
+                    {
+                        PointOfSaleId = a.PointOfSaleId,
+                        Name = a.PointOfSale.Name,
+                        Code = a.PointOfSale.Code,
+                        IsActive = a.IsActive,
+                        AssignedAt = a.AssignedAt
+                    })
+                    .ToList()
+                : new List<AssignedPointOfSaleDto>()
         };
-
-        // For operators, include assigned point of sales
-        // Note: In a full implementation, we'd join with PointOfSale entity to get names/codes
-        // For now, we return the IDs - this will be enhanced when PointOfSale entity exists
-        if (user.Role == Domain.Enums.UserRole.Operator)
-        {
-            var assignedIds = await _userPointOfSaleRepository.GetAssignedPointOfSaleIdsAsync(userId);
-            response.AssignedPointOfSales = assignedIds.Select(id => new AssignedPointOfSaleDto
-            {
-                Id = id,
-                Name = "Pending", // Will be populated when PointOfSale entity exists
-                Code = "Pending"
-            }).ToList();
-        }
 
         return response;
     }

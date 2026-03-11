@@ -13,6 +13,7 @@ public class DashboardServiceTests
 {
     private readonly Mock<ISaleRepository> _saleRepoMock;
     private readonly Mock<IReturnRepository> _returnRepoMock;
+    private readonly Mock<IInventoryRepository> _inventoryRepoMock;
     private readonly Mock<IUserPointOfSaleRepository> _uposRepoMock;
     private readonly IMemoryCache _cache;
     private readonly DashboardService _sut;
@@ -21,12 +22,14 @@ public class DashboardServiceTests
     {
         _saleRepoMock = new Mock<ISaleRepository>();
         _returnRepoMock = new Mock<IReturnRepository>();
+        _inventoryRepoMock = new Mock<IInventoryRepository>();
         _uposRepoMock = new Mock<IUserPointOfSaleRepository>();
         _cache = new MemoryCache(new MemoryCacheOptions());
 
         _sut = new DashboardService(
             _saleRepoMock.Object,
             _returnRepoMock.Object,
+            _inventoryRepoMock.Object,
             _uposRepoMock.Object,
             _cache);
     }

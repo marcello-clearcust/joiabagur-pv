@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -34,10 +35,8 @@ import {
 } from 'recharts';
 import { dashboardService } from '@/services/dashboard.service';
 import { salesService } from '@/services/sales.service';
-import { inventoryService } from '@/services/inventory.service';
-import type { DashboardStats } from '@/types/dashboard.types';
+import type { DashboardStats, PaginatedLowStockResult } from '@/types/dashboard.types';
 import type { Sale } from '@/types/sales.types';
-// inventory.service.getCentralizedStock returns PaginatedCentralizedStockResult
 import { ROUTES } from '@/routing/routes';
 
 const CHART_COLORS = [
@@ -68,36 +67,34 @@ interface PosRevenueItem {
   revenue: number;
 }
 
-interface LowStockItem {
-  productName: string;
-  sku: string;
-  posName: string;
-  stock: number;
-}
+const STOCK_PAGE_SIZE = 10;
 
 export function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
   const [posRevenue, setPosRevenue] = useState<PosRevenueItem[]>([]);
   const [posNames, setPosNames] = useState<string[]>([]);
-  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+  const [lowStockResult, setLowStockResult] = useState<PaginatedLowStockResult | null>(null);
+  const [stockPage, setStockPage] = useState(1);
+  const [stockLoading, setStockLoading] = useState(false);
   const [recentSales, setRecentSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [dashStats, salesHistory, centralizedStock] = await Promise.all([
+        const [dashStats, salesHistory, lowStock] = await Promise.all([
           dashboardService.getStats(),
           salesService.getSalesHistory({
             startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             pageSize: 1000,
             page: 1,
           }),
-          inventoryService.getCentralizedStock(1, 50),
+          dashboardService.getLowStock(1, STOCK_PAGE_SIZE),
         ]);
 
         setStats(dashStats);
+        setLowStockResult(lowStock);
 
         // Recent 8 sales
         setRecentSales(salesHistory.sales.slice(0, 8));
@@ -156,23 +153,6 @@ export function AdminDashboard() {
             .map(([name, revenue]) => ({ name, revenue }))
             .sort((a, b) => b.revenue - a.revenue),
         );
-
-        // Low stock items from paginated centralized stock
-        const lowStockItems: LowStockItem[] = [];
-        const stockItems = centralizedStock.items ?? [];
-        for (const item of stockItems) {
-          for (const loc of item.breakdown) {
-            if (loc.quantity <= 2) {
-              lowStockItems.push({
-                productName: item.productName,
-                sku: item.productSku,
-                posName: loc.pointOfSaleName,
-                stock: loc.quantity,
-              });
-            }
-          }
-        }
-        setLowStock(lowStockItems);
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {
@@ -182,6 +162,25 @@ export function AdminDashboard() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    if (stockPage === 1) return;
+    const abortController = new AbortController();
+    const loadPage = async () => {
+      setStockLoading(true);
+      try {
+        const result = await dashboardService.getLowStock(stockPage, STOCK_PAGE_SIZE, abortController.signal);
+        setLowStockResult(result);
+      } catch (err) {
+        if (abortController.signal.aborted) return;
+        console.error('Failed to load low stock page:', err);
+      } finally {
+        if (!abortController.signal.aborted) setStockLoading(false);
+      }
+    };
+    loadPage();
+    return () => abortController.abort();
+  }, [stockPage]);
 
   if (loading) {
     return (
@@ -252,7 +251,141 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Row 2 — Trend + POS revenue charts */}
+      {/* Row 2 — Stock crítico (full width) */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Stock crítico
+            </CardTitle>
+            <CardDescription>Productos con stock &le; 2 unidades</CardDescription>
+          </div>
+          <Link
+            to={ROUTES.INVENTORY.ADJUST}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            Ajustar <ExternalLink className="h-3 w-3" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {!lowStockResult || lowStockResult.totalCount === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay productos con stock crítico.</p>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>POS</TableHead>
+                    <TableHead className="text-right">Stock</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stockLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                        Cargando...
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    lowStockResult.items.map((item, i) => (
+                      <TableRow key={`${item.sku}-${item.pointOfSaleName}-${i}`}>
+                        <TableCell className="font-medium">{item.productName}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.sku}</TableCell>
+                        <TableCell>{item.pointOfSaleName}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={item.stock === 0 ? 'text-red-600 font-bold' : 'text-amber-600 font-semibold'}>
+                            {item.stock}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+              {lowStockResult.totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Página {lowStockResult.page} de {lowStockResult.totalPages} ({lowStockResult.totalCount} artículos)
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={stockPage === 1 || stockLoading}
+                      onClick={() => setStockPage((p) => p - 1)}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={stockPage >= lowStockResult.totalPages || stockLoading}
+                      onClick={() => setStockPage((p) => p + 1)}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Row 3 — Últimas ventas (full width) */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Últimas ventas</CardTitle>
+            <CardDescription>8 ventas más recientes</CardDescription>
+          </div>
+          <Link
+            to={ROUTES.SALES.HISTORY}
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            Ver todo <ExternalLink className="h-3 w-3" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {recentSales.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay ventas recientes.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Producto</TableHead>
+                  <TableHead>POS</TableHead>
+                  <TableHead>Operador</TableHead>
+                  <TableHead className="text-right">Importe</TableHead>
+                  <TableHead>Pago</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentSales.map((sale) => (
+                  <TableRow key={sale.id}>
+                    <TableCell className="text-xs">
+                      {new Date(sale.saleDate).toLocaleDateString('es-ES')}
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[120px] truncate">{sale.productName}</TableCell>
+                    <TableCell className="text-xs">{sale.pointOfSaleName}</TableCell>
+                    <TableCell className="text-xs">{sale.userName}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(sale.total)}</TableCell>
+                    <TableCell className="text-xs">{sale.paymentMethodName}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Row 4 — Trend + POS revenue charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -301,105 +434,7 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Row 3 — Stock alerts + Recent sales */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                Stock crítico
-              </CardTitle>
-              <CardDescription>Productos con stock &le; 2 unidades</CardDescription>
-            </div>
-            <Link
-              to={ROUTES.INVENTORY.ADJUST}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              Ajustar <ExternalLink className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {lowStock.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay productos con stock crítico.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>POS</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lowStock.slice(0, 10).map((item, i) => (
-                    <TableRow key={`${item.sku}-${item.posName}-${i}`}>
-                      <TableCell className="font-medium">{item.productName}</TableCell>
-                      <TableCell className="text-muted-foreground">{item.sku}</TableCell>
-                      <TableCell>{item.posName}</TableCell>
-                      <TableCell className="text-right">
-                        <span className={item.stock === 0 ? 'text-red-600 font-bold' : 'text-amber-600 font-semibold'}>
-                          {item.stock}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Últimas ventas</CardTitle>
-              <CardDescription>8 ventas más recientes</CardDescription>
-            </div>
-            <Link
-              to={ROUTES.SALES.HISTORY}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              Ver todo <ExternalLink className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {recentSales.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay ventas recientes.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>POS</TableHead>
-                    <TableHead>Operador</TableHead>
-                    <TableHead className="text-right">Importe</TableHead>
-                    <TableHead>Pago</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentSales.map((sale) => (
-                    <TableRow key={sale.id}>
-                      <TableCell className="text-xs">
-                        {new Date(sale.saleDate).toLocaleDateString('es-ES')}
-                      </TableCell>
-                      <TableCell className="font-medium max-w-[120px] truncate">{sale.productName}</TableCell>
-                      <TableCell className="text-xs">{sale.pointOfSaleName}</TableCell>
-                      <TableCell className="text-xs">{sale.userName}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(sale.total)}</TableCell>
-                      <TableCell className="text-xs">{sale.paymentMethodName}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 4 — Donut charts */}
+      {/* Row 5 — Donut charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>

@@ -634,6 +634,224 @@ public class SalesService : ISalesService
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<SalesReportResponse> GetSalesReportAsync(
+        SalesReportFilterRequest request,
+        Guid userId,
+        bool isAdmin)
+    {
+        var posIds = await GetAuthorizedPosIdsAsync(userId, isAdmin);
+        if (!isAdmin && posIds != null && posIds.Count == 0)
+        {
+            return new SalesReportResponse
+            {
+                Items = new List<SalesReportItemDto>(),
+                TotalCount = 0,
+                Page = request.Page,
+                PageSize = request.PageSize,
+                TotalPages = 0,
+                TotalSalesCount = 0,
+                TotalQuantity = 0,
+                TotalAmount = 0
+            };
+        }
+
+        var skip = (request.Page - 1) * request.PageSize;
+
+        var (sales, totalCount) = await _saleRepository.GetSalesForReportAsync(
+            posIds,
+            request.StartDate, request.EndDate,
+            request.PointOfSaleId, request.ProductId,
+            request.UserId, request.PaymentMethodId,
+            request.Search, request.AmountMin, request.AmountMax,
+            request.HasPhoto, request.PriceWasOverridden,
+            skip, request.PageSize);
+
+        var (aggCount, aggQuantity, aggAmount) = await _saleRepository.GetSalesReportAggregatesAsync(
+            posIds,
+            request.StartDate, request.EndDate,
+            request.PointOfSaleId, request.ProductId,
+            request.UserId, request.PaymentMethodId,
+            request.Search, request.AmountMin, request.AmountMax,
+            request.HasPhoto, request.PriceWasOverridden);
+
+        var totalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize);
+
+        return new SalesReportResponse
+        {
+            Items = sales.Select(MapToReportItemDto).ToList(),
+            TotalCount = totalCount,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalPages = totalPages,
+            TotalSalesCount = aggCount,
+            TotalQuantity = aggQuantity,
+            TotalAmount = aggAmount
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<(MemoryStream Stream, int TotalCount)> ExportSalesReportAsync(
+        SalesReportFilterRequest request,
+        Guid userId,
+        bool isAdmin)
+    {
+        var posIds = await GetAuthorizedPosIdsAsync(userId, isAdmin);
+
+        var (aggCount, _, _) = await _saleRepository.GetSalesReportAggregatesAsync(
+            posIds,
+            request.StartDate, request.EndDate,
+            request.PointOfSaleId, request.ProductId,
+            request.UserId, request.PaymentMethodId,
+            request.Search, request.AmountMin, request.AmountMax,
+            request.HasPhoto, request.PriceWasOverridden);
+
+        if (aggCount > 10_000)
+        {
+            throw new InvalidOperationException($"EXPORT_LIMIT_EXCEEDED:{aggCount}");
+        }
+
+        var (sales, _) = await _saleRepository.GetSalesForReportAsync(
+            posIds,
+            request.StartDate, request.EndDate,
+            request.PointOfSaleId, request.ProductId,
+            request.UserId, request.PaymentMethodId,
+            request.Search, request.AmountMin, request.AmountMax,
+            request.HasPhoto, request.PriceWasOverridden,
+            skip: 0, take: 10_000);
+
+        var items = sales.Select(MapToReportItemDto).ToList();
+
+        var stream = GenerateSalesReportExcel(items);
+        return (stream, aggCount);
+    }
+
+    private MemoryStream GenerateSalesReportExcel(List<SalesReportItemDto> items)
+    {
+        using var workbook = new ClosedXML.Excel.XLWorkbook();
+
+        var ws = workbook.Worksheets.Add("Ventas");
+        var headers = new[]
+        {
+            "Fecha", "Hora", "SKU", "Producto", "Colección", "Punto de venta",
+            "Cantidad", "Precio", "Total", "Precio original",
+            "Método de pago", "Operador", "Notas", "Con foto"
+        };
+        for (var c = 0; c < headers.Length; c++)
+            ws.Cell(1, c + 1).Value = headers[c];
+
+        var headerRange = ws.Range(1, 1, 1, headers.Length);
+        headerRange.Style.Font.Bold = true;
+        headerRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var row = i + 2;
+            var item = items[i];
+            ws.Cell(row, 1).Value = item.SaleDate.ToString("dd/MM/yyyy");
+            ws.Cell(row, 2).Value = item.SaleDate.ToString("HH:mm");
+            ws.Cell(row, 3).Value = item.ProductSku;
+            ws.Cell(row, 4).Value = item.ProductName;
+            ws.Cell(row, 5).Value = item.CollectionName ?? "";
+            ws.Cell(row, 6).Value = item.PointOfSaleName;
+            ws.Cell(row, 7).Value = item.Quantity;
+            ws.Cell(row, 8).Value = item.Price;
+            ws.Cell(row, 9).Value = item.Total;
+            ws.Cell(row, 10).Value = item.PriceWasOverridden ? item.OriginalProductPrice ?? 0m : 0m;
+            if (!item.PriceWasOverridden)
+                ws.Cell(row, 10).Value = "";
+            ws.Cell(row, 11).Value = item.PaymentMethodName;
+            ws.Cell(row, 12).Value = item.OperatorName;
+            ws.Cell(row, 13).Value = item.Notes ?? "";
+            ws.Cell(row, 14).Value = item.HasPhoto ? "Sí" : "No";
+        }
+
+        ws.Columns(8, 10).Style.NumberFormat.Format = "#,##0.00";
+        ws.Columns().AdjustToContents();
+
+        var wsSummary = workbook.Worksheets.Add("Resumen por punto de venta");
+        var summaryHeaders = new[] { "Punto de venta", "Nº ventas", "Cantidad total", "Importe total" };
+        for (var c = 0; c < summaryHeaders.Length; c++)
+            wsSummary.Cell(1, c + 1).Value = summaryHeaders[c];
+
+        var summaryHeaderRange = wsSummary.Range(1, 1, 1, summaryHeaders.Length);
+        summaryHeaderRange.Style.Font.Bold = true;
+        summaryHeaderRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
+
+        var posSummary = items
+            .GroupBy(i => i.PointOfSaleName)
+            .Select(g => new
+            {
+                PosName = g.Key,
+                SalesCount = g.Count(),
+                TotalQuantity = g.Sum(x => x.Quantity),
+                TotalAmount = g.Sum(x => x.Total)
+            })
+            .OrderBy(x => x.PosName)
+            .ToList();
+
+        for (var i = 0; i < posSummary.Count; i++)
+        {
+            var row = i + 2;
+            var pos = posSummary[i];
+            wsSummary.Cell(row, 1).Value = pos.PosName;
+            wsSummary.Cell(row, 2).Value = pos.SalesCount;
+            wsSummary.Cell(row, 3).Value = pos.TotalQuantity;
+            wsSummary.Cell(row, 4).Value = pos.TotalAmount;
+        }
+
+        var totalRow = posSummary.Count + 2;
+        wsSummary.Cell(totalRow, 1).Value = "TOTAL GENERAL";
+        wsSummary.Cell(totalRow, 2).Value = posSummary.Sum(x => x.SalesCount);
+        wsSummary.Cell(totalRow, 3).Value = posSummary.Sum(x => x.TotalQuantity);
+        wsSummary.Cell(totalRow, 4).Value = posSummary.Sum(x => x.TotalAmount);
+
+        var totalRowRange = wsSummary.Range(totalRow, 1, totalRow, summaryHeaders.Length);
+        totalRowRange.Style.Font.Bold = true;
+
+        wsSummary.Column(4).Style.NumberFormat.Format = "#,##0.00";
+        wsSummary.Columns().AdjustToContents();
+
+        var ms = new MemoryStream();
+        workbook.SaveAs(ms);
+        ms.Position = 0;
+        return ms;
+    }
+
+    private async Task<List<Guid>?> GetAuthorizedPosIdsAsync(Guid userId, bool isAdmin)
+    {
+        if (isAdmin)
+            return null;
+
+        return await _userPointOfSaleRepository
+            .GetAll()
+            .Where(ups => ups.UserId == userId && ups.IsActive)
+            .Select(ups => ups.PointOfSaleId)
+            .ToListAsync();
+    }
+
+    private static SalesReportItemDto MapToReportItemDto(Sale sale)
+    {
+        return new SalesReportItemDto
+        {
+            Id = sale.Id,
+            SaleDate = sale.SaleDate,
+            ProductName = sale.Product?.Name ?? string.Empty,
+            ProductSku = sale.Product?.SKU ?? string.Empty,
+            CollectionName = sale.Product?.Collection?.Name,
+            PointOfSaleName = sale.PointOfSale?.Name ?? string.Empty,
+            Quantity = sale.Quantity,
+            Price = sale.Price,
+            Total = sale.GetTotal(),
+            OriginalProductPrice = sale.OriginalProductPrice,
+            PriceWasOverridden = sale.PriceWasOverridden,
+            PaymentMethodName = sale.PaymentMethod?.Name ?? string.Empty,
+            OperatorName = sale.User?.Username ?? string.Empty,
+            Notes = sale.Notes,
+            HasPhoto = sale.Photo != null
+        };
+    }
+
     /// <summary>
     /// Maps a Sale entity to a SaleDto.
     /// </summary>

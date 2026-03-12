@@ -4,7 +4,7 @@
  */
 
 import { Link } from 'react-router-dom';
-import { TrendingUp, PackageX } from 'lucide-react';
+import { TrendingUp, PackageX, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/routing/routes';
@@ -20,6 +20,29 @@ export function ReportsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="size-5" />
+              Reporte de Ventas
+            </CardTitle>
+            <CardDescription>
+              Análisis detallado de ventas con exportación a Excel
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Consulta ventas con filtros avanzados, totales globales por filtro y exportación
+              a Excel con resumen por punto de venta.
+            </p>
+            <Button variant="secondary" asChild className="w-full">
+              <Link to={ROUTES.REPORTS.SALES}>
+                Ver Reporte
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

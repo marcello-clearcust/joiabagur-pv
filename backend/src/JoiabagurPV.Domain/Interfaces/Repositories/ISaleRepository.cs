@@ -79,4 +79,42 @@ public interface ISaleRepository : IRepository<Sale>
         Guid? paymentMethodId = null,
         int skip = 0,
         int take = 50);
+
+    /// <summary>
+    /// Gets sales for the report with extended filters and pagination.
+    /// Includes Product.Collection navigation for collection name.
+    /// </summary>
+    Task<(List<Sale> Sales, int TotalCount)> GetSalesForReportAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null,
+        Guid? productId = null,
+        Guid? userId = null,
+        Guid? paymentMethodId = null,
+        string? search = null,
+        decimal? amountMin = null,
+        decimal? amountMax = null,
+        bool? hasPhoto = null,
+        bool? priceWasOverridden = null,
+        int skip = 0,
+        int take = 20);
+
+    /// <summary>
+    /// Gets aggregate totals for the sales report (count, total quantity, total amount) 
+    /// over the full filtered result set without pagination.
+    /// </summary>
+    Task<(int TotalCount, int TotalQuantity, decimal TotalAmount)> GetSalesReportAggregatesAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null,
+        Guid? productId = null,
+        Guid? userId = null,
+        Guid? paymentMethodId = null,
+        string? search = null,
+        decimal? amountMin = null,
+        decimal? amountMax = null,
+        bool? hasPhoto = null,
+        bool? priceWasOverridden = null);
 }

@@ -51,6 +51,7 @@ export const ROUTES = {
   POINTS_OF_SALE: '/points-of-sale',
   REPORTS: {
     ROOT: '/reports',
+    SALES: '/reports/sales',
     PRODUCT_MARGINS: '/reports/product-margins',
     PRODUCTS_WITHOUT_COMPONENTS: '/reports/products-without-components',
   },

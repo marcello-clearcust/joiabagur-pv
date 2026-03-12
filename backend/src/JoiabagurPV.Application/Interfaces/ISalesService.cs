@@ -56,4 +56,16 @@ public interface ISalesService
     /// All lines must use the same point of sale and payment method.
     /// </summary>
     Task<CreateBulkSalesResult> CreateBulkSalesAsync(CreateBulkSalesRequest request, Guid userId, bool isAdmin);
+
+    /// <summary>
+    /// Gets a paginated sales report with extended filters and global aggregates.
+    /// Admins see all POS, operators see only assigned POS.
+    /// </summary>
+    Task<SalesReportResponse> GetSalesReportAsync(SalesReportFilterRequest request, Guid userId, bool isAdmin);
+
+    /// <summary>
+    /// Exports the sales report as an Excel file (MemoryStream).
+    /// Throws InvalidOperationException if the filtered result exceeds 10,000 rows.
+    /// </summary>
+    Task<(MemoryStream Stream, int TotalCount)> ExportSalesReportAsync(SalesReportFilterRequest request, Guid userId, bool isAdmin);
 }

@@ -134,9 +134,141 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
         return (sales, totalCount);
     }
 
-    /// <summary>
-    /// Applies common filters to a sale query.
-    /// </summary>
+    /// <inheritdoc/>
+    public async Task<(List<Sale> Sales, int TotalCount)> GetSalesForReportAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null,
+        Guid? productId = null,
+        Guid? userId = null,
+        Guid? paymentMethodId = null,
+        string? search = null,
+        decimal? amountMin = null,
+        decimal? amountMax = null,
+        bool? hasPhoto = null,
+        bool? priceWasOverridden = null,
+        int skip = 0,
+        int take = 20)
+    {
+        var query = BuildReportQuery(pointOfSaleIds, startDate, endDate, pointOfSaleId,
+            productId, userId, paymentMethodId, search, amountMin, amountMax, hasPhoto, priceWasOverridden);
+
+        var totalCount = await query.CountAsync();
+
+        var sales = await query
+            .OrderByDescending(s => s.SaleDate)
+            .ThenByDescending(s => s.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return (sales, totalCount);
+    }
+
+    /// <inheritdoc/>
+    public async Task<(int TotalCount, int TotalQuantity, decimal TotalAmount)> GetSalesReportAggregatesAsync(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        Guid? pointOfSaleId = null,
+        Guid? productId = null,
+        Guid? userId = null,
+        Guid? paymentMethodId = null,
+        string? search = null,
+        decimal? amountMin = null,
+        decimal? amountMax = null,
+        bool? hasPhoto = null,
+        bool? priceWasOverridden = null)
+    {
+        var query = BuildReportQuery(pointOfSaleIds, startDate, endDate, pointOfSaleId,
+            productId, userId, paymentMethodId, search, amountMin, amountMax, hasPhoto, priceWasOverridden);
+
+        var result = await query
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TotalCount = g.Count(),
+                TotalQuantity = g.Sum(s => s.Quantity),
+                TotalAmount = g.Sum(s => s.Price * s.Quantity)
+            })
+            .FirstOrDefaultAsync();
+
+        if (result == null)
+            return (0, 0, 0m);
+
+        return (result.TotalCount, result.TotalQuantity, result.TotalAmount);
+    }
+
+    private IQueryable<Sale> BuildReportQuery(
+        IEnumerable<Guid>? pointOfSaleIds,
+        DateTime? startDate,
+        DateTime? endDate,
+        Guid? pointOfSaleId,
+        Guid? productId,
+        Guid? userId,
+        Guid? paymentMethodId,
+        string? search,
+        decimal? amountMin,
+        decimal? amountMax,
+        bool? hasPhoto,
+        bool? priceWasOverridden)
+    {
+        var query = _context.Sales
+            .Include(s => s.Product)
+                .ThenInclude(p => p.Collection)
+            .Include(s => s.PointOfSale)
+            .Include(s => s.User)
+            .Include(s => s.PaymentMethod)
+            .Include(s => s.Photo)
+            .AsQueryable();
+
+        if (pointOfSaleIds != null)
+        {
+            var posIds = pointOfSaleIds.ToList();
+            query = query.Where(s => posIds.Contains(s.PointOfSaleId));
+        }
+
+        if (pointOfSaleId.HasValue)
+        {
+            query = query.Where(s => s.PointOfSaleId == pointOfSaleId.Value);
+        }
+
+        query = ApplyFilters(query, startDate, endDate, productId, userId, paymentMethodId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLower();
+            query = query.Where(s =>
+                s.Product.SKU.ToLower().Contains(searchLower) ||
+                s.Product.Name.ToLower().Contains(searchLower));
+        }
+
+        if (amountMin.HasValue)
+        {
+            query = query.Where(s => s.Price * s.Quantity >= amountMin.Value);
+        }
+
+        if (amountMax.HasValue)
+        {
+            query = query.Where(s => s.Price * s.Quantity <= amountMax.Value);
+        }
+
+        if (hasPhoto.HasValue)
+        {
+            query = hasPhoto.Value
+                ? query.Where(s => s.Photo != null)
+                : query.Where(s => s.Photo == null);
+        }
+
+        if (priceWasOverridden.HasValue)
+        {
+            query = query.Where(s => s.PriceWasOverridden == priceWasOverridden.Value);
+        }
+
+        return query;
+    }
+
     private static IQueryable<Sale> ApplyFilters(
         IQueryable<Sale> query,
         DateTime? startDate,

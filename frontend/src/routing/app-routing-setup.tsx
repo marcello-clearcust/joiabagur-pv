@@ -35,6 +35,7 @@ const ComponentListPage = lazy(() => import('@/pages/products/components'));
 const ComponentTemplatesPage = lazy(() => import('@/pages/products/component-templates'));
 const ProductMarginsPage = lazy(() => import('@/pages/reports/product-margins'));
 const ProductsWithoutComponentsPage = lazy(() => import('@/pages/reports/products-without-components'));
+const SalesReportPage = lazy(() => import('@/pages/reports/sales'));
 
 /**
  * Loading fallback component for lazy-loaded pages
@@ -100,6 +101,7 @@ export function AppRoutingSetup() {
             <Route path={ROUTES.USERS} element={<UsersPage />} />
             <Route path={ROUTES.POINTS_OF_SALE} element={<PointsOfSalePage />} />
             <Route path={ROUTES.REPORTS.ROOT} element={<ReportsPage />} />
+            <Route path={ROUTES.REPORTS.SALES} element={<SalesReportPage />} />
             <Route path={ROUTES.REPORTS.PRODUCT_MARGINS} element={<ProductMarginsPage />} />
             <Route path={ROUTES.REPORTS.PRODUCTS_WITHOUT_COMPONENTS} element={<ProductsWithoutComponentsPage />} />
             <Route path={ROUTES.AI_MODEL} element={<AIModelPage />} />

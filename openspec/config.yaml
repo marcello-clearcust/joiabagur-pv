@@ -1,0 +1,60 @@
+schema: spec-driven
+
+context: |
+  Jewelry POS management system — multi-location inventory, sales, AI image recognition.
+  Target: 2-3 concurrent users, ~500 products, free-tier cloud (AWS).
+
+  Backend: .NET 10, ASP.NET Core Web API, C#, EF Core, PostgreSQL 15+, JWT auth, Serilog.
+  API docs: Scalar (not Swagger). Excel: ClosedXML. Passwords: BCrypt.Net.
+  Layered monolith: Domain → Infrastructure → Application → API.
+  Testing: xUnit, Moq, FluentAssertions, Bogus, Testcontainers.
+
+  Frontend: React 19, TypeScript (strict), Vite, Metronic React (Layout 8 sidebar).
+  UI: Radix UI + Tailwind CSS + Lucide icons. Forms: React Hook Form + Zod.
+  Tables: TanStack Table. Routing: React Router v7. Toasts: Sonner. Theme: next-themes.
+  Testing: Vitest, React Testing Library, MSW, Playwright.
+  ML: TensorFlow.js client-side inference (MobileNetV2 transfer learning).
+
+  Infra: Docker Compose (dev), AWS App Runner + RDS + S3 + CloudFront (prod).
+  Storage: IFileStorageService abstraction (local dev, S3 prod).
+
+  Roles: Admin (full access), Operator (restricted to assigned POS).
+  Currency: EUR (€), locale es-ES. UI language: Spanish. Technical docs: English.
+
+  Key constraints:
+  - Max 5-10 DB connections (connection pooling).
+  - Mandatory pagination on all lists (max 50 items/page).
+  - Frontend bundle < 500KB initial load.
+  - Stock cannot be negative (application-level validation).
+  - Sale.Price is a snapshot, not a reference to current product price.
+  - Manual price override only when POS.AllowManualPriceEdit = true, audited.
+  - Cart checkout is atomic (all-or-nothing) with idempotency key; all lines same POS + payment method.
+  - Returns: same POS as sale, 30-day window, mandatory category, multi-sale supported.
+  - Inventory.IsActive determines product assignment to POS (not just quantity).
+  - Prefer Metronic UI components over custom implementations.
+  - Backend naming: Microsoft C# conventions, async/await for I/O, Repository + Service patterns.
+  - Frontend naming: functional components, hooks, colocated tests.
+
+  Epics: EP1-Products, EP2-Inventory, EP3-Sales, EP4-AI Recognition, EP5-Returns,
+  EP6-Payment Methods, EP7-Auth/Users, EP8-POS, EP9-Reports, EP10-Jewelry Components.
+
+  Reference docs: Documentos/epicas.md, Documentos/modelo-de-datos.md,
+  Documentos/arquitectura.md, Documentos/Guias/*.md, Documentos/Historias/*.md.
+
+rules:
+  proposal:
+    - Proposals must not contain code — only design documents (proposal.md, tasks.md, design.md, spec deltas).
+    - Check Documentos/epicas.md for existing user stories before proposing new ones.
+    - Reference the data model in Documentos/modelo-de-datos.md for entity/field decisions.
+  specs:
+    - Use Given/When/Then format for all scenarios.
+    - Reference existing spec patterns in openspec/specs/ before inventing new ones.
+    - Spec requirements must be verifiable (no vague qualifiers like "fast" or "user-friendly").
+  design:
+    - Include sequence diagrams for flows spanning multiple layers or services.
+    - Document trade-offs explicitly when multiple approaches exist.
+  tasks:
+    - Each task must be completable in a single AI coding session.
+    - Include validation step (test, build, manual check) in every task.
+    - After completing tasks, update affected docs in Documentos/ (epicas.md, modelo-de-datos.md, Historias/, Guias/).
+    - Backend test naming: Method_Scenario_ExpectedResult. Frontend: should [behavior] when [condition].

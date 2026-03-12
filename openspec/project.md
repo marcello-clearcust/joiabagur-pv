@@ -13,16 +13,17 @@
 - Free-tier cloud deployment (AWS/Azure)
 
 ### MVP Scope (Phase 1)
-9 Epics with 35 User Stories covering:
+10 Epics with 47 User Stories covering:
 - **EP1**: Product Management (7 stories)
-- **EP2**: Inventory Management (5 stories)
-- **EP3**: Sales Registration (2 stories)
+- **EP2**: Inventory Management (6 stories — includes assign/unassign products to POS)
+- **EP3**: Sales Registration (4 stories — includes manual price override, cart & bulk checkout)
 - **EP4**: AI Image Recognition (1 story)
-- **EP5**: Returns Management (3 stories)
+- **EP5**: Returns Management (3 stories — multi-sale, partial, categorized)
 - **EP6**: Payment Methods Management (3 stories)
 - **EP7**: Authentication & User Management (6 stories)
-- **EP8**: Points of Sale Management (4 stories)
+- **EP8**: Points of Sale Management (5 stories — includes AllowManualPriceEdit config)
 - **EP9**: Queries & Reports (4 stories)
+- **EP10**: Jewelry Component Management (8 stories — master table, assignment, templates, margin reports)
 
 ---
 
@@ -55,8 +56,9 @@
 - **Containers**: Docker, Docker Compose (development)
 - **CI/CD**: GitHub Actions
 - **Repository**: GitHub
-- **Cloud**: AWS (ECS/App Runner, RDS, S3, CloudFront) or Azure (App Service, PostgreSQL, Blob Storage, CDN)
+- **Cloud**: AWS (App Runner, RDS PostgreSQL, S3, CloudFront, Secrets Manager)
 - **Target**: Free-tier optimized deployment
+- **Locale**: es-ES, currency EUR (€)
 
 ### Testing Stack
 
@@ -151,8 +153,9 @@
 
 ### Documentation
 
-- **Language**: Technical documentation in English, User Stories in Spanish
+- **Language**: Technical documentation in English, User Stories and user-facing guides in Spanish
 - **Tickets**: Written in English for code consistency
+- **UI Language**: Spanish (es-ES)
 - **Location**: `Documentos/` folder for all project documentation
 - **User Stories**: `Documentos/Historias/HU-EP[X]-[NNN].md`
 - **Work Tickets**: `Tickets/EP[X]/HU-EP[X]-[NNN]/T-EP[X]-[NNN]-[MMM].md`
@@ -185,14 +188,21 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 - **ProductPhoto**: Multiple reference photos per product for ML training
 - **PointOfSale**: Store locations with assigned operators, payment methods, and manual price edit policy (`AllowManualPriceEdit`)
 - **User**: Admin (full access) or Operator (restricted to assigned locations)
-- **Sale**: Transaction with price snapshot (official or manual override), payment method, optional photo, override audit fields (`PriceWasOverridden`, `OriginalProductPrice`)
-- **Inventory**: Stock quantity per product per location
-- **InventoryMovement**: Full audit trail (Sale, Return, Adjustment, Import)
+- **Sale**: Transaction with price snapshot (official or manual override), payment method, optional photo, override audit fields (`PriceWasOverridden`, `OriginalProductPrice`), optional `BulkOperationId` for cart checkout grouping
+- **SalePhoto**: Optional photo attached to a sale (image recognition or manual)
+- **Inventory**: Stock quantity per product per location. `IsActive` flag = product assigned to POS (soft delete)
+- **InventoryMovement**: Full audit trail (Sale, Return, Adjustment, Import) with `QuantityBefore`/`QuantityAfter`
 - **PaymentMethod**: Efectivo, Bizum, Transferencia, Tarjeta TPV propio, Tarjeta TPV punto de venta, PayPal
-- **Return**: Linked to original sale, auto-updates inventory
+- **Return**: Multi-sale returns with category (Defectuoso, TamañoIncorrecto, NoSatisfecho, Otro), optional reason & photo, 30-day window, same POS only
+- **ReturnSale**: Many-to-many between Return and Sale with quantity and unit price snapshot
+- **ReturnPhoto**: Optional photo for return documentation
+- **RefreshToken**: JWT refresh token with revocation and rotation tracking
 - **ProductComponent**: Master table of jewelry components (materials, labor) with optional cost/sale prices
-- **ProductComponentAssignment**: Component assigned to product with quantity and override prices
+- **ProductComponentAssignment**: Component assigned to product with quantity, override prices, display order
 - **ComponentTemplate**: Reusable template of components for quick product setup
+- **ComponentTemplateItem**: Component within a template with quantity
+- **ModelMetadata**: AI model versions with accuracy metrics, only one active at a time
+- **ModelTrainingJob**: Training job status tracking (Queued, InProgress, Completed, Failed) with progress
 
 ### Business Rules
 1. Operators can only access assigned points of sale
@@ -202,6 +212,11 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 5. Products need at least one photo for image recognition
 6. Only one photo can be marked as primary per product
 7. Manual sale price edits are only allowed when the POS has `AllowManualPriceEdit = true`; overrides are audited with `PriceWasOverridden` and `OriginalProductPrice`
+8. Returns must be at the same POS as the original sale, within 30 days, with mandatory category
+9. Cart checkout is atomic (all-or-nothing) with idempotency key to prevent duplicates; all lines share same POS and payment method
+10. Inventory record presence (`IsActive = true`) determines product assignment to POS (visible to operators)
+11. Jewelry component prices use 4-decimal precision; component management is admin-only
+12. AI model trains in-browser via TensorFlow.js (MobileNetV2 transfer learning); confidence threshold 40%
 
 ---
 
@@ -236,11 +251,13 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 
 ## External Dependencies
 
-### Cloud Services (Production)
-- **PostgreSQL**: RDS (AWS) or Azure Database for PostgreSQL
-- **Object Storage**: S3 (AWS) or Azure Blob Storage
-- **CDN**: CloudFront (AWS) or Azure CDN
-- **Container Hosting**: ECS Fargate/App Runner (AWS) or Azure App Service
+### Cloud Services (Production — AWS)
+- **PostgreSQL**: RDS (db.t3.micro, 20GB)
+- **Object Storage**: S3 (5GB)
+- **CDN**: CloudFront
+- **Container Hosting**: App Runner (0.25 vCPU, 0.5GB RAM)
+- **Secrets**: AWS Secrets Manager
+- **Logging**: CloudWatch Logs
 
 ### Third-party Libraries
 
@@ -267,22 +284,6 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 
 ---
 
-## Implementation Order
-
-Epics must be implemented in this order due to dependencies:
-
-1. **EP7**: Authentication & User Management (system foundation)
-2. **EP8**: Points of Sale Management (required for inventory, sales)
-3. **EP6**: Payment Methods Management (required for sales)
-4. **EP1**: Product Management (required for sales, inventory)
-5. **EP2**: Inventory Management (required for sales)
-6. **EP3**: Sales Registration (core functionality)
-7. **EP4**: AI Image Recognition (enhances sales)
-8. **EP5**: Returns Management (complement)
-9. **EP9**: Queries & Reports (analysis)
-
----
-
 ## Key Documentation References
 
 - **Architecture**: `Documentos/arquitectura.md`
@@ -293,5 +294,9 @@ Epics must be implemented in this order due to dependencies:
 - **Testing Frontend**: `Documentos/testing-frontend.md` + `Documentos/Testing/Frontend/`
 - **Metronic Analysis**: `Documentos/Propuestas/analisis-metronic-frontend.md`
 - **Technical Clarifications**: `Documentos/Propuestas/aclaraciones-tecnicas.md`
+- **AWS Deploy Guide**: `Documentos/Guias/deploy-aws-production.md`
+- **AI Model Admin Guide**: `Documentos/Guias/admin-modelo-ia.md`
+- **Sales Registration Guide**: `Documentos/Guias/ventas-registro.md`
+- **AWS vs Azure Comparison**: `Documentos/Propuestas/comparacion-aws-azure-deploy.md`
 - **User Story Procedure**: `Documentos/Procedimientos/Procedimiento-UserStories.md`
 - **Work Ticket Procedure**: `Documentos/Procedimientos/Procedimiento-TicketsTrabajo.md`

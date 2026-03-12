@@ -75,7 +75,7 @@ export function OperatorDashboard() {
             pageSize: 50,
             page: 1,
           }),
-          inventoryService.getStock(posId, 1, 50),
+          inventoryService.getAllStock(posId),
         ]);
 
         setStats(dashStats);

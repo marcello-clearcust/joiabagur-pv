@@ -120,7 +120,7 @@ export const inventoryService = {
   // ==================== Stock View Operations ====================
 
   /**
-   * Get stock for a point of sale
+   * Get stock for a point of sale (single page)
    */
   getStock: async (
     pointOfSaleId: string,
@@ -134,6 +134,38 @@ export const inventoryService = {
       }
     );
     return response.data;
+  },
+
+  /**
+   * Get all stock for a point of sale (fetches all pages)
+   */
+  getAllStock: async (
+    pointOfSaleId: string,
+    pageSize = 100
+  ): Promise<PaginatedInventoryResult> => {
+    const allItems: Inventory[] = [];
+    let currentPage = 1;
+
+    while (true) {
+      const response = await apiClient.get<PaginatedInventoryResult>(
+        INVENTORY_ENDPOINTS.STOCK,
+        {
+          params: { pointOfSaleId, page: currentPage, pageSize },
+        }
+      );
+      allItems.push(...response.data.items);
+
+      if (allItems.length >= response.data.totalCount) break;
+      currentPage++;
+    }
+
+    return {
+      items: allItems,
+      totalCount: allItems.length,
+      page: 1,
+      pageSize: allItems.length,
+      totalPages: 1,
+    };
   },
 
   /**

@@ -9,6 +9,21 @@ import * as tf from '@tensorflow/tfjs';
 import { imageRecognitionService } from './sales.service';
 import type { ProductSuggestion } from '@/types/sales.types';
 
+const AUTH_TOKEN_KEY = 'jpv_access_token';
+
+/**
+ * Build request headers with JWT Bearer token for authenticated fetch/TF.js calls
+ * that bypass the Axios interceptor (e.g. tf.loadLayersModel, raw fetch).
+ */
+function getAuthRequestInit(): RequestInit {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return { credentials: 'include' as RequestCredentials, headers };
+}
+
 /**
  * Confidence Threshold Configuration
  * 
@@ -225,7 +240,7 @@ async function loadClassLabels(version: string): Promise<string[]> {
     const classLabelsUrl = imageRecognitionService.getModelUrl(version, 'class_labels.json');
     const cacheBustedUrl = `${classLabelsUrl}${classLabelsUrl.includes('?') ? '&' : '?'}cb=${Date.now()}`;
     
-    const response = await fetch(cacheBustedUrl, { credentials: 'include' });
+    const response = await fetch(cacheBustedUrl, getAuthRequestInit());
     
     if (!response.ok) {
       console.warn('class_labels.json not found, falling back to API class labels');
@@ -261,15 +276,17 @@ export async function loadModel(version: string): Promise<tf.LayersModel> {
     const modelUrl = imageRecognitionService.getModelUrl(version, 'model.json');
     const cacheBustedUrl = `${modelUrl}${modelUrl.includes('?') ? '&' : '?'}cb=${Date.now()}`;
     
+    const authInit = getAuthRequestInit();
+    
     // Browser-trained models are LayersModel format (classification head)
     try {
       cachedClassificationHead = await tf.loadLayersModel(cacheBustedUrl, {
-        requestInit: { credentials: 'include' },
+        requestInit: authInit,
       });
     } catch (layersError) {
       // Backward-compat fallback: if a GraphModel is served, try graph loader
       const graph = await tf.loadGraphModel(cacheBustedUrl, {
-        requestInit: { credentials: 'include' },
+        requestInit: authInit,
       });
       cachedClassificationHead = graph as unknown as tf.LayersModel;
     }

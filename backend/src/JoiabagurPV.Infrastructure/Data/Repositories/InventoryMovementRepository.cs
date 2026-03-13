@@ -74,5 +74,37 @@ public class InventoryMovementRepository : Repository<InventoryMovement>, IInven
 
         return (movements, totalCount);
     }
+
+    /// <inheritdoc/>
+    public IQueryable<MovementSummaryProjection> GetMovementSummaryByProduct(
+        DateTime startDate,
+        DateTime endDate,
+        Guid? pointOfSaleId = null)
+    {
+        var query = _dbSet
+            .Where(m => m.MovementDate >= startDate && m.MovementDate <= endDate);
+
+        if (pointOfSaleId.HasValue)
+        {
+            query = query.Where(m => m.Inventory.PointOfSaleId == pointOfSaleId.Value);
+        }
+
+        return query
+            .GroupBy(m => new
+            {
+                m.Inventory.ProductId,
+                m.Inventory.Product.Name,
+                m.Inventory.Product.SKU
+            })
+            .Select(g => new MovementSummaryProjection(
+                g.Key.ProductId,
+                g.Key.Name,
+                g.Key.SKU,
+                g.Sum(m => m.QuantityChange > 0 ? m.QuantityChange : 0),
+                g.Sum(m => m.QuantityChange < 0 ? -m.QuantityChange : 0),
+                g.Sum(m => m.QuantityChange > 0 ? m.QuantityChange : 0)
+                    - g.Sum(m => m.QuantityChange < 0 ? -m.QuantityChange : 0)
+            ));
+    }
 }
 

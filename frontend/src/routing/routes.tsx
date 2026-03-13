@@ -54,6 +54,7 @@ export const ROUTES = {
     SALES: '/reports/sales',
     PRODUCT_MARGINS: '/reports/product-margins',
     PRODUCTS_WITHOUT_COMPONENTS: '/reports/products-without-components',
+    INVENTORY_MOVEMENT_SUMMARY: '/reports/inventory-movement-summary',
   },
 } as const;
 

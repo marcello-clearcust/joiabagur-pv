@@ -66,6 +66,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IComponentTemplateService, ComponentTemplateService>();
         services.AddScoped<IComponentReportService, ComponentReportService>();
 
+        // Register report services
+        services.AddScoped<IInventoryMovementReportService, InventoryMovementReportService>();
+
         // Register image recognition services
         services.AddScoped<IImageRecognitionService, ImageRecognitionService>();
         services.AddScoped<IModelHealthService, ModelHealthService>();

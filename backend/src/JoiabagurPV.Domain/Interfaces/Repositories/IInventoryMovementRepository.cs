@@ -3,6 +3,17 @@ using JoiabagurPV.Domain.Entities;
 namespace JoiabagurPV.Domain.Interfaces.Repositories;
 
 /// <summary>
+/// Projection for aggregated inventory movement summary per product.
+/// </summary>
+public record MovementSummaryProjection(
+    Guid ProductId,
+    string ProductName,
+    string ProductSku,
+    int Additions,
+    int Subtractions,
+    int Difference);
+
+/// <summary>
 /// Repository interface for InventoryMovement entities.
 /// </summary>
 public interface IInventoryMovementRepository : IRepository<InventoryMovement>
@@ -32,5 +43,13 @@ public interface IInventoryMovementRepository : IRepository<InventoryMovement>
         DateTime? endDate = null,
         int page = 1,
         int pageSize = 50);
+
+    /// <summary>
+    /// Gets inventory movements aggregated by product within a date range.
+    /// </summary>
+    IQueryable<MovementSummaryProjection> GetMovementSummaryByProduct(
+        DateTime startDate,
+        DateTime endDate,
+        Guid? pointOfSaleId = null);
 }
 

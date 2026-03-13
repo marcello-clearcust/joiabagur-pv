@@ -57,4 +57,4 @@ rules:
     - Each task must be completable in a single AI coding session.
     - Include validation step (test, build, manual check) in every task.
     - After completing tasks, update affected docs in Documentos/ (epicas.md, modelo-de-datos.md, Historias/, Guias/).
-    - Backend test naming: Method_Scenario_ExpectedResult. Frontend: should [behavior] when [condition].
+    - "Backend test naming: Method_Scenario_ExpectedResult. Frontend: should [behavior] when [condition]."

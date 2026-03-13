@@ -4,7 +4,7 @@
  */
 
 import { Link } from 'react-router-dom';
-import { TrendingUp, PackageX, ShoppingCart } from 'lucide-react';
+import { TrendingUp, PackageX, ShoppingCart, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ROUTES } from '@/routing/routes';
@@ -82,6 +82,29 @@ export function ReportsPage() {
             </p>
             <Button variant="secondary" asChild className="w-full">
               <Link to={ROUTES.REPORTS.PRODUCTS_WITHOUT_COMPONENTS}>
+                Ver Reporte
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="size-5" />
+              Resumen de movimientos de inventario
+            </CardTitle>
+            <CardDescription>
+              Adiciones y sustracciones agregadas por producto
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Vista agregada de entradas y salidas de inventario por producto en un rango de fechas,
+              con filtro opcional por punto de venta y exportación a Excel.
+            </p>
+            <Button variant="secondary" asChild className="w-full">
+              <Link to={ROUTES.REPORTS.INVENTORY_MOVEMENT_SUMMARY}>
                 Ver Reporte
               </Link>
             </Button>

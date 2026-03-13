@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -163,8 +163,12 @@ export function AdminDashboard() {
     load();
   }, []);
 
+  const stockPageInitialRef = useRef(true);
   useEffect(() => {
-    if (stockPage === 1) return;
+    if (stockPageInitialRef.current) {
+      stockPageInitialRef.current = false;
+      return;
+    }
     const abortController = new AbortController();
     const loadPage = async () => {
       setStockLoading(true);

@@ -1,7 +1,6 @@
 using JoiabagurPV.Application.DTOs.Inventory;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Interfaces.Repositories;
-using Microsoft.EntityFrameworkCore;
 
 namespace JoiabagurPV.Application.Services;
 
@@ -17,24 +16,24 @@ public class InventoryMovementReportService : IInventoryMovementReportService
 
     public async Task<InventoryMovementReportResponse> GetReportAsync(InventoryMovementReportFilterRequest request)
     {
-        var query = _movementRepository.GetMovementSummaryByProduct(
+        var allItems = await _movementRepository.GetMovementSummaryByProductAsync(
             request.StartDate!.Value,
             request.EndDate!.Value,
             request.PointOfSaleId);
 
-        query = ApplySorting(query, request.SortBy, request.SortDirection);
+        var sorted = ApplySorting(allItems, request.SortBy, request.SortDirection);
 
-        var totalCount = await query.CountAsync();
+        var totalCount = sorted.Count;
         var totalPages = (int)Math.Ceiling(totalCount / (double)request.PageSize);
 
-        var items = await query
+        var page = sorted
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .ToListAsync();
+            .ToList();
 
         return new InventoryMovementReportResponse
         {
-            Items = items.Select(p => new InventoryMovementSummaryRow
+            Items = page.Select(p => new InventoryMovementSummaryRow
             {
                 ProductId = p.ProductId,
                 ProductName = p.ProductName,
@@ -52,40 +51,42 @@ public class InventoryMovementReportService : IInventoryMovementReportService
 
     public async Task<(MemoryStream Stream, int TotalCount)> ExportReportAsync(InventoryMovementReportFilterRequest request)
     {
-        var query = _movementRepository.GetMovementSummaryByProduct(
+        var allItems = await _movementRepository.GetMovementSummaryByProductAsync(
             request.StartDate!.Value,
             request.EndDate!.Value,
             request.PointOfSaleId);
 
-        var totalCount = await query.CountAsync();
+        var totalCount = allItems.Count;
 
         if (totalCount > ExportLimit)
         {
             throw new InvalidOperationException($"EXPORT_LIMIT_EXCEEDED:{totalCount}");
         }
 
-        query = ApplySorting(query, request.SortBy, request.SortDirection);
+        var sorted = ApplySorting(allItems, request.SortBy, request.SortDirection);
 
-        var items = await query.Take(ExportLimit).ToListAsync();
+        var items = sorted.Take(ExportLimit).ToList();
 
         var stream = GenerateExcel(items);
         return (stream, totalCount);
     }
 
-    private static IQueryable<MovementSummaryProjection> ApplySorting(
-        IQueryable<MovementSummaryProjection> query,
+    private static List<MovementSummaryProjection> ApplySorting(
+        List<MovementSummaryProjection> items,
         string? sortBy,
         string? sortDirection)
     {
         var desc = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
 
-        return sortBy?.ToLowerInvariant() switch
+        IEnumerable<MovementSummaryProjection> sorted = sortBy?.ToLowerInvariant() switch
         {
-            "additions" => desc ? query.OrderByDescending(r => r.Additions) : query.OrderBy(r => r.Additions),
-            "subtractions" => desc ? query.OrderByDescending(r => r.Subtractions) : query.OrderBy(r => r.Subtractions),
-            "difference" => desc ? query.OrderByDescending(r => r.Difference) : query.OrderBy(r => r.Difference),
-            _ => desc ? query.OrderByDescending(r => r.ProductName) : query.OrderBy(r => r.ProductName),
+            "additions" => desc ? items.OrderByDescending(r => r.Additions) : items.OrderBy(r => r.Additions),
+            "subtractions" => desc ? items.OrderByDescending(r => r.Subtractions) : items.OrderBy(r => r.Subtractions),
+            "difference" => desc ? items.OrderByDescending(r => r.Difference) : items.OrderBy(r => r.Difference),
+            _ => desc ? items.OrderByDescending(r => r.ProductName) : items.OrderBy(r => r.ProductName),
         };
+
+        return sorted.ToList();
     }
 
     private static MemoryStream GenerateExcel(List<MovementSummaryProjection> items)

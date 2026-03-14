@@ -47,7 +47,7 @@ public interface IInventoryMovementRepository : IRepository<InventoryMovement>
     /// <summary>
     /// Gets inventory movements aggregated by product within a date range.
     /// </summary>
-    IQueryable<MovementSummaryProjection> GetMovementSummaryByProduct(
+    Task<List<MovementSummaryProjection>> GetMovementSummaryByProductAsync(
         DateTime startDate,
         DateTime endDate,
         Guid? pointOfSaleId = null);

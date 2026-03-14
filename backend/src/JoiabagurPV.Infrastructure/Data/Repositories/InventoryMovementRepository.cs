@@ -76,7 +76,7 @@ public class InventoryMovementRepository : Repository<InventoryMovement>, IInven
     }
 
     /// <inheritdoc/>
-    public IQueryable<MovementSummaryProjection> GetMovementSummaryByProduct(
+    public async Task<List<MovementSummaryProjection>> GetMovementSummaryByProductAsync(
         DateTime startDate,
         DateTime endDate,
         Guid? pointOfSaleId = null)
@@ -89,22 +89,31 @@ public class InventoryMovementRepository : Repository<InventoryMovement>, IInven
             query = query.Where(m => m.Inventory.PointOfSaleId == pointOfSaleId.Value);
         }
 
-        return query
-            .GroupBy(m => new
+        var rows = await query
+            .Select(m => new
             {
                 m.Inventory.ProductId,
-                m.Inventory.Product.Name,
-                m.Inventory.Product.SKU
+                ProductName = m.Inventory.Product.Name,
+                ProductSku = m.Inventory.Product.SKU,
+                m.QuantityChange
             })
-            .Select(g => new MovementSummaryProjection(
-                g.Key.ProductId,
-                g.Key.Name,
-                g.Key.SKU,
-                g.Sum(m => m.QuantityChange > 0 ? m.QuantityChange : 0),
-                g.Sum(m => m.QuantityChange < 0 ? -m.QuantityChange : 0),
-                g.Sum(m => m.QuantityChange > 0 ? m.QuantityChange : 0)
-                    - g.Sum(m => m.QuantityChange < 0 ? -m.QuantityChange : 0)
-            ));
+            .ToListAsync();
+
+        return rows
+            .GroupBy(m => new { m.ProductId, m.ProductName, m.ProductSku })
+            .Select(g =>
+            {
+                var additions = g.Sum(m => m.QuantityChange > 0 ? m.QuantityChange : 0);
+                var subtractions = g.Sum(m => m.QuantityChange < 0 ? -m.QuantityChange : 0);
+                return new MovementSummaryProjection(
+                    g.Key.ProductId,
+                    g.Key.ProductName,
+                    g.Key.ProductSku,
+                    additions,
+                    subtractions,
+                    additions - subtractions);
+            })
+            .ToList();
     }
 }
 

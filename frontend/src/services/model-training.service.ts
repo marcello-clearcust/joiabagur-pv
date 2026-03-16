@@ -18,9 +18,8 @@ import type { TrainingDataset } from '@/types/sales.types';
 const MOBILENET_URL = 'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/feature_vector/3/default/1';
 const IMAGE_SIZE = 224;
 const EPOCHS = 15;
-const BATCH_SIZE = 16; // Reduced from 32 to prevent memory issues
+const BATCH_SIZE = 16;
 const VALIDATION_SPLIT = 0.2;
-const MAX_CONCURRENT_IMAGE_LOADS = 10; // Limit concurrent image loading
 
 export interface TrainingCapabilities {
   hasGPU: boolean;
@@ -247,56 +246,50 @@ async function downloadPreprocessAndExtractFeatures(
     const batchEnd = Math.min(batchStart + PROCESS_BATCH_SIZE, photos.length);
     const batchPhotos = photos.slice(batchStart, batchEnd);
 
-    // Load batch of images
-    const batchPromises = batchPhotos.map(async (photo) => {
+    // Load batch of images sequentially to limit concurrent GPU texture uploads
+    const validBatchResults: { img: tf.Tensor3D; labelIndex: number }[] = [];
+
+    for (const photo of batchPhotos) {
       const labelIndex = classToIndex.get(photo.productSku);
-      
+
       if (labelIndex === undefined) {
         console.warn(`Unknown class label for SKU: ${photo.productSku} (${photo.productName})`);
-        return null;
+        continue;
       }
 
-      const absolutePhotoUrl = photo.photoUrl.startsWith('http') 
-        ? photo.photoUrl 
+      const absolutePhotoUrl = photo.photoUrl.startsWith('http')
+        ? photo.photoUrl
         : `${backendBaseUrl}${photo.photoUrl}`;
 
       try {
         const tensor = await loadAndPreprocessImage(absolutePhotoUrl);
-        return { img: tensor, labelIndex };
+        validBatchResults.push({ img: tensor, labelIndex });
       } catch (error) {
         console.error(`Failed to load image ${absolutePhotoUrl}:`, error);
-        return null;
       }
-    });
-
-    const batchResults = await Promise.all(batchPromises);
-    const validBatchResults = batchResults.filter((res): res is { img: tf.Tensor3D; labelIndex: number } => res !== null);
+    }
 
     if (validBatchResults.length > 0) {
-      // Stack batch images and extract features immediately
-      const batchImages = tf.stack(validBatchResults.map(r => r.img)) as tf.Tensor4D;
-      
-      // Extract features from this batch
-      const batchFeatures = await tf.tidy(() => {
-        const features = featureExtractor.predict(batchImages) as tf.Tensor;
-        // MobileNetV2 from TF Hub outputs [batch, 1, 1, 1280], reshape to [batch, 1280]
-        return features.reshape([validBatchResults.length, -1]) as tf.Tensor2D;
-      });
-      
-      featureArrays.push(batchFeatures);
-      
-      // Store label indices for successfully processed images
-      validBatchResults.forEach(r => labelIndices.push(r.labelIndex));
-      
-      // Dispose batch images and individual tensors immediately
-      batchImages.dispose();
-      validBatchResults.forEach(r => r.img.dispose());
-      
-      // Force GPU cleanup between batches
+      let batchImages: tf.Tensor4D | null = null;
+      try {
+        batchImages = tf.stack(validBatchResults.map(r => r.img)) as tf.Tensor4D;
+
+        const batchFeatures = tf.tidy(() => {
+          const features = featureExtractor.predict(batchImages!) as tf.Tensor;
+          return features.reshape([validBatchResults.length, -1]) as tf.Tensor2D;
+        });
+
+        featureArrays.push(batchFeatures);
+        validBatchResults.forEach(r => labelIndices.push(r.labelIndex));
+      } finally {
+        // Always clean up image tensors whether feature extraction succeeded or not
+        batchImages?.dispose();
+        validBatchResults.forEach(r => r.img.dispose());
+      }
+
       await tf.nextFrame();
     }
 
-    // Update progress
     const progress = Math.floor((batchEnd / photos.length) * 35);
     onProgress({
       stage: 'downloading',
@@ -304,7 +297,6 @@ async function downloadPreprocessAndExtractFeatures(
       message: `Procesadas ${batchEnd}/${photos.length} fotos (${progress}%)`,
     });
 
-    // Monitor memory periodically
     if (batchStart % 40 === 0) {
       monitorGPUMemory();
     }
@@ -320,13 +312,14 @@ async function downloadPreprocessAndExtractFeatures(
     message: `Consolidando características...`,
   });
 
-  // Concatenate all feature batches
-  const allFeatures = tf.concat(featureArrays, 0) as tf.Tensor2D;
-  
-  // Clean up intermediate feature tensors
-  featureArrays.forEach(t => t.dispose());
+  // Concatenate all feature batches, then dispose intermediates
+  let allFeatures: tf.Tensor2D;
+  try {
+    allFeatures = tf.concat(featureArrays, 0) as tf.Tensor2D;
+  } finally {
+    featureArrays.forEach(t => t.dispose());
+  }
 
-  // Create one-hot encoded labels
   const labelsTensor = tf.oneHot(labelIndices, classLabels.length) as tf.Tensor2D;
 
   return {
@@ -437,6 +430,8 @@ async function downloadAndPreprocessPhotos(
 
 /**
  * Load and preprocess a single image from URL.
+ * Uses a Canvas to resize large images BEFORE passing to WebGL, preventing
+ * shader compilation failures from textures that exceed GPU limits.
  */
 async function loadAndPreprocessImage(url: string): Promise<tf.Tensor3D> {
   return new Promise((resolve, reject) => {
@@ -445,16 +440,27 @@ async function loadAndPreprocessImage(url: string): Promise<tf.Tensor3D> {
     
     img.onload = () => {
       try {
+        // Downscale on CPU via Canvas to avoid WebGL texture size limits.
+        // Most GPUs cap at 4096x4096 or 8192x8192; product photos from
+        // high-res cameras regularly exceed this.
+        const MAX_DIM = 1024;
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const scale = MAX_DIM / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+
         const tensor = tf.tidy(() => {
-          // Convert to tensor
-          let imgTensor = tf.browser.fromPixels(img);
-          
-          // Resize to model input size
+          let imgTensor = tf.browser.fromPixels(canvas);
           imgTensor = tf.image.resizeBilinear(imgTensor, [IMAGE_SIZE, IMAGE_SIZE]);
-          
-          // Normalize to [-1, 1] for MobileNetV2
           imgTensor = imgTensor.toFloat().div(127.5).sub(1);
-          
           return imgTensor as tf.Tensor3D;
         });
         resolve(tensor);
@@ -694,12 +700,17 @@ export async function executeClientSideTraining(
 ): Promise<void> {
   const startTime = Date.now();
 
+  // Track disposable resources so we can clean up on error
+  let featureExtractor: tf.GraphModel | null = null;
+  let features: tf.Tensor2D | null = null;
+  let labels: tf.Tensor2D | null = null;
+  let classificationHead: tf.LayersModel | null = null;
+
   try {
     // Step 1: Check capabilities
     const capabilities = await checkTrainingCapabilities();
     console.log('Training capabilities:', capabilities);
 
-    // Warn if low memory
     if (capabilities.memoryMB < 4096) {
       console.warn(`Low memory detected (${capabilities.memoryMB}MB). Training may be slow or fail.`);
     }
@@ -717,32 +728,30 @@ export async function executeClientSideTraining(
       throw new Error('No hay fotos disponibles para entrenamiento');
     }
 
-    // Limit dataset size to prevent memory issues
     if (dataset.totalPhotos > 300) {
       console.warn(`Large dataset detected (${dataset.totalPhotos} photos). Training may consume significant memory.`);
     }
 
     // Step 3: Load MobileNetV2 feature extractor
-    const featureExtractor = await loadMobileNetV2(onProgress);
+    featureExtractor = await loadMobileNetV2(onProgress);
 
     // Step 4 & 5: Process images and extract features in integrated batches
-    // This prevents keeping all raw images in memory at once
-    const { features, labels, classLabels } = await downloadPreprocessAndExtractFeatures(
+    const extracted = await downloadPreprocessAndExtractFeatures(
       dataset, 
       featureExtractor, 
       onProgress
     );
+    features = extracted.features;
+    labels = extracted.labels;
+    const classLabels = extracted.classLabels;
     
-    // Clean up feature extractor early (we don't need it anymore)
+    // Clean up feature extractor early
     featureExtractor.dispose();
+    featureExtractor = null;
     
-    // Force memory cleanup
     await tf.nextFrame();
-    
-    // Monitor memory after feature extraction
     monitorGPUMemory();
     
-    // Get the feature dimension from extracted features
     const featureDim = features.shape[1];
     console.log(`Extracted ${features.shape[0]} feature vectors of dimension ${featureDim}`);
 
@@ -753,16 +762,14 @@ export async function executeClientSideTraining(
       message: 'Construyendo modelo de clasificación...',
     });
 
-    const classificationHead = buildClassificationHead(classLabels.length, featureDim);
+    classificationHead = buildClassificationHead(classLabels.length, featureDim);
 
     // Step 7: Train classification head on features
     const { accuracy } = await trainModel(classificationHead, features, labels, onProgress);
     
-    // Monitor memory after training
     monitorGPUMemory();
 
     // Step 8: Build final combined model for inference
-    // Create a model that takes images as input and outputs predictions
     onProgress({
       stage: 'uploading',
       progress: 88,
@@ -771,7 +778,6 @@ export async function executeClientSideTraining(
 
     const model = await buildInferenceModel(classificationHead, featureDim, classLabels.length);
 
-    // Step 7: Export and upload
     const trainingDurationSeconds = Math.floor((Date.now() - startTime) / 1000);
     const version = `v${Date.now()}_${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
 
@@ -782,35 +788,42 @@ export async function executeClientSideTraining(
       dataset.totalPhotos,
       dataset.totalProducts,
       trainingDurationSeconds,
-      classLabels, // Pass the class labels used during training
+      classLabels,
       onProgress
     );
 
     // Cleanup tensors
-    features.dispose();
-    labels.dispose();
-    // model and classificationHead are the same object now, dispose once
-    model.dispose();
+    features.dispose(); features = null;
+    labels.dispose(); labels = null;
+    // model and classificationHead are the same object; dispose once
+    model.dispose(); classificationHead = null;
 
-    // Final cleanup
     await tf.nextFrame();
 
     console.log('Training complete!');
   } catch (error) {
     console.error('Training error:', error);
     
-    // Attempt cleanup on error
+    // Deterministic cleanup of all tracked resources
     try {
-      const memInfo = tf.memory();
-      if (memInfo.numTensors > 0) {
-        console.warn(`Memory leak detected: ${memInfo.numTensors} tensors not disposed`);
-        console.warn(`GPU Memory: ${(memInfo.numBytesInGPU || 0) / (1024 * 1024)}MB`);
-      }
+      featureExtractor?.dispose();
+      features?.dispose();
+      labels?.dispose();
+      classificationHead?.dispose();
     } catch (e) {
-      // Ignore cleanup errors
+      // Ignore disposal errors (e.g., already disposed or context lost)
     }
     
-    // Check if error is due to WebGL context loss
+    try {
+      const memInfo = tf.memory();
+      if (memInfo.numTensors > 10) {
+        console.warn(`Memory leak detected: ${memInfo.numTensors} tensors not disposed`);
+        console.warn(`GPU Memory: ${((memInfo.numBytesInGPU || 0) / (1024 * 1024)).toFixed(1)}MB`);
+      }
+    } catch (e) {
+      // Ignore
+    }
+    
     if (error instanceof Error) {
       if (error.message.includes('WebGL') || error.message.includes('context') || error.message.includes('shader')) {
         throw new Error('GPU memory exhausted. Please try: 1) Close other tabs, 2) Refresh the page, 3) Use fewer training images.');

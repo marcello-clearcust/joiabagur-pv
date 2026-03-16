@@ -4,6 +4,7 @@ using JoiabagurPV.Application.DTOs.ImageRecognition;
 using JoiabagurPV.Application.DTOs.Products;
 using JoiabagurPV.Application.DTOs.Users;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Interfaces.Services;
 using JoiabagurPV.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -347,8 +348,7 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Headers.CacheControl?.Public.Should().BeTrue();
-        response.Headers.CacheControl?.MaxAge.Should().Be(TimeSpan.FromDays(1));
+        response.Headers.CacheControl?.NoStore.Should().BeTrue();
     }
 
     #endregion
@@ -420,11 +420,14 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
         savedModel.TotalPhotosUsed.Should().Be(10);
         savedModel.TotalProductsUsed.Should().Be(5);
         
-        // Verify model files were saved
-        var modelsPath = Path.Combine(Directory.GetCurrentDirectory(), "models", "v1_20260112_browser");
-        Directory.Exists(modelsPath).Should().BeTrue();
-        File.Exists(Path.Combine(modelsPath, "model.json")).Should().BeTrue();
-        File.Exists(Path.Combine(modelsPath, "group1-shard1of1.bin")).Should().BeTrue();
+        // Verify model files were saved via file storage service
+        var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
+        var modelFile = await fileStorage.DownloadAsync("model.json", "models/v1_20260112_browser");
+        modelFile.Should().NotBeNull();
+        modelFile!.Value.Stream.Dispose();
+        var weightFile2 = await fileStorage.DownloadAsync("group1-shard1of1.bin", "models/v1_20260112_browser");
+        weightFile2.Should().NotBeNull();
+        weightFile2!.Value.Stream.Dispose();
     }
 
     [Fact]
@@ -763,11 +766,10 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
 
     private async Task CreateMockModelFilesAsync(string version)
     {
-        // Create mock model directory and files for testing file serving
-        var modelsPath = Path.Combine(Directory.GetCurrentDirectory(), "models", version);
-        Directory.CreateDirectory(modelsPath);
+        using var scope = _factory.Services.CreateScope();
+        var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
+        var modelFolder = $"models/{version}";
 
-        // Create mock model.json
         var modelJson = new
         {
             format = "graph-model",
@@ -783,12 +785,16 @@ public class ImageRecognitionControllerTests : IAsyncLifetime
             }
         };
 
-        var modelJsonPath = Path.Combine(modelsPath, "model.json");
-        await File.WriteAllTextAsync(modelJsonPath, System.Text.Json.JsonSerializer.Serialize(modelJson));
+        var modelJsonBytes = System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(modelJson));
+        using (var stream = new MemoryStream(modelJsonBytes))
+        {
+            await fileStorage.UploadExactAsync(stream, "model.json", "application/json", modelFolder);
+        }
 
-        // Create mock binary file
-        var binPath = Path.Combine(modelsPath, "group1-shard1of1.bin");
-        await File.WriteAllBytesAsync(binPath, new byte[] { 0x00, 0x01, 0x02, 0x03 });
+        using (var stream = new MemoryStream(new byte[] { 0x00, 0x01, 0x02, 0x03 }))
+        {
+            await fileStorage.UploadExactAsync(stream, "group1-shard1of1.bin", "application/octet-stream", modelFolder);
+        }
     }
 
     #endregion

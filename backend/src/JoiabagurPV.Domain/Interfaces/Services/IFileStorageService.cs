@@ -7,7 +7,7 @@ namespace JoiabagurPV.Domain.Interfaces.Services;
 public interface IFileStorageService
 {
     /// <summary>
-    /// Uploads a file to storage.
+    /// Uploads a file to storage with a generated unique filename.
     /// </summary>
     /// <param name="stream">The file stream to upload.</param>
     /// <param name="fileName">The original file name.</param>
@@ -15,6 +15,16 @@ public interface IFileStorageService
     /// <param name="folder">Optional folder/container path.</param>
     /// <returns>The stored file name (unique identifier).</returns>
     Task<string> UploadAsync(Stream stream, string fileName, string contentType, string? folder = null);
+
+    /// <summary>
+    /// Uploads a file to storage preserving the exact filename.
+    /// Use for files that must be retrievable by their original name (e.g., ML model files).
+    /// </summary>
+    /// <param name="stream">The file stream to upload.</param>
+    /// <param name="fileName">The exact file name to use in storage.</param>
+    /// <param name="contentType">The MIME content type.</param>
+    /// <param name="folder">Optional folder/container path.</param>
+    Task UploadExactAsync(Stream stream, string fileName, string contentType, string? folder = null);
 
     /// <summary>
     /// Downloads a file from storage.

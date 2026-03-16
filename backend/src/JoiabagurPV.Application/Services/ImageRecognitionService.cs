@@ -77,6 +77,18 @@ public class ImageRecognitionService : IImageRecognitionService
     }
 
     /// <inheritdoc/>
+    public async Task<(Stream Stream, string ContentType)?> DownloadModelFileAsync(string version, string fileName)
+    {
+        var model = await _modelMetadataRepository.GetByVersionAsync(version);
+        if (model == null)
+        {
+            return null;
+        }
+
+        return await _fileStorageService.DownloadAsync(fileName, $"models/{version}");
+    }
+
+    /// <inheritdoc/>
     public async Task<(bool IsValid, string? ErrorMessage)> ValidateRetrainingRequirementsAsync()
     {
         // Check if at least one product has photos
@@ -213,87 +225,68 @@ public class ImageRecognitionService : IImageRecognitionService
                 "Uploading trained model {Version} by user {UserId}. Files: {FileCount}",
                 request.Version, uploadedBy, weightFiles.Count);
 
-            // Create models directory if it doesn't exist
-            var modelsBasePath = Path.Combine(Directory.GetCurrentDirectory(), "models", request.Version);
-            Directory.CreateDirectory(modelsBasePath);
+            var modelFolder = $"models/{request.Version}";
 
-            try
+            // Save model.json via file storage service (S3 in production)
+            using (var modelJsonStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(request.ModelTopologyJson)))
             {
-                // Save model.json file
-                var modelJsonPath = Path.Combine(modelsBasePath, "model.json");
-                await File.WriteAllTextAsync(modelJsonPath, request.ModelTopologyJson);
-
-                // Save weight files
-                foreach (var (fileName, fileData) in weightFiles)
-                {
-                    // Validate file name for security
-                    if (fileName.Contains("..") || fileName.Contains("/") || fileName.Contains("\\"))
-                    {
-                        _logger.LogWarning("Invalid weight file name rejected: {FileName}", fileName);
-                        continue;
-                    }
-
-                    var weightFilePath = Path.Combine(modelsBasePath, fileName);
-                    await File.WriteAllBytesAsync(weightFilePath, fileData);
-                }
-
-                // Deactivate previous active model
-                var currentActive = await _modelMetadataRepository.GetActiveModelAsync();
-                if (currentActive != null)
-                {
-                    currentActive.IsActive = false;
-                    await _modelMetadataRepository.UpdateAsync(currentActive);
-                }
-
-                // Create new model metadata
-                var accuracyJson = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    trainingAccuracy = request.TrainingAccuracy,
-                    validationAccuracy = request.ValidationAccuracy,
-                    trainingDurationSeconds = request.TrainingDurationSeconds
-                });
-
-                var newModel = new ModelMetadata
-                {
-                    Version = request.Version,
-                    TrainedAt = DateTime.UtcNow,
-                    ModelPath = modelsBasePath,
-                    AccuracyMetrics = accuracyJson,
-                    TotalPhotosUsed = request.TotalPhotosUsed,
-                    TotalProductsUsed = request.TotalProductsUsed,
-                    IsActive = true
-                };
-
-                await _modelMetadataRepository.AddAsync(newModel);
-                await _unitOfWork.SaveChangesAsync();
-
-                _logger.LogInformation(
-                    "Model {Version} uploaded successfully. Accuracy: {Accuracy}%",
-                    request.Version, request.ValidationAccuracy);
-
-                return new UploadTrainedModelResult
-                {
-                    Success = true,
-                    Version = request.Version,
-                    Metadata = MapToDto(newModel)
-                };
+                await _fileStorageService.UploadExactAsync(modelJsonStream, "model.json", "application/json", modelFolder);
             }
-            catch (Exception ex)
+
+            // Save weight files via file storage service
+            foreach (var (fileName, fileData) in weightFiles)
             {
-                // Cleanup on failure
-                _logger.LogError(ex, "Failed to save model files for version {Version}", request.Version);
-                
-                if (Directory.Exists(modelsBasePath))
+                if (fileName.Contains("..") || fileName.Contains("/") || fileName.Contains("\\"))
                 {
-                    try
-                    {
-                        Directory.Delete(modelsBasePath, recursive: true);
-                    }
-                    catch { /* Ignore cleanup errors */ }
+                    _logger.LogWarning("Invalid weight file name rejected: {FileName}", fileName);
+                    continue;
                 }
 
-                throw;
+                using var weightStream = new MemoryStream(fileData);
+                var contentType = fileName.EndsWith(".json") ? "application/json" : "application/octet-stream";
+                await _fileStorageService.UploadExactAsync(weightStream, fileName, contentType, modelFolder);
             }
+
+            // Deactivate previous active model
+            var currentActive = await _modelMetadataRepository.GetActiveModelAsync();
+            if (currentActive != null)
+            {
+                currentActive.IsActive = false;
+                await _modelMetadataRepository.UpdateAsync(currentActive);
+            }
+
+            // Create new model metadata
+            var accuracyJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                trainingAccuracy = request.TrainingAccuracy,
+                validationAccuracy = request.ValidationAccuracy,
+                trainingDurationSeconds = request.TrainingDurationSeconds
+            });
+
+            var newModel = new ModelMetadata
+            {
+                Version = request.Version,
+                TrainedAt = DateTime.UtcNow,
+                ModelPath = modelFolder,
+                AccuracyMetrics = accuracyJson,
+                TotalPhotosUsed = request.TotalPhotosUsed,
+                TotalProductsUsed = request.TotalProductsUsed,
+                IsActive = true
+            };
+
+            await _modelMetadataRepository.AddAsync(newModel);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Model {Version} uploaded successfully. Accuracy: {Accuracy}%",
+                request.Version, request.ValidationAccuracy);
+
+            return new UploadTrainedModelResult
+            {
+                Success = true,
+                Version = request.Version,
+                Metadata = MapToDto(newModel)
+            };
         }
         catch (Exception ex)
         {

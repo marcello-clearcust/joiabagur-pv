@@ -49,6 +49,24 @@ public class LocalFileStorageService : IFileStorageService
     }
 
     /// <inheritdoc/>
+    public async Task UploadExactAsync(Stream stream, string fileName, string contentType, string? folder = null)
+    {
+        var folderPath = GetFolderPath(folder);
+
+        if (!Directory.Exists(folderPath))
+        {
+            Directory.CreateDirectory(folderPath);
+        }
+
+        var filePath = Path.Combine(folderPath, fileName);
+
+        await using var fileStream = new FileStream(filePath, FileMode.Create);
+        await stream.CopyToAsync(fileStream);
+
+        _logger.LogInformation("File uploaded (exact name): {FileName} -> {FilePath}", fileName, filePath);
+    }
+
+    /// <inheritdoc/>
     public Task<(Stream Stream, string ContentType)?> DownloadAsync(string storedFileName, string? folder = null)
     {
         var filePath = Path.Combine(GetFolderPath(folder), storedFileName);

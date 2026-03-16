@@ -27,6 +27,14 @@ public interface IImageRecognitionService
     Task<string?> GetModelFilePathAsync(string? version = null);
 
     /// <summary>
+    /// Downloads a model file from storage.
+    /// </summary>
+    /// <param name="version">Model version.</param>
+    /// <param name="fileName">File name (e.g., model.json, weights.bin).</param>
+    /// <returns>File stream and content type, or null if not found.</returns>
+    Task<(Stream Stream, string ContentType)?> DownloadModelFileAsync(string version, string fileName);
+
+    /// <summary>
     /// Validates that model retraining requirements are met.
     /// </summary>
     /// <returns>Validation result with error message if invalid.</returns>

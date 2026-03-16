@@ -210,93 +210,85 @@ public class ImageRecognitionController : ControllerBase
             return BadRequest(new { message = "Invalid file name." });
         }
 
-        // Verify model version exists
-        var modelPath = await _imageRecognitionService.GetModelFilePathAsync(version);
-        if (string.IsNullOrEmpty(modelPath))
+        var result = await _imageRecognitionService.DownloadModelFileAsync(version, fileName);
+        if (result == null)
         {
-            return NotFound(new { message = "Model version not found." });
-        }
-
-        // Construct full file path
-        var modelsBasePath = Path.Combine(Directory.GetCurrentDirectory(), "models");
-        var filePath = Path.Combine(modelsBasePath, version, fileName);
-
-        if (!System.IO.File.Exists(filePath))
-        {
-            _logger.LogWarning("Model file not found: {FilePath}", filePath);
+            _logger.LogWarning("Model file not found: models/{Version}/{FileName}", version, fileName);
             return NotFound(new { message = "Model file not found." });
         }
 
-        // Determine content type
-        var contentType = fileName.EndsWith(".json") ? "application/json" : "application/octet-stream";
+        var (stream, contentType) = result.Value;
 
-        // NOTE: Do not cache model files aggressively.
-        // The model may be retrained under the same version during development, and browsers can otherwise keep stale copies.
         Response.Headers["Cache-Control"] = "no-store";
 
-        // Backward compatibility:
-        // Earlier browser-training uploads stored ONLY the model topology in model.json (no modelTopology/weightsManifest wrapper),
-        // which TensorFlow.js cannot load. If detected, wrap it on-the-fly using weights_manifest.json + weights.bin.
-        if (string.Equals(fileName, "model.json", StringComparison.OrdinalIgnoreCase))
+        // Non-JSON files: stream directly to client
+        if (!string.Equals(fileName, "model.json", StringComparison.OrdinalIgnoreCase))
         {
-            try
-            {
-                var text = await System.IO.File.ReadAllTextAsync(filePath);
-                var node = JsonNode.Parse(text);
-
-                var hasModelTopology = node?["modelTopology"] != null;
-                var hasWeightsManifest = node?["weightsManifest"] != null;
-
-                if (!hasModelTopology || !hasWeightsManifest)
-                {
-                    var weightsManifestPath = Path.Combine(modelsBasePath, version, "weights_manifest.json");
-                    if (!System.IO.File.Exists(weightsManifestPath))
-                    {
-                        _logger.LogWarning("Legacy model.json detected but weights_manifest.json missing for version {Version}", version);
-                    }
-                    else
-                    {
-                        var weightsText = await System.IO.File.ReadAllTextAsync(weightsManifestPath);
-                        var weightsNode = JsonNode.Parse(weightsText);
-
-                        // weights_manifest.json is stored as a raw weightSpecs array (TFJS artifacts.weightSpecs).
-                        var weightsArray = weightsNode as JsonArray;
-
-                        if (weightsArray != null)
-                        {
-                            var wrapped = new JsonObject
-                            {
-                                ["format"] = "layers-model",
-                                ["generatedBy"] = "jpv",
-                                ["convertedBy"] = null,
-                                ["modelTopology"] = node,
-                                ["weightsManifest"] = new JsonArray
-                                {
-                                    new JsonObject
-                                    {
-                                        ["paths"] = new JsonArray("weights.bin"),
-                                        ["weights"] = weightsArray
-                                    }
-                                }
-                            };
-
-                            var wrappedJson = wrapped.ToJsonString();
-                            return Content(wrappedJson, "application/json");
-                        }
-
-                        _logger.LogWarning("weights_manifest.json was not a JSON array for version {Version}", version);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to apply legacy model.json wrapper for version {Version}", version);
-                // fall back to returning original file below
-            }
+            return File(stream, contentType, fileName);
         }
 
-        var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
-        return File(fileBytes, contentType, fileName);
+        // For model.json: read into string so we can inspect/transform for backward compatibility.
+        // The stream is fully consumed here and disposed; all return paths below use Content().
+        string text;
+        await using (stream)
+        {
+            using var reader = new StreamReader(stream);
+            text = await reader.ReadToEndAsync();
+        }
+
+        try
+        {
+            var node = JsonNode.Parse(text);
+
+            var hasModelTopology = node?["modelTopology"] != null;
+            var hasWeightsManifest = node?["weightsManifest"] != null;
+
+            if (!hasModelTopology || !hasWeightsManifest)
+            {
+                var weightsResult = await _imageRecognitionService.DownloadModelFileAsync(version, "weights_manifest.json");
+                if (weightsResult == null)
+                {
+                    _logger.LogWarning("Legacy model.json detected but weights_manifest.json missing for version {Version}", version);
+                }
+                else
+                {
+                    using var weightsReader = new StreamReader(weightsResult.Value.Stream);
+                    var weightsText = await weightsReader.ReadToEndAsync();
+                    var weightsNode = JsonNode.Parse(weightsText);
+
+                    var weightsArray = weightsNode as JsonArray;
+                    if (weightsArray != null)
+                    {
+                        var wrapped = new JsonObject
+                        {
+                            ["format"] = "layers-model",
+                            ["generatedBy"] = "jpv",
+                            ["convertedBy"] = null,
+                            ["modelTopology"] = node,
+                            ["weightsManifest"] = new JsonArray
+                            {
+                                new JsonObject
+                                {
+                                    ["paths"] = new JsonArray("weights.bin"),
+                                    ["weights"] = weightsArray
+                                }
+                            }
+                        };
+
+                        return Content(wrapped.ToJsonString(), "application/json");
+                    }
+
+                    _logger.LogWarning("weights_manifest.json was not a JSON array for version {Version}", version);
+                }
+            }
+
+            return Content(text, "application/json");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to apply legacy model.json wrapper for version {Version}", version);
+            return NotFound(new { message = "Error processing model file." });
+        }
     }
 
     /// <summary>

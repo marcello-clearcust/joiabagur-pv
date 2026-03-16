@@ -62,6 +62,33 @@ public class S3FileStorageService : IFileStorageService
     }
 
     /// <inheritdoc/>
+    public async Task UploadExactAsync(Stream stream, string fileName, string contentType, string? folder = null)
+    {
+        var key = BuildKey(folder, fileName);
+
+        try
+        {
+            var request = new PutObjectRequest
+            {
+                BucketName = _bucketName,
+                Key = key,
+                InputStream = stream,
+                ContentType = contentType,
+                ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
+            };
+
+            await _s3Client.PutObjectAsync(request);
+            _logger.LogInformation("File uploaded to S3 (exact name): {Key}", key);
+        }
+        catch (AmazonS3Exception ex)
+        {
+            _logger.LogError(ex, "S3 upload failed for {Key}: {ErrorCode} - {Message}",
+                key, ex.ErrorCode, ex.Message);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<(Stream Stream, string ContentType)?> DownloadAsync(string storedFileName, string? folder = null)
     {
         var key = BuildKey(folder, storedFileName);

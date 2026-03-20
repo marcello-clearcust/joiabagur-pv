@@ -58,8 +58,9 @@ public class StockImportService : IStockImportService
             SheetName = "Stock Import",
             Instructions = "Fill in stock data starting from row 2. Both columns are required. " +
                           "The SKU must exist in the product catalog. " +
-                          "Quantity values will be ADDED to existing stock. " +
-                          "Products not assigned to the point of sale will be automatically assigned. " +
+                          "Positive Quantity values add stock; negative values subtract stock. " +
+                          "The import will fail if any row would result in negative final stock. " +
+                          "Products not assigned to the point of sale will be automatically assigned (positive quantities only). " +
                           "Example rows are shown in gray italic - delete or overwrite them with your data.",
             Columns = new List<ExcelColumnConfig>
             {
@@ -77,8 +78,7 @@ public class StockImportService : IStockImportService
                     IsRequired = true,
                     DataType = ExcelDataType.Integer,
                     Width = 12,
-                    MinValue = 0,
-                    Description = "Quantity to add (required). Must be 0 or greater."
+                    Description = "Quantity to add or subtract (required). Positive values add stock, negative values subtract. Final stock cannot be negative."
                 }
             },
             ExampleRows = new List<Dictionary<string, object?>>
@@ -92,6 +92,11 @@ public class StockImportService : IStockImportService
                 {
                     { ColSku, "NECK-002" },
                     { ColQuantity, 25 }
+                },
+                new()
+                {
+                    { ColSku, "BRAC-003" },
+                    { ColQuantity, -5 }
                 }
             }
         };
@@ -237,6 +242,16 @@ public class StockImportService : IStockImportService
                 return result;
             }
 
+            // Pre-commit stock-floor validation: ensure no row causes stock to go negative
+            var stockFloorErrors = await ValidateStockFloorAsync(rowsData, pointOfSaleId);
+            if (stockFloorErrors.Any())
+            {
+                result.Errors.AddRange(stockFloorErrors);
+                result.Success = false;
+                result.Message = $"Se encontraron {stockFloorErrors.Count} error(es) de stock insuficiente. Importación cancelada.";
+                return result;
+            }
+
             // Begin transaction
             await _unitOfWork.BeginTransactionAsync();
 
@@ -254,13 +269,19 @@ public class StockImportService : IStockImportService
                         continue; // Already validated, shouldn't happen
                     }
 
+                    // Zero-quantity rows produce no side effects — skip entirely
+                    if (row.Quantity == 0)
+                    {
+                        continue;
+                    }
+
                     // Check if inventory exists
                     var inventory = await _inventoryRepository.FindByProductAndPointOfSaleAsync(
                         product.Id, pointOfSaleId);
 
                     if (inventory == null)
                     {
-                        // Create new inventory (implicit assignment)
+                        // Create new inventory (implicit assignment) — only reached for non-zero quantities
                         inventory = new Inventory
                         {
                             ProductId = product.Id,
@@ -286,30 +307,26 @@ public class StockImportService : IStockImportService
                         result.Warnings.Add($"Producto '{row.Sku}' reactivado en el punto de venta.");
                     }
 
-                    // Add quantity and create movement
-                    if (row.Quantity > 0)
+                    // Add or subtract quantity and create movement
+                    var quantityBefore = inventory.Quantity;
+                    inventory.Quantity += row.Quantity;
+                    inventory.LastUpdatedAt = DateTime.UtcNow;
+                    await _inventoryRepository.UpdateAsync(inventory);
+
+                    var movement = new InventoryMovement
                     {
-                        var quantityBefore = inventory.Quantity;
-                        inventory.Quantity += row.Quantity;
-                        inventory.LastUpdatedAt = DateTime.UtcNow;
-                        await _inventoryRepository.UpdateAsync(inventory);
+                        InventoryId = inventory.Id,
+                        UserId = userId,
+                        MovementType = MovementType.Import,
+                        QuantityChange = row.Quantity,
+                        QuantityBefore = quantityBefore,
+                        QuantityAfter = inventory.Quantity,
+                        Reason = "Importación desde Excel",
+                        MovementDate = DateTime.UtcNow
+                    };
+                    await _movementRepository.AddAsync(movement);
 
-                        // Create movement record
-                        var movement = new InventoryMovement
-                        {
-                            InventoryId = inventory.Id,
-                            UserId = userId,
-                            MovementType = MovementType.Import,
-                            QuantityChange = row.Quantity,
-                            QuantityBefore = quantityBefore,
-                            QuantityAfter = inventory.Quantity,
-                            Reason = "Importación desde Excel",
-                            MovementDate = DateTime.UtcNow
-                        };
-                        await _movementRepository.AddAsync(movement);
-
-                        result.StockUpdatedCount++;
-                    }
+                    result.StockUpdatedCount++;
                 }
 
                 await _unitOfWork.SaveChangesAsync();
@@ -434,6 +451,62 @@ public class StockImportService : IStockImportService
         return row.Cell(colIndex).GetString().Trim();
     }
 
+    private async Task<List<ImportError>> ValidateStockFloorAsync(List<StockRowData> rows, Guid pointOfSaleId)
+    {
+        var errors = new List<ImportError>();
+
+        var skus = rows.Select(r => r.Sku.ToUpperInvariant()).ToList();
+        var products = await _productRepository.GetBySkusAsync(skus);
+
+        // Aggregate deltas by product (defensive grouping in case duplicates ever allowed)
+        var deltasByProduct = new Dictionary<Guid, (int Delta, List<StockRowData> Rows)>();
+        foreach (var row in rows)
+        {
+            var normalizedSku = row.Sku.ToUpperInvariant();
+            if (!products.TryGetValue(normalizedSku, out var product))
+            {
+                continue; // Already caught by ValidateRowsAsync
+            }
+
+            if (!deltasByProduct.TryGetValue(product.Id, out var entry))
+            {
+                entry = (0, new List<StockRowData>());
+                deltasByProduct[product.Id] = entry;
+            }
+
+            deltasByProduct[product.Id] = (entry.Delta + row.Quantity, entry.Rows.Append(row).ToList());
+        }
+
+        foreach (var (productId, (totalDelta, affectedRows)) in deltasByProduct)
+        {
+            if (totalDelta >= 0)
+            {
+                continue; // No risk of going negative
+            }
+
+            var inventory = await _inventoryRepository.FindByProductAndPointOfSaleAsync(productId, pointOfSaleId);
+            var currentQuantity = inventory?.Quantity ?? 0;
+            var projected = currentQuantity + totalDelta;
+
+            if (projected < 0)
+            {
+                // Report an error for each row that contributes to this failure
+                foreach (var row in affectedRows.Where(r => r.Quantity < 0))
+                {
+                    errors.Add(new ImportError
+                    {
+                        RowNumber = row.RowNumber,
+                        Field = ColQuantity,
+                        Message = $"Fila {row.RowNumber}: El stock resultante para '{row.Sku}' sería negativo (actual: {currentQuantity}, cambio: {row.Quantity}, resultado: {currentQuantity + row.Quantity}).",
+                        Value = row.QuantityRaw
+                    });
+                }
+            }
+        }
+
+        return errors;
+    }
+
     private async Task<List<ImportError>> ValidateRowsAsync(List<StockRowData> rows)
     {
         var errors = new List<ImportError>();
@@ -489,17 +562,6 @@ public class StockImportService : IStockImportService
                 }
             }
 
-            // Validate Quantity >= 0
-            if (row.Quantity < 0)
-            {
-                errors.Add(new ImportError
-                {
-                    RowNumber = row.RowNumber,
-                    Field = ColQuantity,
-                    Message = "La cantidad debe ser 0 o mayor.",
-                    Value = row.QuantityRaw
-                });
-            }
         }
 
         return errors;

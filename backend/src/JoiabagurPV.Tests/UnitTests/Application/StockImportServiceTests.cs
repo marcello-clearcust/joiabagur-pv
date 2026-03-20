@@ -3,6 +3,7 @@ using FluentAssertions;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Application.Services;
 using JoiabagurPV.Domain.Entities;
+using JoiabagurPV.Domain.Enums;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Tests.TestHelpers;
 using Microsoft.Extensions.Logging;
@@ -216,12 +217,13 @@ public class StockImportServiceTests
     }
 
     [Fact]
-    public async Task ValidateAsync_WithNegativeQuantity_ShouldReturnError()
+    public async Task ValidateAsync_WithNegativeQuantity_ShouldPass()
     {
-        // Arrange
+        // Arrange — negative quantities are now valid at the format/row level;
+        // stock-floor enforcement only happens during ImportAsync.
         var pos = TestDataGenerator.CreatePointOfSale();
         var product = TestDataGenerator.CreateProduct(sku: "TEST-001");
-        using var stream = CreateExcelStream(("TEST-001", -5)); // Negative
+        using var stream = CreateExcelStream(("TEST-001", -5));
 
         _pointOfSaleRepositoryMock.Setup(x => x.GetByIdAsync(pos.Id))
             .ReturnsAsync(pos);
@@ -235,9 +237,8 @@ public class StockImportServiceTests
         var result = await _sut.ValidateAsync(stream, pos.Id);
 
         // Assert
-        result.Success.Should().BeFalse();
-        result.Errors.Should().ContainSingle(e => 
-            e.Field == "Quantity" && e.Message.Contains("0 o mayor"));
+        result.Success.Should().BeTrue();
+        result.Errors.Should().BeEmpty();
     }
 
     [Fact]
@@ -360,6 +361,155 @@ public class StockImportServiceTests
         // Assert
         result.Success.Should().BeFalse();
         result.Errors.Should().ContainSingle(e => e.Message.Contains("inactivo"));
+    }
+
+    [Fact]
+    public async Task ImportAsync_WithNegativeQuantity_ShouldReduceStock()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var product = TestDataGenerator.CreateProduct(sku: "TEST-001");
+        var existingInventory = TestDataGenerator.CreateInventory(
+            productId: product.Id,
+            pointOfSaleId: pos.Id,
+            quantity: 10,
+            isActive: true);
+
+        using var stream = CreateExcelStream(("TEST-001", -3));
+
+        _pointOfSaleRepositoryMock.Setup(x => x.GetByIdAsync(pos.Id))
+            .ReturnsAsync(pos);
+        _productRepositoryMock.Setup(x => x.GetBySkusAsync(It.IsAny<List<string>>()))
+            .ReturnsAsync(new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "TEST-001", product }
+            });
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync(existingInventory);
+        _inventoryRepositoryMock.Setup(x => x.UpdateAsync(It.IsAny<Inventory>()))
+            .ReturnsAsync((Inventory i) => i);
+
+        InventoryMovement? capturedMovement = null;
+        _movementRepositoryMock.Setup(x => x.AddAsync(It.IsAny<InventoryMovement>()))
+            .Callback<InventoryMovement>(m => capturedMovement = m)
+            .ReturnsAsync((InventoryMovement m) => m);
+
+        // Act
+        var result = await _sut.ImportAsync(stream, pos.Id, userId);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.StockUpdatedCount.Should().Be(1);
+        existingInventory.Quantity.Should().Be(7); // 10 - 3
+
+        capturedMovement.Should().NotBeNull();
+        capturedMovement!.QuantityChange.Should().Be(-3);
+        capturedMovement.QuantityBefore.Should().Be(10);
+        capturedMovement.QuantityAfter.Should().Be(7);
+        capturedMovement.MovementType.Should().Be(MovementType.Import);
+    }
+
+    [Fact]
+    public async Task ImportAsync_WithNegativeQuantityExceedingStock_ShouldReturnError()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var product = TestDataGenerator.CreateProduct(sku: "TEST-001");
+        var existingInventory = TestDataGenerator.CreateInventory(
+            productId: product.Id,
+            pointOfSaleId: pos.Id,
+            quantity: 2,
+            isActive: true);
+
+        using var stream = CreateExcelStream(("TEST-001", -5));
+
+        _pointOfSaleRepositoryMock.Setup(x => x.GetByIdAsync(pos.Id))
+            .ReturnsAsync(pos);
+        _productRepositoryMock.Setup(x => x.GetBySkusAsync(It.IsAny<List<string>>()))
+            .ReturnsAsync(new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "TEST-001", product }
+            });
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync(existingInventory);
+
+        // Act
+        var result = await _sut.ImportAsync(stream, pos.Id, userId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e =>
+            e.Field == "Quantity" && e.Message.Contains("sería negativo"));
+        _movementRepositoryMock.Verify(x => x.AddAsync(It.IsAny<InventoryMovement>()), Times.Never);
+        _inventoryRepositoryMock.Verify(x => x.UpdateAsync(It.IsAny<Inventory>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_WithZeroQuantity_ShouldNotCreateMovement()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var product = TestDataGenerator.CreateProduct(sku: "TEST-001");
+        var existingInventory = TestDataGenerator.CreateInventory(
+            productId: product.Id,
+            pointOfSaleId: pos.Id,
+            quantity: 5,
+            isActive: true);
+
+        using var stream = CreateExcelStream(("TEST-001", 0));
+
+        _pointOfSaleRepositoryMock.Setup(x => x.GetByIdAsync(pos.Id))
+            .ReturnsAsync(pos);
+        _productRepositoryMock.Setup(x => x.GetBySkusAsync(It.IsAny<List<string>>()))
+            .ReturnsAsync(new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "TEST-001", product }
+            });
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync(existingInventory);
+
+        // Act
+        var result = await _sut.ImportAsync(stream, pos.Id, userId);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.StockUpdatedCount.Should().Be(0);
+        existingInventory.Quantity.Should().Be(5); // Unchanged
+        _movementRepositoryMock.Verify(x => x.AddAsync(It.IsAny<InventoryMovement>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ImportAsync_NegativeQuantityForUnassignedProduct_ShouldReturnError()
+    {
+        // Arrange — product has no inventory at this POS, so effective current stock is 0.
+        var userId = Guid.NewGuid();
+        var pos = TestDataGenerator.CreatePointOfSale();
+        var product = TestDataGenerator.CreateProduct(sku: "TEST-001");
+
+        using var stream = CreateExcelStream(("TEST-001", -3));
+
+        _pointOfSaleRepositoryMock.Setup(x => x.GetByIdAsync(pos.Id))
+            .ReturnsAsync(pos);
+        _productRepositoryMock.Setup(x => x.GetBySkusAsync(It.IsAny<List<string>>()))
+            .ReturnsAsync(new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "TEST-001", product }
+            });
+        _inventoryRepositoryMock.Setup(x => x.FindByProductAndPointOfSaleAsync(product.Id, pos.Id))
+            .ReturnsAsync((Inventory?)null);
+
+        // Act
+        var result = await _sut.ImportAsync(stream, pos.Id, userId);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.Errors.Should().ContainSingle(e =>
+            e.Field == "Quantity" && e.Message.Contains("sería negativo"));
+        _inventoryRepositoryMock.Verify(x => x.AddAsync(It.IsAny<Inventory>()), Times.Never);
+        _movementRepositoryMock.Verify(x => x.AddAsync(It.IsAny<InventoryMovement>()), Times.Never);
     }
 
     #endregion

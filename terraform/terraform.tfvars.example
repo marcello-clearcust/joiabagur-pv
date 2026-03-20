@@ -1,0 +1,25 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# terraform.tfvars is in .gitignore — never commit it.
+
+aws_region  = "eu-west-3"
+domain_name = "pv.joiabagur.com"
+github_repo = "your-org/joiabagur-pv"
+
+# Find latest Amazon Linux 2023 AMI:
+# aws ec2 describe-images --owners amazon \
+#   --filters "Name=name,Values=al2023-ami-*-x86_64" \
+#   --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+#   --output text --region eu-west-3
+ami_id = "ami-xxxxxxxxxxxxxxxxx"
+
+# Sensitive — use a strong, randomly generated value
+db_password    = "CHANGE_ME_strong_password_here"
+jwt_secret_key = "CHANGE_ME_at_least_32_characters_long_random_string"
+
+# Optional overrides (defaults are usually fine)
+# ec2_instance_type                   = "t3.micro"
+# db_instance_class                   = "db.t3.micro"
+# jwt_issuer                          = "JoiabagurPV"
+# jwt_audience                        = "JoiabagurPV"
+# s3_presigned_url_expiration_minutes = 60
+# key_pair_name                       = ""

@@ -375,7 +375,7 @@ Se documentan tres tickets principales a partir de las especificaciones OpenSpec
 
 - Asignación: el administrador asigna productos del catálogo a un POS creando registros Inventory con Quantity = 0 e IsActive = true. La existencia de un Inventory activo determina que el producto sea visible para los operadores de ese POS. Evitar asignación duplicada; no asignar productos inactivos. Reasignar reactivando registro existente (IsActive = true) preservando cantidad.
 - Desasignación: soft delete (IsActive = false) solo cuando Quantity = 0; error explícito si hay stock.
-- Importación Excel: columnas SKU y Quantity; punto de venta elegido en la UI. Sumar a cantidades existentes o crear Inventory (asignación implícita) si no existe. Crear InventoryMovement tipo "Import". Validar SKUs en catálogo y formato antes de importar; ofrecer plantilla de descarga.
+- Importación Excel: columnas SKU y Quantity; punto de venta elegido en la UI. Valores positivos suman al stock existente; valores negativos restan (el stock resultante no puede ser negativo). Crear Inventory (asignación implícita) si el producto no existe en el POS (solo para cantidades positivas). Crear InventoryMovement tipo "Import". Validar SKUs en catálogo y formato antes de importar; la importación es todo o nada. Ofrecer plantilla de descarga con ejemplos positivos y negativos.
 - Visualización: administradores ven stock de cualquier POS; operadores solo de sus POS asignados. Incluir productos con cantidad 0.
 - Ajustes manuales: crear InventoryMovement tipo "Adjustment" con QuantityChange, Reason y usuario; actualizar Inventory.Quantity y LastUpdatedAt. No permitir stock negativo.
 

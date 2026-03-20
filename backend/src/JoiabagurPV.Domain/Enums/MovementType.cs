@@ -21,7 +21,7 @@ public enum MovementType
     Adjustment = 3,
 
     /// <summary>
-    /// Stock addition via Excel import.
+    /// Stock change via Excel import (addition or subtraction).
     /// </summary>
     Import = 4
 }

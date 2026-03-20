@@ -1,0 +1,64 @@
+# ============================================================
+# Dockerfile.bundled — EC2 production image
+# Build context: REPO ROOT (not backend/)
+# Usage: docker build -f backend/src/JoiabagurPV.API/Dockerfile.bundled \
+#          --build-arg VITE_API_BASE_URL=https://joiabagur.com/api \
+#          -t jpv-backend:latest .
+# ============================================================
+
+# ─── Stage 1: Build React frontend ───────────────────────────────────────────
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+
+COPY frontend/package*.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY frontend/ .
+
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN npm run build
+# Output: /frontend/dist/
+
+# ─── Stage 2: Build .NET application ─────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY backend/src/JoiabagurPV.Domain/*.csproj         JoiabagurPV.Domain/
+COPY backend/src/JoiabagurPV.Infrastructure/*.csproj  JoiabagurPV.Infrastructure/
+COPY backend/src/JoiabagurPV.Application/*.csproj     JoiabagurPV.Application/
+COPY backend/src/JoiabagurPV.API/*.csproj             JoiabagurPV.API/
+
+RUN dotnet restore JoiabagurPV.API/JoiabagurPV.API.csproj
+
+COPY backend/src/ .
+
+RUN dotnet publish JoiabagurPV.API/JoiabagurPV.API.csproj \
+    -c Release -o /app/publish --no-restore
+
+# ─── Stage 3: Runtime ─────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/publish .
+
+# Copy React SPA into wwwroot/ — served by UseStaticFiles() + MapFallbackToFile()
+COPY --from=frontend-build /frontend/dist ./wwwroot/
+
+RUN groupadd -r appuser && useradd -r -g appuser appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8080/api/health || exit 1
+
+ENTRYPOINT ["dotnet", "JoiabagurPV.API.dll"]

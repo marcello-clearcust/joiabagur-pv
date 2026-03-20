@@ -54,8 +54,13 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(); // Available at: /scalar/v1
 }
 
-// Add CORS BEFORE HTTPS redirection to handle preflight requests correctly
+// Add CORS BEFORE static files and HTTPS redirection to handle preflight requests correctly,
+// and to ensure CORS headers are present on static file responses for cross-origin requests.
 app.UseCors(app.Environment.IsDevelopment() ? "Development" : "Production");
+
+// Serve static files from wwwroot/ (e.g., bundled React SPA in production).
+// Safe when wwwroot/ is absent or empty — middleware simply passes through.
+app.UseStaticFiles();
 
 // HTTPS redirection - skip OPTIONS requests (preflight) and HTTP requests in development to avoid CORS issues
 // In development, allow HTTP connections from frontend without redirecting
@@ -79,5 +84,9 @@ app.UseAuthorization();
 
 // Map controllers
 app.MapControllers();
+
+// SPA fallback: serve index.html for any non-API path not matched by a controller.
+// The regex explicitly excludes /api/ routes so unmatched API calls keep returning 404.
+app.MapFallbackToFile("/{**path:regex(^(?!api/).*$)}", "index.html");
 
 app.Run();

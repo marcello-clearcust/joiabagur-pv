@@ -209,11 +209,16 @@ export function InventoryImportPage() {
           </p>
           <ul className="ml-4 list-disc space-y-1 text-sm text-muted-foreground">
             <li><strong>SKU</strong> - Código del producto (debe existir en el catálogo)</li>
-            <li><strong>Quantity</strong> - Cantidad a agregar (número entero ≥ 0)</li>
+            <li>
+              <strong>Quantity</strong> - Cantidad a agregar o restar (número entero positivo o negativo).
+              Los valores positivos <em>suman</em> al stock; los negativos <em>restan</em>.
+              El stock final no puede ser negativo.
+            </li>
           </ul>
           <p className="text-sm text-muted-foreground">
-            <strong>Nota:</strong> Las cantidades se <em>agregan</em> al stock existente.
-            Los productos no asignados serán asignados automáticamente.
+            <strong>Nota:</strong> La importación es todo o nada — si alguna fila haría que el stock quede negativo,
+            se rechaza el archivo completo con un mensaje de error por fila.
+            Los productos no asignados se asignan automáticamente (solo con cantidades positivas).
           </p>
           <Button variant="outline" onClick={handleDownloadTemplate}>
             <Download className="mr-2 h-4 w-4" />

@@ -487,6 +487,87 @@ public class InventoryIntegrationTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task ExcelImport_NegativeQuantityWithSufficientStock_ShouldReduceStockAndCreateMovement()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // Arrange — _testProduct1 has quantity 10 at _testPos1; subtract 3 (result = 7)
+        var workbook = new ClosedXML.Excel.XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Stock Import");
+        worksheet.Cell(1, 1).Value = "SKU";
+        worksheet.Cell(1, 2).Value = "Quantity";
+        worksheet.Cell(2, 1).Value = _testProduct1.SKU;
+        worksheet.Cell(2, 2).Value = -3;
+
+        var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var content = new MultipartFormDataContent();
+        content.Add(new StreamContent(stream), "file", "negative_import.xlsx");
+
+        // Act
+        var response = await _adminClient!.PostAsync($"/api/inventory/import?pointOfSaleId={_testPos1.Id}", content);
+
+        // Assert HTTP 200
+        response.EnsureSuccessStatusCode();
+
+        // Verify inventory quantity was reduced
+        var inventory = await context.Inventories
+            .FirstOrDefaultAsync(i => i.ProductId == _testProduct1.Id && i.PointOfSaleId == _testPos1.Id);
+        inventory.Should().NotBeNull();
+        inventory!.Quantity.Should().Be(7); // 10 - 3
+
+        // Verify movement with negative QuantityChange was created
+        var movement = await context.InventoryMovements
+            .Where(m => m.InventoryId == inventory.Id && m.MovementType == MovementType.Import && m.QuantityChange == -3)
+            .FirstOrDefaultAsync();
+        movement.Should().NotBeNull();
+        movement!.QuantityBefore.Should().Be(10);
+        movement.QuantityAfter.Should().Be(7);
+    }
+
+    [Fact]
+    public async Task ExcelImport_NegativeQuantityExceedingStock_ShouldReturnErrorAndLeaveStockUnchanged()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // Arrange — _testProduct1 has quantity 10; try to subtract 50 (would go negative)
+        var workbook = new ClosedXML.Excel.XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Stock Import");
+        worksheet.Cell(1, 1).Value = "SKU";
+        worksheet.Cell(1, 2).Value = "Quantity";
+        worksheet.Cell(2, 1).Value = _testProduct1.SKU;
+        worksheet.Cell(2, 2).Value = -50;
+
+        var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var content = new MultipartFormDataContent();
+        content.Add(new StreamContent(stream), "file", "exceeds_stock_import.xlsx");
+
+        var inventoryBefore = await context.Inventories
+            .AsNoTracking()
+            .FirstAsync(i => i.ProductId == _testProduct1.Id && i.PointOfSaleId == _testPos1.Id);
+        var quantityBefore = inventoryBefore.Quantity;
+
+        // Act
+        var response = await _adminClient!.PostAsync($"/api/inventory/import?pointOfSaleId={_testPos1.Id}", content);
+
+        // Assert — bad request
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Verify inventory is unchanged
+        var inventoryAfter = await context.Inventories
+            .AsNoTracking()
+            .FirstAsync(i => i.ProductId == _testProduct1.Id && i.PointOfSaleId == _testPos1.Id);
+        inventoryAfter.Quantity.Should().Be(quantityBefore);
+    }
+
     #endregion
 
     #region 9.11 Integration tests for movement history creation and querying

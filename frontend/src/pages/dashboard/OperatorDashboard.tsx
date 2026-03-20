@@ -317,7 +317,7 @@ export function OperatorDashboard() {
       </div>
 
       {/* Sticky Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-input shadow-lg">
+      <div className="fixed bottom-0 start-0 end-0 z-50 bg-background border-t border-input shadow-lg lg:start-(--sidebar-width)">
         <div className="flex justify-around items-center p-3 max-w-lg mx-auto gap-2">
           <Link
             to={ROUTES.SALES.NEW}

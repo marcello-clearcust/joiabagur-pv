@@ -22,6 +22,8 @@ erDiagram
     PointOfSale ||--o{ Return : "recibe devoluciones"
     
     Product ||--o{ ProductPhoto : "tiene fotos"
+    Product ||--o{ ProductPhotoEmbedding : "tiene embeddings"
+    ProductPhoto ||--o| ProductPhotoEmbedding : "tiene embedding"
     Product ||--o{ Sale : "se vende"
     Product ||--o{ Inventory : "en stock"
     Product ||--o{ InventoryMovement : "movimiento"
@@ -119,7 +121,17 @@ erDiagram
         datetime UpdatedAt
         indexed(ProductId, DisplayOrder)
     }
-    
+
+    ProductPhotoEmbedding {
+        uuid Id PK
+        uuid ProductPhotoId FK UK "unique - un embedding por foto"
+        uuid ProductId FK
+        string ProductSku "desnormalizado para búsquedas sin JOIN"
+        text EmbeddingVector "1280 floats como JSON"
+        datetime CreatedAt
+        datetime UpdatedAt
+    }
+
     PaymentMethod {
         uuid Id PK
         string Code UK "unique"
@@ -428,6 +440,32 @@ Fotos de referencia de productos para el reconocimiento de imágenes. Múltiples
 **Optimizaciones:**
 - Índice compuesto en `(ProductId, DisplayOrder)` para ordenamiento eficiente
 - Las fotos se almacenan en object storage (S3/Blob), no en la base de datos
+
+---
+
+### ProductPhotoEmbedding (Embeddings de Fotos de Productos)
+
+Almacena el vector de características MobileNetV2 (1280 dimensiones) de cada foto de producto. Se usa para inferencia por similitud coseno en lugar del clasificador entrenado.
+
+**Campos Clave:**
+- `ProductPhotoId`: FK a la foto de producto (único — un embedding por foto)
+- `ProductId`: FK al producto (desnormalizado para evitar JOINs en lecturas masivas)
+- `ProductSku`: SKU del producto (desnormalizado para búsquedas sin JOIN)
+- `EmbeddingVector`: Vector de 1280 floats serializado como JSON text
+
+**Ciclo de Vida:**
+- Se crea automáticamente cuando se sube una foto de producto (extracción en el navegador con MobileNetV2)
+- Se elimina automáticamente cuando se elimina la foto asociada
+- Se puede regenerar en bloque desde la página de administración de IA ("Generar Embeddings")
+
+**Decisiones de Diseño:**
+- Almacenado como `text` (JSON) en lugar de `pgvector` porque la similitud se calcula íntegramente en el navegador, sin consultas de similitud en servidor
+- Una fila por foto (no por producto) para capturar múltiples ángulos visuales
+- Tamaño estimado: ~366 filas × 1280 floats × ~8 bytes (JSON) ≈ 3 MB
+
+**Optimizaciones:**
+- Índice único en `ProductPhotoId` (un embedding por foto)
+- Índice en `ProductId` para borrados en cascada eficientes
 
 ---
 

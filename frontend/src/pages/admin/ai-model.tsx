@@ -14,7 +14,8 @@ import {
   Image,
   Package,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,8 +36,8 @@ import {
 
 import { imageRecognitionService } from '@/services/sales.service';
 import { modelTrainingService } from '@/services/model-training.service';
-import type { ModelHealth, ModelMetadata } from '@/types/sales.types';
-import type { TrainingProgress } from '@/services/model-training.service';
+import type { ModelHealth, ModelMetadata, EmbeddingsStatusResponse } from '@/types/sales.types';
+import type { TrainingProgress, EmbeddingGenerationProgress } from '@/services/model-training.service';
 
 type AlertLevel = 'OK' | 'RECOMMENDED' | 'HIGH' | 'CRITICAL';
 
@@ -47,8 +48,12 @@ export function AIModelPage() {
   const [trainingInProgress, setTrainingInProgress] = useState(false);
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [trainingError, setTrainingError] = useState<string | null>(null);
+  const [embeddingsStatus, setEmbeddingsStatus] = useState<EmbeddingsStatusResponse | null>(null);
+  const [embeddingGenerationInProgress, setEmbeddingGenerationInProgress] = useState(false);
+  const [embeddingGenerationProgress, setEmbeddingGenerationProgress] = useState<EmbeddingGenerationProgress | null>(null);
+  const [embeddingGenerationError, setEmbeddingGenerationError] = useState<string | null>(null);
 
-  // Load model health and versions
+  // Load model health, versions, and embeddings status
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -82,7 +87,18 @@ export function AIModelPage() {
         setLoading(false);
       }
     };
+
+    const loadEmbeddingsStatus = async () => {
+      try {
+        const status = await imageRecognitionService.getEmbeddingsStatus();
+        setEmbeddingsStatus(status);
+      } catch {
+        // Non-critical — just leave null
+      }
+    };
+
     loadData();
+    loadEmbeddingsStatus();
   }, []);
 
   // Prevent accidental tab close during training
@@ -180,6 +196,36 @@ export function AIModelPage() {
     }
   };
 
+  const handleGenerateEmbeddings = async () => {
+    const confirmed = window.confirm(
+      'Se generarán embeddings para todas las fotos del catálogo (~30-60 segundos).\n\n' +
+      '⚠️ Los embeddings existentes serán reemplazados.\n\n' +
+      '¿Deseas continuar?'
+    );
+    if (!confirmed) return;
+
+    setEmbeddingGenerationInProgress(true);
+    setEmbeddingGenerationError(null);
+    setEmbeddingGenerationProgress(null);
+
+    try {
+      await modelTrainingService.executeEmbeddingGeneration((progress) => {
+        setEmbeddingGenerationProgress(progress);
+      });
+
+      toast.success('¡Embeddings generados exitosamente!');
+
+      const status = await imageRecognitionService.getEmbeddingsStatus();
+      setEmbeddingsStatus(status);
+    } catch (error: unknown) {
+      const errorMessage = (error as { message?: string }).message || 'Error al generar embeddings';
+      setEmbeddingGenerationError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setEmbeddingGenerationInProgress(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -207,22 +253,41 @@ export function AIModelPage() {
             Gestión del modelo de reconocimiento de imágenes
           </p>
         </div>
-        <Button 
-          onClick={handleStartTraining}
-          disabled={trainingInProgress}
-        >
-          {trainingInProgress ? (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              Entrenando...
-            </>
-          ) : (
-            <>
-              <Upload className="mr-2 h-4 w-4" />
-              Entrenar Modelo
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleGenerateEmbeddings}
+            disabled={trainingInProgress || embeddingGenerationInProgress}
+          >
+            {embeddingGenerationInProgress ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Generando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generar Embeddings
+              </>
+            )}
+          </Button>
+          <Button 
+            onClick={handleStartTraining}
+            disabled={trainingInProgress || embeddingGenerationInProgress}
+          >
+            {trainingInProgress ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Entrenando...
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" />
+                Entrenar Modelo
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Alert Banner */}
@@ -241,7 +306,7 @@ export function AIModelPage() {
       )}
 
       {/* Metrics Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         {/* Model Status */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -347,7 +412,90 @@ export function AIModelPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Embeddings Index */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Embeddings</CardTitle>
+            <Sparkles className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {embeddingsStatus && embeddingsStatus.count > 0 ? (
+              <>
+                <div className="text-2xl font-bold">{embeddingsStatus.count}</div>
+                <p className="text-xs text-muted-foreground">
+                  {embeddingsStatus.lastUpdated
+                    ? `Actualizado ${formatDate(embeddingsStatus.lastUpdated)}`
+                    : 'Generados'}
+                </p>
+                <Badge variant="default" className="mt-2 bg-green-500 gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Activos
+                </Badge>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-muted-foreground">0</div>
+                <p className="text-xs text-muted-foreground">
+                  No hay embeddings generados
+                </p>
+                <Badge variant="secondary" className="mt-2">Sin embeddings</Badge>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Embedding Generation Progress (shown when generating) */}
+      {embeddingGenerationInProgress && embeddingGenerationProgress && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 animate-spin" />
+              Generando Embeddings
+            </CardTitle>
+            <CardDescription>
+              Mantenga esta pestaña abierta durante la generación
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>{embeddingGenerationProgress.message}</span>
+                <span>
+                  {embeddingGenerationProgress.total > 0
+                    ? `${embeddingGenerationProgress.current}/${embeddingGenerationProgress.total}`
+                    : ''}
+                </span>
+              </div>
+              <Progress
+                value={
+                  embeddingGenerationProgress.total > 0
+                    ? Math.round((embeddingGenerationProgress.current / embeddingGenerationProgress.total) * 100)
+                    : 0
+                }
+              />
+            </div>
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>⚠️ No cierre esta pestaña</AlertTitle>
+              <AlertDescription>
+                La generación de embeddings se ejecuta en su navegador. Cerrar la pestaña cancelará el proceso.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Embedding Generation Error */}
+      {embeddingGenerationError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error al Generar Embeddings</AlertTitle>
+          <AlertDescription>
+            {embeddingGenerationError}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Training Progress (shown when training) */}
       {trainingInProgress && trainingProgress && (

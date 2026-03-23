@@ -76,6 +76,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IModelMetadataRepository, ModelMetadataRepository>();
         services.AddScoped<IModelTrainingJobRepository, ModelTrainingJobRepository>();
 
+        services.AddScoped<IProductPhotoEmbeddingRepository, ProductPhotoEmbeddingRepository>();
+
         // Register component management repositories (EP10)
         services.AddScoped<IProductComponentRepository, ProductComponentRepository>();
         services.AddScoped<IProductComponentAssignmentRepository, ProductComponentAssignmentRepository>();

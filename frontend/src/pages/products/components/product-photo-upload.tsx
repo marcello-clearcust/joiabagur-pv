@@ -24,11 +24,14 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/providers/auth-provider';
 import { productService } from '@/services/product.service';
+import { imageRecognitionService } from '@/services/sales.service';
+import { loadFeatureExtractor, preprocessImage } from '@/services/image-recognition.service';
 import { ProductPhoto } from '@/types/product.types';
 import { getImageUrl } from '@/lib/image-url';
 
 interface ProductPhotoUploadProps {
   productId: string;
+  productSku: string;
   photos: ProductPhoto[];
   onPhotosChange: () => void;
 }
@@ -42,7 +45,7 @@ interface PendingFile {
   error?: string;
 }
 
-export function ProductPhotoUpload({ productId, photos, onPhotosChange }: ProductPhotoUploadProps) {
+export function ProductPhotoUpload({ productId, productSku, photos, onPhotosChange }: ProductPhotoUploadProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'Administrator';
   
@@ -135,13 +138,49 @@ export function ProductPhotoUpload({ productId, photos, onPhotosChange }: Produc
       );
 
       try {
-        await productService.uploadPhoto(productId, pendingFile.file);
+        const updatedProduct = await productService.uploadPhoto(productId, pendingFile.file);
         successCount++;
-        
+
+        // Find the newly uploaded photo (last photo in updated list)
+        const uploadedPhoto = updatedProduct.photos?.slice(-1)[0];
+
         // Marcar como éxito y remover después de un breve delay
         setPendingFiles((prev) =>
           prev.map((f) => (f.id === pendingFile.id ? { ...f, status: 'success' as const } : f))
         );
+
+        // Non-blocking: extract embedding and save to API
+        if (uploadedPhoto) {
+          (async () => {
+            try {
+              const img = new Image();
+              const objectUrl = URL.createObjectURL(pendingFile.file);
+              await new Promise<void>((resolve, reject) => {
+                img.onload = () => resolve();
+                img.onerror = () => reject();
+                img.src = objectUrl;
+              });
+
+              const featureExtractor = await loadFeatureExtractor();
+              const preprocessed = await preprocessImage(img);
+              const batchedTensor = preprocessed.expandDims(0);
+              const featuresTensor = (featureExtractor as any).predict(batchedTensor);
+              const reshaped = featuresTensor.reshape([1, -1]);
+              const vectorData = await reshaped.data();
+              const vector = Array.from(vectorData) as number[];
+
+              reshaped.dispose();
+              featuresTensor.dispose();
+              batchedTensor.dispose();
+              preprocessed.dispose();
+              URL.revokeObjectURL(objectUrl);
+
+              await imageRecognitionService.saveEmbedding(uploadedPhoto.id, productId, productSku, vector);
+            } catch (embErr) {
+              console.warn('Embedding generation failed (non-blocking):', embErr);
+            }
+          })();
+        }
         
         // Limpiar el archivo exitoso después de mostrar el estado
         setTimeout(() => {
@@ -234,10 +273,17 @@ export function ProductPhotoUpload({ productId, photos, onPhotosChange }: Produc
     setDeletingPhotoId(photoToDelete);
     setDeleteConfirmOpen(false);
     
+    const deletedPhotoId = photoToDelete;
+
     try {
-      await productService.deletePhoto(productId, photoToDelete);
+      await productService.deletePhoto(productId, deletedPhotoId);
       toast.success('Foto eliminada');
       onPhotosChange();
+
+      // Non-blocking: remove embedding for deleted photo
+      imageRecognitionService.deleteEmbedding(deletedPhotoId).catch((err) => {
+        console.warn('Failed to delete embedding (non-blocking):', err);
+      });
     } catch (error: any) {
       console.error('Failed to delete photo:', error);
       const errorMessage = error.response?.data?.error || 'Error al eliminar la foto';

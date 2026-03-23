@@ -7,6 +7,7 @@ import * as tf from '@tensorflow/tfjs';
 import {
   checkTrainingCapabilities,
   executeClientSideTraining,
+  executeEmbeddingGeneration,
   modelTrainingService,
 } from '../model-training.service';
 import { imageRecognitionService } from '../sales.service';
@@ -17,6 +18,8 @@ vi.mock('../sales.service', () => ({
   imageRecognitionService: {
     getTrainingDataset: vi.fn(),
     uploadTrainedModel: vi.fn(),
+    deleteAllEmbeddings: vi.fn(),
+    saveEmbedding: vi.fn(),
   },
 }));
 
@@ -169,6 +172,70 @@ describe('Model Training Service', () => {
       await expect(executeClientSideTraining(mockProgressCallback)).rejects.toThrow(
         'No hay fotos disponibles'
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // executeEmbeddingGeneration
+  // ---------------------------------------------------------------------------
+
+  describe('executeEmbeddingGeneration', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(imageRecognitionService.deleteAllEmbeddings).mockResolvedValue(undefined);
+      vi.mocked(imageRecognitionService.saveEmbedding).mockResolvedValue(undefined);
+    });
+
+    it('should report complete with 0/0 when no photos are available', async () => {
+      vi.mocked(imageRecognitionService.getTrainingDataset).mockResolvedValue({
+        photos: [],
+        totalPhotos: 0,
+        totalProducts: 0,
+        classLabels: [],
+      });
+
+      const progressUpdates: Array<{ phase: string; current: number; total: number }> = [];
+
+      await executeEmbeddingGeneration((p) => progressUpdates.push(p));
+
+      const lastUpdate = progressUpdates[progressUpdates.length - 1];
+      expect(lastUpdate.phase).toBe('complete');
+      expect(lastUpdate.current).toBe(0);
+    });
+
+    it('should call deleteAllEmbeddings before processing photos', async () => {
+      vi.mocked(imageRecognitionService.getTrainingDataset).mockResolvedValue({
+        photos: [],
+        totalPhotos: 0,
+        totalProducts: 0,
+        classLabels: [],
+      });
+
+      await executeEmbeddingGeneration(() => {});
+
+      expect(imageRecognitionService.deleteAllEmbeddings).toHaveBeenCalledTimes(1);
+    });
+
+    it('should report clearing phase as first progress event', async () => {
+      vi.mocked(imageRecognitionService.getTrainingDataset).mockResolvedValue({
+        photos: [],
+        totalPhotos: 0,
+        totalProducts: 0,
+        classLabels: [],
+      });
+
+      const progressUpdates: Array<{ phase: string }> = [];
+      await executeEmbeddingGeneration((p) => progressUpdates.push(p));
+
+      expect(progressUpdates[0].phase).toBe('clearing');
+    });
+
+    it('should throw when getTrainingDataset fails', async () => {
+      vi.mocked(imageRecognitionService.getTrainingDataset).mockRejectedValue(
+        new Error('Network error')
+      );
+
+      await expect(executeEmbeddingGeneration(() => {})).rejects.toThrow('Network error');
     });
   });
 });

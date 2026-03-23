@@ -1,3 +1,4 @@
+using System.Text.Json;
 using JoiabagurPV.Application.DTOs.ImageRecognition;
 using JoiabagurPV.Application.Interfaces;
 using JoiabagurPV.Domain.Entities;
@@ -13,10 +14,13 @@ namespace JoiabagurPV.Application.Services;
 /// </summary>
 public class ImageRecognitionService : IImageRecognitionService
 {
+    private const int EmbeddingVectorLength = 1280;
+
     private readonly IModelMetadataRepository _modelMetadataRepository;
     private readonly IModelTrainingJobRepository _trainingJobRepository;
     private readonly IProductRepository _productRepository;
     private readonly IProductPhotoRepository _productPhotoRepository;
+    private readonly IProductPhotoEmbeddingRepository _embeddingRepository;
     private readonly IInventoryRepository _inventoryRepository;
     private readonly IUserPointOfSaleService _userPointOfSaleService;
     private readonly IFileStorageService _fileStorageService;
@@ -28,6 +32,7 @@ public class ImageRecognitionService : IImageRecognitionService
         IModelTrainingJobRepository trainingJobRepository,
         IProductRepository productRepository,
         IProductPhotoRepository productPhotoRepository,
+        IProductPhotoEmbeddingRepository embeddingRepository,
         IInventoryRepository inventoryRepository,
         IUserPointOfSaleService userPointOfSaleService,
         IFileStorageService fileStorageService,
@@ -38,6 +43,7 @@ public class ImageRecognitionService : IImageRecognitionService
         _trainingJobRepository = trainingJobRepository ?? throw new ArgumentNullException(nameof(trainingJobRepository));
         _productRepository = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
         _productPhotoRepository = productPhotoRepository ?? throw new ArgumentNullException(nameof(productPhotoRepository));
+        _embeddingRepository = embeddingRepository ?? throw new ArgumentNullException(nameof(embeddingRepository));
         _inventoryRepository = inventoryRepository ?? throw new ArgumentNullException(nameof(inventoryRepository));
         _userPointOfSaleService = userPointOfSaleService ?? throw new ArgumentNullException(nameof(userPointOfSaleService));
         _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
@@ -404,6 +410,84 @@ public class ImageRecognitionService : IImageRecognitionService
             ErrorMessage = job.ErrorMessage,
             ResultModelVersion = job.ResultModelVersion,
             DurationSeconds = job.DurationSeconds
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task SaveEmbeddingAsync(SaveEmbeddingRequest request)
+    {
+        if (request.Vector == null || request.Vector.Length != EmbeddingVectorLength)
+        {
+            throw new ArgumentException($"Embedding vector must have exactly {EmbeddingVectorLength} elements.");
+        }
+
+        // Upsert: delete existing embedding for this photo, then insert new one
+        await _embeddingRepository.DeleteByPhotoIdAsync(request.PhotoId);
+
+        var embedding = new ProductPhotoEmbedding
+        {
+            ProductPhotoId = request.PhotoId,
+            ProductId = request.ProductId,
+            ProductSku = request.Sku,
+            EmbeddingVector = JsonSerializer.Serialize(request.Vector)
+        };
+
+        await _embeddingRepository.AddAsync(embedding);
+        await _unitOfWork.SaveChangesAsync();
+
+        _logger.LogDebug("Saved embedding for photo {PhotoId} (product {ProductId})", request.PhotoId, request.ProductId);
+    }
+
+    /// <inheritdoc/>
+    public async Task DeleteEmbeddingAsync(Guid photoId)
+    {
+        await _embeddingRepository.DeleteByPhotoIdAsync(photoId);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    /// <inheritdoc/>
+    public async Task DeleteAllEmbeddingsAsync()
+    {
+        await _embeddingRepository.DeleteAllAsync();
+        _logger.LogInformation("All photo embeddings deleted");
+    }
+
+    /// <inheritdoc/>
+    public async Task<EmbeddingsIndexResponse> GetAllEmbeddingsAsync()
+    {
+        var embeddings = await _embeddingRepository.GetAllAsync();
+        var lastUpdated = embeddings.Count > 0 ? embeddings.Max(e => e.UpdatedAt) : (DateTime?)null;
+
+        var dtos = embeddings.Select(e =>
+        {
+            var vector = JsonSerializer.Deserialize<float[]>(e.EmbeddingVector) ?? Array.Empty<float>();
+            return new EmbeddingDto
+            {
+                PhotoId = e.ProductPhotoId,
+                ProductId = e.ProductId,
+                Sku = e.ProductSku,
+                Vector = vector
+            };
+        }).ToList();
+
+        return new EmbeddingsIndexResponse
+        {
+            Embeddings = dtos,
+            LastUpdated = lastUpdated,
+            Count = dtos.Count
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<EmbeddingsStatusResponse> GetEmbeddingsStatusAsync()
+    {
+        var count = await _embeddingRepository.GetCountAsync();
+        var lastUpdated = await _embeddingRepository.GetLastUpdatedAsync();
+
+        return new EmbeddingsStatusResponse
+        {
+            Count = count,
+            LastUpdated = lastUpdated
         };
     }
 }

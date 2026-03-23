@@ -435,6 +435,79 @@ public class ImageRecognitionController : ControllerBase
 
         return Ok(dataset);
     }
+
+    /// <summary>
+    /// Saves (or updates) the MobileNetV2 embedding for a product photo.
+    /// Vector must have exactly 1280 elements.
+    /// </summary>
+    [HttpPost("embeddings")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SaveEmbedding([FromBody] SaveEmbeddingRequest request)
+    {
+        if (request.Vector == null || request.Vector.Length != 1280)
+        {
+            return BadRequest(new { message = "Embedding vector must have exactly 1280 elements." });
+        }
+
+        try
+        {
+            await _imageRecognitionService.SaveEmbeddingAsync(request);
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Deletes the embedding for a specific product photo.
+    /// </summary>
+    [HttpDelete("embeddings/{photoId:guid}")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteEmbedding(Guid photoId)
+    {
+        await _imageRecognitionService.DeleteEmbeddingAsync(photoId);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes all stored embeddings.
+    /// </summary>
+    [HttpDelete("embeddings")]
+    [Authorize(Roles = "Administrator")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteAllEmbeddings()
+    {
+        await _imageRecognitionService.DeleteAllEmbeddingsAsync();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns all stored embeddings for client-side similarity search.
+    /// </summary>
+    [HttpGet("embeddings")]
+    [ProducesResponseType(typeof(EmbeddingsIndexResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<EmbeddingsIndexResponse>> GetAllEmbeddings()
+    {
+        var result = await _imageRecognitionService.GetAllEmbeddingsAsync();
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns the count and last-updated timestamp of the embeddings index.
+    /// Lightweight endpoint for staleness checks before downloading the full index.
+    /// </summary>
+    [HttpGet("embeddings/status")]
+    [ProducesResponseType(typeof(EmbeddingsStatusResponse), StatusCodes.Status200OK)]
+    public async Task<ActionResult<EmbeddingsStatusResponse>> GetEmbeddingsStatus()
+    {
+        var result = await _imageRecognitionService.GetEmbeddingsStatusAsync();
+        return Ok(result);
+    }
 }
 
 /// <summary>

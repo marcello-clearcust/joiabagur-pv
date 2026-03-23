@@ -7,7 +7,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import { imageRecognitionService } from './sales.service';
-import type { ProductSuggestion } from '@/types/sales.types';
+import type { EmbeddingDto, ProductSuggestion } from '@/types/sales.types';
 
 const AUTH_TOKEN_KEY = 'jpv_access_token';
 
@@ -60,6 +60,12 @@ const MAX_ENTROPY_THRESHOLD = 2.0; // Maximum entropy for valid predictions
 const IMAGE_SIZE = 224; // MobileNetV2 input size
 const MAX_SUGGESTIONS = 5;
 
+/** Minimum cosine similarity for a product to appear in suggestions. */
+export const SIMILARITY_THRESHOLD = 0.70;
+
+/** Minimum cosine similarity for the top match to return any results at all. */
+export const MIN_TOP_SIMILARITY = 0.50;
+
 // MobileNetV2 feature extractor URL (same as training)
 const MOBILENET_URL = 'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v2_100_224/feature_vector/3/default/1';
 
@@ -68,6 +74,13 @@ let cachedFeatureExtractor: tf.GraphModel | null = null;
 let cachedClassificationHead: tf.LayersModel | null = null;
 let cachedModelVersion: string | null = null;
 let cachedClassLabels: string[] | null = null;
+
+/** In-memory embeddings index cache for similarity inference. */
+interface EmbeddingsIndexCache {
+  embeddings: Array<{ photoId: string; productId: string; sku: string; vector: Float32Array }>;
+  lastUpdated: string | null;
+}
+let embeddingsIndexCache: EmbeddingsIndexCache | null = null;
 
 /**
  * Stored class labels from training (saved in class_labels.json).
@@ -210,7 +223,7 @@ export async function preprocessImage(imageElement: HTMLImageElement): Promise<t
  * Load MobileNetV2 feature extractor from TensorFlow Hub.
  * Cached to avoid reloading on every inference.
  */
-async function loadFeatureExtractor(): Promise<tf.GraphModel> {
+export async function loadFeatureExtractor(): Promise<tf.GraphModel> {
   if (cachedFeatureExtractor) {
     return cachedFeatureExtractor;
   }
@@ -516,9 +529,9 @@ export async function generateSuggestions(
 }
 
 /**
- * Complete image recognition workflow.
+ * Classifier-based recognition (original path). Kept as fallback when no embeddings exist.
  */
-export async function recognizeProduct(imageFile: File): Promise<ProductSuggestion[]> {
+async function recognizeProductByClassifier(imageFile: File): Promise<ProductSuggestion[]> {
   // Step 1: Validate file
   const fileValidation = validateImage(imageFile);
   if (!fileValidation.isValid) {
@@ -604,6 +617,27 @@ export async function recognizeProduct(imageFile: File): Promise<ProductSuggesti
 }
 
 /**
+ * Complete image recognition workflow.
+ * Uses similarity-based inference when embeddings exist, falls back to the classifier otherwise.
+ */
+export async function recognizeProduct(imageFile: File): Promise<ProductSuggestion[]> {
+  try {
+    const status = await imageRecognitionService.getEmbeddingsStatus();
+    if (status.count > 0) {
+      try {
+        return await recognizeProductBySimilarity(imageFile);
+      } catch (simError) {
+        console.warn('Similarity inference failed, falling back to classifier:', simError);
+        return await recognizeProductByClassifier(imageFile);
+      }
+    }
+  } catch {
+    // If status check fails, fall through to classifier
+  }
+  return recognizeProductByClassifier(imageFile);
+}
+
+/**
  * Load image file into HTMLImageElement.
  */
 function loadImageElement(imageFile: File): Promise<HTMLImageElement> {
@@ -660,6 +694,135 @@ function enrichSuggestionsFromMappings(
 }
 
 /**
+ * Compute cosine similarity between two Float32Arrays.
+ * Returns a value in [-1, 1] where 1 = identical, 0 = orthogonal, -1 = opposite.
+ */
+export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+/**
+ * Load embeddings index from the API, caching in memory.
+ * On subsequent calls, checks staleness via the lightweight status endpoint
+ * and re-fetches only if the server has newer embeddings.
+ */
+export async function loadEmbeddingsIndex(): Promise<EmbeddingsIndexCache> {
+  if (embeddingsIndexCache !== null) {
+    const status = await imageRecognitionService.getEmbeddingsStatus();
+    const serverTs = status.lastUpdated;
+    if (serverTs === embeddingsIndexCache.lastUpdated) {
+      return embeddingsIndexCache;
+    }
+  }
+
+  const response = await imageRecognitionService.getAllEmbeddings();
+  const embeddings = response.embeddings.map((dto: EmbeddingDto) => ({
+    photoId: dto.photoId,
+    productId: dto.productId,
+    sku: dto.sku,
+    vector: new Float32Array(dto.vector),
+  }));
+
+  embeddingsIndexCache = {
+    embeddings,
+    lastUpdated: response.lastUpdated,
+  };
+
+  return embeddingsIndexCache;
+}
+
+/**
+ * Invalidate the in-memory embeddings cache.
+ */
+export function clearEmbeddingsCache(): void {
+  embeddingsIndexCache = null;
+}
+
+/**
+ * Run similarity-based product recognition.
+ * Computes cosine similarity of the query image features against all stored embeddings,
+ * groups by SKU (max similarity per product), filters by thresholds, and returns top 5.
+ */
+async function recognizeProductBySimilarity(imageFile: File): Promise<ProductSuggestion[]> {
+  const fileValidation = validateImage(imageFile);
+  if (!fileValidation.isValid) {
+    throw new Error(fileValidation.error);
+  }
+
+  const imageElement = await loadImageElement(imageFile);
+  const dimensionValidation = await validateImageDimensions(imageElement);
+  if (!dimensionValidation.isValid) {
+    throw new Error(dimensionValidation.error);
+  }
+
+  const featureExtractor = await loadFeatureExtractor();
+  const preprocessed = await preprocessImage(imageElement);
+
+  let queryVector: Float32Array;
+  try {
+    const features = await extractImageFeatures(preprocessed);
+    queryVector = (await features.data()) as Float32Array;
+    features.dispose();
+  } finally {
+    preprocessed.dispose();
+  }
+
+  const index = await loadEmbeddingsIndex();
+
+  if (index.embeddings.length === 0) {
+    return [];
+  }
+
+  // Compute max similarity per SKU across all photos
+  const skuBestSimilarity = new Map<string, { similarity: number; productId: string }>();
+  for (const entry of index.embeddings) {
+    const sim = cosineSimilarity(queryVector, entry.vector);
+    const existing = skuBestSimilarity.get(entry.sku);
+    if (!existing || sim > existing.similarity) {
+      skuBestSimilarity.set(entry.sku, { similarity: sim, productId: entry.productId });
+    }
+  }
+
+  // Sort by similarity descending
+  const ranked = Array.from(skuBestSimilarity.entries())
+    .map(([sku, { similarity, productId }]) => ({ sku, similarity, productId }))
+    .sort((a, b) => b.similarity - a.similarity);
+
+  // Enforce minimum top similarity
+  if (ranked.length === 0 || ranked[0].similarity < MIN_TOP_SIMILARITY) {
+    return [];
+  }
+
+  // Filter by threshold and take top 5
+  const filtered = ranked
+    .filter((r) => r.similarity >= SIMILARITY_THRESHOLD)
+    .slice(0, MAX_SUGGESTIONS);
+
+  // Enrich with product details from class labels mappings
+  const classLabelsData = await imageRecognitionService.getClassLabels();
+
+  return filtered.map((r) => {
+    const mapping = classLabelsData.productMappings[r.sku];
+    return {
+      productId: r.productId,
+      productSku: r.sku,
+      productName: mapping?.productName ?? '',
+      confidence: Math.round(r.similarity * 100),
+      photoUrl: mapping?.photoUrl ?? '',
+    };
+  });
+}
+
+/**
  * Clear cached models (useful for testing or forcing reload).
  */
 export function clearModelCache(): void {
@@ -681,4 +844,7 @@ export const imageRecognitionInferenceService = {
   validateImageDimensions,
   recognizeProduct,
   clearModelCache,
+  cosineSimilarity,
+  loadEmbeddingsIndex,
+  clearEmbeddingsCache,
 };

@@ -64,6 +64,11 @@ public class TestDataMother : IDisposable
     /// </summary>
     public UserMother User() => new(_context);
 
+    /// <summary>
+    /// Creates a new ProductPhotoEmbeddingMother for building ProductPhotoEmbedding entities.
+    /// </summary>
+    public ProductPhotoEmbeddingMother ProductPhotoEmbedding() => new(_context);
+
     public void Dispose()
     {
         _scope.Dispose();

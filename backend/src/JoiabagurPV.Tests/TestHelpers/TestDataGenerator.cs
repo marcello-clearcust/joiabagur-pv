@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Bogus;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Enums;
@@ -429,5 +430,69 @@ public static class TestDataGenerator
     public static ReturnSale CreateReturnSale(Guid? returnId = null, Guid? saleId = null, int? quantity = null, decimal? unitPrice = null)
     {
         return ReturnSaleFaker(returnId, saleId, quantity, unitPrice).Generate();
+    }
+
+    /// <summary>
+    /// Generates a realistic 1280-dimensional float vector (random unit-normalised values).
+    /// </summary>
+    public static float[] CreateEmbeddingVector(int dimension = 1280)
+    {
+        var random = new Random();
+        var vector = new float[dimension];
+        double norm = 0;
+        for (int i = 0; i < dimension; i++)
+        {
+            vector[i] = (float)(random.NextDouble() * 2 - 1);
+            norm += vector[i] * vector[i];
+        }
+        norm = Math.Sqrt(norm);
+        for (int i = 0; i < dimension; i++)
+        {
+            vector[i] = (float)(vector[i] / norm);
+        }
+        return vector;
+    }
+
+    /// <summary>
+    /// Creates a ProductPhotoEmbedding faker with customizable rules.
+    /// </summary>
+    public static Faker<ProductPhotoEmbedding> ProductPhotoEmbeddingFaker(
+        Guid? productPhotoId = null,
+        Guid? productId = null,
+        string? sku = null,
+        float[]? vector = null)
+    {
+        return new Faker<ProductPhotoEmbedding>()
+            .RuleFor(e => e.Id, f => f.Random.Guid())
+            .RuleFor(e => e.ProductPhotoId, f => productPhotoId ?? f.Random.Guid())
+            .RuleFor(e => e.ProductId, f => productId ?? f.Random.Guid())
+            .RuleFor(e => e.ProductSku, f => sku ?? f.Commerce.Ean8())
+            .RuleFor(e => e.EmbeddingVector, _ => JsonSerializer.Serialize(vector ?? CreateEmbeddingVector()))
+            .RuleFor(e => e.CreatedAt, f => f.Date.Past().ToUniversalTime())
+            .RuleFor(e => e.UpdatedAt, f => f.Date.Recent().ToUniversalTime());
+    }
+
+    /// <summary>
+    /// Creates a single ProductPhotoEmbedding with optional customization.
+    /// </summary>
+    public static ProductPhotoEmbedding CreateProductPhotoEmbedding(
+        Guid? productPhotoId = null,
+        Guid? productId = null,
+        string? sku = null,
+        float[]? vector = null)
+    {
+        return ProductPhotoEmbeddingFaker(productPhotoId, productId, sku, vector).Generate();
+    }
+
+    /// <summary>
+    /// Creates multiple ProductPhotoEmbedding instances.
+    /// </summary>
+    public static List<ProductPhotoEmbedding> CreateProductPhotoEmbeddings(
+        int count,
+        Guid? productPhotoId = null,
+        Guid? productId = null,
+        string? sku = null)
+    {
+        return ProductPhotoEmbeddingFaker(productPhotoId, productId, sku).Generate(count);
     }
 }

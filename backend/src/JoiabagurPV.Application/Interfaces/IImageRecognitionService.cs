@@ -92,4 +92,29 @@ public interface IImageRecognitionService
     /// <param name="isAdmin">Whether the user is an administrator.</param>
     /// <returns>Set of accessible product IDs, or null if admin (has access to all).</returns>
     Task<HashSet<Guid>?> GetAccessibleProductIdsAsync(Guid? userId, bool isAdmin);
+
+    /// <summary>
+    /// Saves (or updates) the embedding for a photo. Validates vector length = 1280.
+    /// </summary>
+    Task SaveEmbeddingAsync(SaveEmbeddingRequest request);
+
+    /// <summary>
+    /// Deletes the embedding for a specific photo.
+    /// </summary>
+    Task DeleteEmbeddingAsync(Guid photoId);
+
+    /// <summary>
+    /// Deletes all stored embeddings.
+    /// </summary>
+    Task DeleteAllEmbeddingsAsync();
+
+    /// <summary>
+    /// Returns all stored embeddings with their deserialized vectors.
+    /// </summary>
+    Task<EmbeddingsIndexResponse> GetAllEmbeddingsAsync();
+
+    /// <summary>
+    /// Returns the count and last-updated timestamp of the embeddings index.
+    /// </summary>
+    Task<EmbeddingsStatusResponse> GetEmbeddingsStatusAsync();
 }

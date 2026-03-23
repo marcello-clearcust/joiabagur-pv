@@ -110,13 +110,19 @@ Sistema de identificación de productos mediante reconocimiento de imágenes usa
 
 **Entidades del modelo de datos relacionadas:**
 - `ProductPhoto` (fotos de referencia para entrenamiento/comparación)
+- `ProductPhotoEmbedding` (vectores de características MobileNetV2 almacenados por foto, usados para similitud coseno)
 - `SalePhoto` (foto capturada en el punto de venta)
 - `Product` (productos candidatos sugeridos)
 
 **Consideraciones técnicas:**
-- Procesamiento de imágenes en cliente (móvil) usando TensorFlow.js/ONNX.js
-- Modelo de IA entrenado con fotos de referencia de productos
-- Generación de 3 sugerencias ordenadas por confianza/precisión
+- Procesamiento de imágenes en cliente (navegador) usando TensorFlow.js
+- **Método de inferencia principal (implementado):** Similitud coseno sobre embeddings MobileNetV2 almacenados en base de datos. Más rápido y fiable que el clasificador para catálogos pequeños.
+  - Los embeddings se generan automáticamente al subir/eliminar fotos
+  - "Generar Embeddings" en la página de IA permite regeneración masiva (~30-60 segundos)
+  - La similitud coseno se calcula en el navegador con Float32Arrays; ~366 comparaciones en <1ms
+  - Umbrales: `SIMILARITY_THRESHOLD = 0.70` (mínimo para aparecer en sugerencias), `MIN_TOP_SIMILARITY = 0.50` (mínimo del top-1)
+- **Método de inferencia de respaldo:** Clasificador entrenado (Dense 256 → 128 → N clases). Se usa cuando no existen embeddings generados (instalación inicial o rollback).
+- Generación de 3-5 sugerencias ordenadas por similitud/confianza
 - Manejo de errores cuando no hay correspondencia fiable (redirigir a venta manual)
 - Almacenamiento de fotos: sistema de archivos local en desarrollo, S3/Blob Storage en producción
 

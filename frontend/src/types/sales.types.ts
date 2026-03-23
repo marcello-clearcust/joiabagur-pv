@@ -185,6 +185,33 @@ export interface UploadTrainedModelResult {
 }
 
 /**
+ * Single embedding entry in the embeddings index.
+ */
+export interface EmbeddingDto {
+  photoId: string;
+  productId: string;
+  sku: string;
+  vector: number[];
+}
+
+/**
+ * Full embeddings index response for client-side similarity search.
+ */
+export interface EmbeddingsIndexResponse {
+  embeddings: EmbeddingDto[];
+  lastUpdated: string | null;
+  count: number;
+}
+
+/**
+ * Lightweight response for staleness checks.
+ */
+export interface EmbeddingsStatusResponse {
+  count: number;
+  lastUpdated: string | null;
+}
+
+/**
  * Product suggestion from image recognition.
  */
 export interface ProductSuggestion {

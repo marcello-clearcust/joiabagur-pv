@@ -17,6 +17,8 @@ import type {
   TrainingDataset,
   ClassLabelsResponse,
   UploadTrainedModelResult,
+  EmbeddingsIndexResponse,
+  EmbeddingsStatusResponse,
 } from '@/types/sales.types';
 
 const SALES_ENDPOINT = '/sales';
@@ -182,6 +184,57 @@ export const imageRecognitionService = {
    */
   getModelUrl: (version: string, fileName: string): string => {
     return `${apiClient.defaults.baseURL}${IMAGE_RECOGNITION_ENDPOINT}/model/files/${version}/${fileName}`;
+  },
+
+  /**
+   * Saves (or updates) the MobileNetV2 embedding for a product photo.
+   */
+  saveEmbedding: async (
+    photoId: string,
+    productId: string,
+    sku: string,
+    vector: number[]
+  ): Promise<void> => {
+    await apiClient.post(`${IMAGE_RECOGNITION_ENDPOINT}/embeddings`, {
+      photoId,
+      productId,
+      sku,
+      vector,
+    });
+  },
+
+  /**
+   * Deletes the embedding for a specific product photo.
+   */
+  deleteEmbedding: async (photoId: string): Promise<void> => {
+    await apiClient.delete(`${IMAGE_RECOGNITION_ENDPOINT}/embeddings/${photoId}`);
+  },
+
+  /**
+   * Deletes all stored embeddings.
+   */
+  deleteAllEmbeddings: async (): Promise<void> => {
+    await apiClient.delete(`${IMAGE_RECOGNITION_ENDPOINT}/embeddings`);
+  },
+
+  /**
+   * Returns all stored embeddings for client-side similarity search.
+   */
+  getAllEmbeddings: async (): Promise<EmbeddingsIndexResponse> => {
+    const response = await apiClient.get<EmbeddingsIndexResponse>(
+      `${IMAGE_RECOGNITION_ENDPOINT}/embeddings`
+    );
+    return response.data;
+  },
+
+  /**
+   * Returns the count and last-updated timestamp of the embeddings index.
+   */
+  getEmbeddingsStatus: async (): Promise<EmbeddingsStatusResponse> => {
+    const response = await apiClient.get<EmbeddingsStatusResponse>(
+      `${IMAGE_RECOGNITION_ENDPOINT}/embeddings/status`
+    );
+    return response.data;
   },
 };
 

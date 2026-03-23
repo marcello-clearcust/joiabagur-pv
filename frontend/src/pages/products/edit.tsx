@@ -505,6 +505,7 @@ export function ProductEditPage() {
       {/* Photo Upload Section */}
       <ProductPhotoUpload
         productId={productId}
+        productSku={product.sku}
         photos={product.photos || []}
         onPhotosChange={() => {
           // Reload product to get updated photos

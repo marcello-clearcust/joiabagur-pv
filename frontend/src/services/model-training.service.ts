@@ -834,7 +834,112 @@ export async function executeClientSideTraining(
   }
 }
 
+export interface EmbeddingGenerationProgress {
+  phase: 'clearing' | 'loading_model' | 'processing' | 'complete';
+  current: number;
+  total: number;
+  message: string;
+}
+
+export type EmbeddingGenerationProgressCallback = (progress: EmbeddingGenerationProgress) => void;
+
+/**
+ * Full embedding rebuild: deletes all stored embeddings, downloads the training dataset,
+ * loads MobileNetV2, processes all photos in batches of 8, extracts 1280-dim feature
+ * vectors and saves each to the API. Progress is reported via callback.
+ *
+ * Errors on individual photos are logged and skipped so the overall process continues.
+ */
+export async function executeEmbeddingGeneration(
+  onProgress: EmbeddingGenerationProgressCallback
+): Promise<void> {
+  const BATCH_SIZE_EMBEDDING = 8;
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5056/api';
+  const backendBaseUrl = apiBaseUrl.replace('/api', '');
+
+  // Step 1: Clear existing embeddings
+  onProgress({ phase: 'clearing', current: 0, total: 0, message: 'Eliminando embeddings anteriores...' });
+  await imageRecognitionService.deleteAllEmbeddings();
+
+  // Step 2: Fetch training dataset
+  onProgress({ phase: 'loading_model', current: 0, total: 0, message: 'Obteniendo conjunto de datos...' });
+  const dataset = await imageRecognitionService.getTrainingDataset();
+  const { photos } = dataset;
+
+  if (photos.length === 0) {
+    onProgress({ phase: 'complete', current: 0, total: 0, message: 'No hay fotos disponibles para generar embeddings.' });
+    return;
+  }
+
+  // Step 3: Load MobileNetV2 feature extractor
+  onProgress({ phase: 'loading_model', current: 0, total: photos.length, message: 'Cargando modelo MobileNetV2...' });
+  let featureExtractor: tf.GraphModel | null = null;
+  try {
+    featureExtractor = await tf.loadGraphModel(MOBILENET_URL, { fromTFHub: true });
+  } catch (err) {
+    throw new Error(`Failed to load MobileNetV2: ${err}`);
+  }
+
+  // Step 4: Process photos in batches
+  let processed = 0;
+
+  try {
+    for (let batchStart = 0; batchStart < photos.length; batchStart += BATCH_SIZE_EMBEDDING) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE_EMBEDDING, photos.length);
+      const batchPhotos = photos.slice(batchStart, batchEnd);
+
+      for (const photo of batchPhotos) {
+        const absoluteUrl = photo.photoUrl.startsWith('http')
+          ? photo.photoUrl
+          : `${backendBaseUrl}${photo.photoUrl}`;
+
+        try {
+          const imgTensor = await loadAndPreprocessImage(absoluteUrl);
+          let vector: number[];
+
+          try {
+            const batched = imgTensor.expandDims(0) as tf.Tensor4D;
+            const featuresTensor = featureExtractor!.predict(batched) as tf.Tensor;
+            const reshaped = featuresTensor.reshape([1, -1]);
+            const data = await reshaped.data();
+            vector = Array.from(data);
+            reshaped.dispose();
+            featuresTensor.dispose();
+            batched.dispose();
+          } finally {
+            imgTensor.dispose();
+          }
+
+          await imageRecognitionService.saveEmbedding(photo.photoId, photo.productId, photo.productSku, vector);
+        } catch (photoErr) {
+          console.warn(`Embedding generation skipped for photo ${photo.photoId} (${photo.photoUrl}):`, photoErr);
+        }
+
+        processed++;
+        onProgress({
+          phase: 'processing',
+          current: processed,
+          total: photos.length,
+          message: `Generando embeddings: ${processed}/${photos.length} fotos procesadas`,
+        });
+      }
+
+      await tf.nextFrame();
+    }
+  } finally {
+    featureExtractor?.dispose();
+  }
+
+  onProgress({
+    phase: 'complete',
+    current: processed,
+    total: photos.length,
+    message: `Embeddings generados: ${processed}/${photos.length} fotos procesadas.`,
+  });
+}
+
 export const modelTrainingService = {
   checkTrainingCapabilities,
   executeClientSideTraining,
+  executeEmbeddingGeneration,
 };

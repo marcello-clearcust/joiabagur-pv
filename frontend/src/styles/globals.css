@@ -147,6 +147,12 @@ html {
   scroll-behavior: smooth;
 }
 
+/** Let flex descendants shrink horizontally so content cannot widen past the viewport (mobile overflow). */
+#root {
+  min-width: 0;
+  max-width: 100%;
+}
+
 /** Custom Containers **/
 @utility container {
   @apply mx-auto max-w-none px-4 lg:px-5;

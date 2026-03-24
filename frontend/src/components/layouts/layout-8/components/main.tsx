@@ -16,15 +16,15 @@ export function Main() {
   `);
 
   return (
-    <div className="flex grow">
+    <div className="flex min-h-0 min-w-0 w-full grow">
       {isMobile && <Header />}
 
-      <div className="flex flex-col lg:flex-row grow pt-(--header-height) lg:pt-0">
+      <div className="flex min-h-0 min-w-0 w-full grow flex-col pt-(--header-height) lg:flex-row lg:pt-0">
         {!isMobile && <Sidebar />}
 
-        <div className="flex flex-col grow rounded-xl bg-background border border-input lg:ms-(--sidebar-width) mt-0 m-4 lg:m-5">
-          <div className="flex flex-col grow kt-scrollable-y-auto lg:[scrollbar-width:auto] pt-5">
-            <main className="grow px-5 lg:px-8 pb-5" role="content">           
+        <div className="flex min-h-0 min-w-0 w-full grow flex-col rounded-xl border border-input bg-background m-4 mt-0 lg:m-5 lg:ms-(--sidebar-width)">
+          <div className="kt-scrollable-y-auto flex min-h-0 min-w-0 w-full grow flex-col pt-5 lg:[scrollbar-width:auto]">
+            <main className="min-w-0 max-w-full grow px-5 pb-5 lg:px-8" role="content">
               <Outlet />
             </main>
           </div>

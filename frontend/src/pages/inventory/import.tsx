@@ -38,8 +38,61 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { inventoryService } from '@/services/inventory.service';
 import { pointOfSaleService } from '@/services/point-of-sale.service';
 import { PointOfSale } from '@/types/point-of-sale.types';
-import { StockImportResult } from '@/types/inventory.types';
+import { StockImportError, StockImportResult } from '@/types/inventory.types';
 import { ROUTES } from '@/routing/routes';
+
+const STOCK_IMPORT_MULTI_ERROR_TOAST =
+  'Se encontraron varios errores en el archivo. Consulte el listado detallado a continuación.';
+
+/** Toast: multi-error → generic; single row → that message; none → summary `message`. */
+function toastStockImportFailure(result: StockImportResult): void {
+  const n = result.errors.length;
+  if (n > 1) {
+    toast.error(STOCK_IMPORT_MULTI_ERROR_TOAST);
+    return;
+  }
+  if (n === 1) {
+    const line = result.errors[0].message?.trim() || result.message;
+    toast.error(line || 'Error en la operación');
+    return;
+  }
+  toast.error(result.message || 'Error en la operación');
+}
+
+function StockImportErrorsAlertBlock({ title, errors }: { title: string; errors: StockImportError[] }) {
+  if (errors.length === 0) return null;
+  return (
+    <Alert variant="destructive" appearance="light" className="mt-2">
+      <AlertCircle className="h-4 w-4 shrink-0" />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription className="space-y-3">
+        <div className="space-y-2">
+          <p className="font-medium">Detalle:</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fila</TableHead>
+                <TableHead>Campo</TableHead>
+                <TableHead>Error</TableHead>
+                <TableHead>Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {errors.map((error, index) => (
+                <TableRow key={index}>
+                  <TableCell>{error.rowNumber}</TableCell>
+                  <TableCell>{error.field}</TableCell>
+                  <TableCell>{error.message}</TableCell>
+                  <TableCell className="font-mono text-sm">{error.value || '-'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 export function InventoryImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,6 +170,9 @@ export function InventoryImportPage() {
       try {
         const result = await inventoryService.validateImport(file, selectedPosId);
         setValidationResult(result);
+        if (!result.success) {
+          toastStockImportFailure(result);
+        }
         // Clear file input if validation fails to allow retry
         if (!result.success && fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -150,7 +206,7 @@ export function InventoryImportPage() {
           fileInputRef.current.value = '';
         }
       } else {
-        toast.error(result.message);
+        toastStockImportFailure(result);
       }
     } catch (error) {
       toast.error('Error al importar el stock');
@@ -308,33 +364,7 @@ export function InventoryImportPage() {
               {validationResult.message}
             </p>
 
-            {validationResult.errors.length > 0 && (
-              <div className="space-y-2">
-                <p className="font-medium">Errores encontrados:</p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fila</TableHead>
-                      <TableHead>Campo</TableHead>
-                      <TableHead>Error</TableHead>
-                      <TableHead>Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {validationResult.errors.map((error, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{error.rowNumber}</TableCell>
-                        <TableCell>{error.field}</TableCell>
-                        <TableCell>{error.message}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {error.value || '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            <StockImportErrorsAlertBlock title="Errores encontrados" errors={validationResult.errors} />
 
             {validationResult.success ? (
               <div className="flex gap-2">
@@ -389,6 +419,13 @@ export function InventoryImportPage() {
             )}
           </AlertDescription>
         </Alert>
+      )}
+
+      {importResult && !importResult.success && (
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">{importResult.message}</p>
+          <StockImportErrorsAlertBlock title="Importación rechazada" errors={importResult.errors} />
+        </div>
       )}
     </div>
   );

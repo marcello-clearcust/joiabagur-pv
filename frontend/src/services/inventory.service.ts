@@ -244,6 +244,7 @@ export const inventoryService = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        validateStatus: (status) => status === 200 || status === 400 || status === 413,
       }
     );
     return response.data;
@@ -266,6 +267,7 @@ export const inventoryService = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        validateStatus: (status) => status === 200 || status === 400 || status === 413,
       }
     );
     return response.data;

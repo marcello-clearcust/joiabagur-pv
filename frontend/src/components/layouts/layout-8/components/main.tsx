@@ -22,7 +22,7 @@ export function Main() {
       <div className="flex min-h-0 min-w-0 w-full grow flex-col pt-(--header-height) lg:flex-row lg:pt-0">
         {!isMobile && <Sidebar />}
 
-        <div className="flex min-h-0 min-w-0 w-full grow flex-col rounded-xl border border-input bg-background m-4 mt-0 lg:m-5 lg:ms-(--sidebar-width)">
+        <div className="flex min-h-0 min-w-0 grow flex-col rounded-xl border border-input bg-background m-4 mt-0 lg:m-5 lg:ms-(--sidebar-width)">
           <div className="kt-scrollable-y-auto flex min-h-0 min-w-0 w-full grow flex-col pt-5 lg:[scrollbar-width:auto]">
             <main className="min-w-0 max-w-full grow px-5 pb-5 lg:px-8" role="content">
               <Outlet />

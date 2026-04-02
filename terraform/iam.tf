@@ -78,6 +78,12 @@ resource "aws_iam_role_policy" "github_actions" {
         ]
       },
       {
+        Sid      = "SSMInstanceInfo"
+        Effect   = "Allow"
+        Action   = "ssm:DescribeInstanceInformation"
+        Resource = "*"
+      },
+      {
         Sid      = "EC2Describe"
         Effect   = "Allow"
         Action   = "ec2:DescribeInstances"

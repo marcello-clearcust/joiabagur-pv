@@ -8,7 +8,7 @@
 
 locals {
   # Connection string built from RDS outputs so it stays in sync automatically.
-  db_connection_string = "Host=${aws_db_instance.postgres.address};Port=5432;Database=joiabagur_prod;Username=joiabagur_admin;Password=${var.db_password};SSL Mode=Require"
+  db_connection_string = "Host=${aws_db_instance.postgres.address};Port=5432;Database=jpv;Username=postgres;Password=${var.db_password};SSL Mode=Require"
 }
 
 resource "aws_ssm_parameter" "db_connection" {

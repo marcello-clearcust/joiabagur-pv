@@ -2,7 +2,7 @@
 
 resource "aws_security_group" "ec2" {
   name        = "jpv-ec2-sg"
-  description = "JoiabagurPV EC2 — allows HTTP/HTTPS inbound, all outbound"
+  description = "JoiabagurPV EC2 - HTTP/HTTPS inbound, all outbound"
 
   ingress {
     description = "HTTP (redirect to HTTPS)"
@@ -41,7 +41,8 @@ resource "aws_instance" "api" {
 
   root_block_device {
     volume_type = "gp3"
-    volume_size = 20
+    # AL2023 AMIs often use a snapshot that requires >= 30 GiB (20 fails with InvalidBlockDeviceMapping).
+    volume_size = 30
     encrypted   = true
   }
 

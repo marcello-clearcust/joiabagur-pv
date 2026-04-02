@@ -15,7 +15,7 @@ variable "github_repo" {
 }
 
 variable "db_password" {
-  description = "RDS master password (min 8 chars, no special chars that break connection strings)"
+  description = "RDS master user (postgres) password — min 8 chars; avoid characters that break connection strings in .NET"
   type        = string
   sensitive   = true
 }

@@ -3,7 +3,7 @@
 
 resource "aws_security_group" "rds" {
   name        = "jpv-rds-sg"
-  description = "JoiabagurPV RDS — PostgreSQL access from EC2 only"
+  description = "JoiabagurPV RDS - PostgreSQL from EC2 only"
 
   ingress {
     description     = "PostgreSQL from EC2"
@@ -50,8 +50,8 @@ resource "aws_db_instance" "postgres" {
   storage_type      = "gp2"
   storage_encrypted = true
 
-  db_name  = "joiabagur_prod"
-  username = "joiabagur_admin"
+  db_name  = "jpv"
+  username = "postgres"
   password = var.db_password
 
   db_subnet_group_name   = aws_db_subnet_group.default.name

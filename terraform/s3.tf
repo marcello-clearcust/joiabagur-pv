@@ -2,10 +2,10 @@
 # Frontend is bundled inside the Docker image; no frontend S3 bucket needed.
 
 resource "aws_s3_bucket" "files" {
-  bucket        = "jpv-files-prod"
+  bucket        = "prod-jpv-files"
   force_destroy = false
 
-  tags = { Name = "jpv-files-prod" }
+  tags = { Name = "prod-jpv-files" }
 }
 
 resource "aws_s3_bucket_versioning" "files" {
@@ -52,6 +52,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "files" {
   rule {
     id     = "expire-old-versions"
     status = "Enabled"
+
+    # Required by AWS provider: scope rule to whole bucket (non-current versions only).
+    filter {}
 
     noncurrent_version_expiration {
       noncurrent_days = 30

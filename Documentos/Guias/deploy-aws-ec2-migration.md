@@ -1,5 +1,18 @@
 # Guía de Migración a Nueva Cuenta AWS — Arquitectura EC2
 
+## Decisiones de naming (coherentes con producción actual)
+
+| Recurso | Cuenta antigua (App Runner / legado) | Cuenta nueva (EC2 + Terraform) |
+|---------|--------------------------------------|----------------------------------|
+| **Bucket de ficheros** | `jpv-files-prod` | **`prod-jpv-files`** (nombre global único en S3; evita conflicto con el bucket ya existente en la cuenta antigua) |
+| **PostgreSQL** | Base `jpv`, usuario `postgres` | **Misma convención:** base **`jpv`**, usuario **`postgres`** — el `pg_dump` y el `psql` usan los mismos nombres en origen y destino |
+
+La cadena de conexión en SSM (`ConnectionStrings__DefaultConnection`) la genera Terraform con `Database=jpv` y `Username=postgres`.
+
+> **Si ya ejecutaste `terraform apply` en la nueva cuenta** con la plantilla anterior (`joiabagur_admin` / `joiabagur_prod`), cambiar usuario o nombre de base en Terraform suele **forzar recreación del recurso RDS**. Revisa `terraform plan` y haz copia de seguridad antes de aplicar.
+
+---
+
 ## Índice
 
 1. [Arquitectura nueva](#1-arquitectura-nueva)
@@ -28,7 +41,7 @@ EC2 t3.micro — nginx (SSL/TLS + Let's Encrypt)
     └── Docker: .NET 10 API + React SPA (puerto 8080)
          │
          ├── RDS PostgreSQL db.t3.micro (acceso solo desde EC2)
-         ├── S3 jpv-files-prod (fotos + modelos ML)
+         ├── S3 prod-jpv-files (fotos + modelos ML)
          ├── ECR jpv-backend (imágenes Docker)
          └── SSM Parameter Store /jpv/prod/* (credenciales)
 ```
@@ -138,6 +151,8 @@ RDS en la nueva cuenta no es accesible públicamente. Se usa SSM port forwarding
 
 ### 5.1 Exportar la base de datos actual (cuenta antigua)
 
+La instancia legada usa la base **`jpv`** y el usuario **`postgres`** (misma convención que la nueva RDS).
+
 ```bash
 # Obtener endpoint RDS antiguo
 OLD_RDS=$(aws rds describe-db-instances \
@@ -147,7 +162,7 @@ OLD_RDS=$(aws rds describe-db-instances \
   --profile cuenta-antigua)
 
 PGPASSWORD=TU_PASSWORD_ANTIGUA pg_dump \
-  -h $OLD_RDS -U joiabagur_admin -d joiabagur_prod \
+  -h $OLD_RDS -U postgres -d jpv \
   --no-owner --no-acl \
   -f backup_prod.sql
 
@@ -176,9 +191,10 @@ En otra terminal:
 
 ```bash
 # Con el túnel activo, localhost:5432 apunta al nuevo RDS
+# TU_PASSWORD_NUEVA = db_password en terraform.tfvars
 PGPASSWORD=TU_PASSWORD_NUEVA psql \
   -h localhost -p 5432 \
-  -U joiabagur_admin -d joiabagur_prod \
+  -U postgres -d jpv \
   -f backup_prod.sql
 
 echo "Importación completada."
@@ -188,7 +204,24 @@ echo "Importación completada."
 
 ## 6. Paso 4 — Migrar ficheros S3
 
-### 6.1 Añadir política cross-account en el bucket origen (cuenta antigua)
+Origen (**cuenta antigua**): bucket `jpv-files-prod`. Destino (**cuenta nueva**): bucket **`prod-jpv-files`** creado por Terraform. Los nombres son distintos a propósito: los nombres de bucket S3 son únicos a nivel global y el nombre antiguo ya está ocupado por la cuenta legada.
+
+### 6.1 Sincronizar los ficheros (recomendado: disco local)
+
+No hace falta política en el bucket antiguo: primero descargás con credenciales de la **cuenta antigua** y subís con la **nueva** (perfil por defecto o `--profile cuenta-nueva`).
+
+```bash
+mkdir -p s3-migrate-tmp
+aws s3 sync s3://jpv-files-prod s3-migrate-tmp --profile cuenta-antigua --region eu-west-3 --no-progress
+aws s3 sync s3-migrate-tmp s3://prod-jpv-files --profile cuenta-nueva --region eu-west-3 --no-progress
+rm -rf s3-migrate-tmp
+
+echo "Sync completado."
+```
+
+### 6.2 Opcional — política cross-account en el bucket origen
+
+Solo si necesitás que un principal de la **nueva** cuenta lea `jpv-files-prod` **sin** usar el perfil de la cuenta antigua (p. ej. copia directa entre buckets con un rol concreto). Si usaste el flujo de 6.1, podés omitir este paso.
 
 ```bash
 # Obtener Account ID de la nueva cuenta
@@ -212,21 +245,9 @@ aws s3api put-bucket-policy \
   }"
 ```
 
-### 6.2 Sincronizar los ficheros
+Tras usarla, eliminá la política:
 
-```bash
-# Con credenciales de la nueva cuenta
-aws s3 sync \
-  s3://jpv-files-prod \
-  s3://jpv-files-prod \
-  --source-region eu-west-3 \
-  --region eu-west-3 \
-  --no-progress
-
-echo "Sync completado."
-```
-
-### 6.3 Eliminar la política temporal (cuenta antigua)
+### 6.3 Eliminar la política temporal (cuenta antigua), si aplicó 6.2
 
 ```bash
 aws s3api delete-bucket-policy \
@@ -364,7 +385,7 @@ aws apprunner pause-service \
 |----------|-------|
 | EC2 t3.micro + EBS 20GB | ~9–10 |
 | RDS PostgreSQL db.t3.micro | ~15–18 |
-| S3 jpv-files-prod | ~0.5–2 |
+| S3 prod-jpv-files | ~0.5–2 |
 | ECR jpv-backend | ~0 |
 | SSM Parameter Store (7 params) | ~0.35 |
 | Data transfer | ~1–3 |
@@ -421,9 +442,9 @@ Verificar que el túnel SSM está activo y que las credenciales de la nueva cuen
 ```bash
 # El túnel SSM debe estar corriendo en otra terminal
 # Verificar conectividad:
-psql -h localhost -p 5432 -U joiabagur_admin -d joiabagur_prod -c "SELECT 1;"
+psql -h localhost -p 5432 -U postgres -d jpv -c "SELECT 1;"
 ```
 
 ---
 
-*Última actualización: Marzo 2026*
+*Última actualización: Abril 2026*

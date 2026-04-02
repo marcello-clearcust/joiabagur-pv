@@ -2,7 +2,7 @@
  * Manual Sales Registration Page (EP3)
  * Allows operators to register sales by searching for products
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Search, ShoppingCart, AlertTriangle, CheckCircle2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -59,6 +59,9 @@ export function ManualSalesPage() {
   // Get pre-selected product from image recognition
   const locationState = location.state as LocationState | null;
 
+  // Prevent re-search when productSearch is set programmatically after a selection
+  const skipNextSearchRef = useRef(false);
+
   // State
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -98,6 +101,7 @@ export function ManualSalesPage() {
             const preSelectedProduct = await productService.getProduct(locationState.productId);
             
             if (preSelectedProduct) {
+              skipNextSearchRef.current = true;
               setSelectedProduct(preSelectedProduct);
               setProductSearch(preSelectedProduct.sku);
               toast.success(`Producto "${preSelectedProduct.name}" seleccionado automáticamente`);
@@ -194,6 +198,11 @@ export function ManualSalesPage() {
 
   // Product search using API with debounce
   useEffect(() => {
+    if (skipNextSearchRef.current) {
+      skipNextSearchRef.current = false;
+      return;
+    }
+
     if (!productSearch.trim() || productSearch.length < 2) {
       setSearchResults([]);
       return;
@@ -231,6 +240,7 @@ export function ManualSalesPage() {
 
   // Select product from search
   const handleSelectProduct = (product: Product) => {
+    skipNextSearchRef.current = true;
     setSelectedProduct(product);
     setProductSearch(product.sku);
     setSearchResults([]);

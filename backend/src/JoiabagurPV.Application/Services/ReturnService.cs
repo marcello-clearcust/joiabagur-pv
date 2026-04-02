@@ -1,5 +1,6 @@
 using JoiabagurPV.Application.DTOs.Returns;
 using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Domain.Interfaces.Services;
@@ -21,6 +22,7 @@ public class ReturnService : IReturnService
     private readonly IInventoryService _inventoryService;
     private readonly IFileStorageService _fileStorageService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDashboardService _dashboardService;
 
     private const int ReturnWindowDays = 30;
 
@@ -33,7 +35,8 @@ public class ReturnService : IReturnService
         IUserPointOfSaleRepository userPointOfSaleRepository,
         IInventoryService inventoryService,
         IFileStorageService fileStorageService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IDashboardService dashboardService)
     {
         _returnRepository = returnRepository ?? throw new ArgumentNullException(nameof(returnRepository));
         _returnSaleRepository = returnSaleRepository ?? throw new ArgumentNullException(nameof(returnSaleRepository));
@@ -44,6 +47,7 @@ public class ReturnService : IReturnService
         _inventoryService = inventoryService ?? throw new ArgumentNullException(nameof(inventoryService));
         _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
     }
 
     /// <inheritdoc/>
@@ -277,6 +281,8 @@ public class ReturnService : IReturnService
                 // Commit transaction
                 await _unitOfWork.CommitTransactionAsync();
 
+                _dashboardService.InvalidateDashboardCache();
+
                 // Load return with details for response
                 var returnWithDetails = await _returnRepository.GetByIdWithDetailsAsync(returnEntity.Id);
 
@@ -341,7 +347,7 @@ public class ReturnService : IReturnService
         int totalCount;
 
         var skip = (request.Page - 1) * request.PageSize;
-        var take = Math.Min(request.PageSize, 50);
+        var take = Math.Min(request.PageSize, PaginationConstants.MaxPageSize);
 
         if (isAdmin)
         {

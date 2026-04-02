@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,7 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
             .Include(r => r.User)
             .Include(r => r.Photo)
             .Include(r => r.ReturnSales)
+                .ThenInclude(rs => rs.Sale)
             .Where(r => r.PointOfSaleId == pointOfSaleId);
 
         query = ApplyFilters(query, startDate, endDate, productId);
@@ -55,7 +57,7 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
             .OrderByDescending(r => r.ReturnDate)
             .ThenByDescending(r => r.CreatedAt)
             .Skip(skip)
-            .Take(Math.Min(take, 50))
+            .Take(Math.Min(take, PaginationConstants.MaxPageSize))
             .ToListAsync();
 
         return (returns, totalCount);
@@ -76,6 +78,7 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
             .Include(r => r.User)
             .Include(r => r.Photo)
             .Include(r => r.ReturnSales)
+                .ThenInclude(rs => rs.Sale)
             .AsQueryable();
 
         if (pointOfSaleId.HasValue)
@@ -91,7 +94,7 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
             .OrderByDescending(r => r.ReturnDate)
             .ThenByDescending(r => r.CreatedAt)
             .Skip(skip)
-            .Take(Math.Min(take, 50))
+            .Take(Math.Min(take, PaginationConstants.MaxPageSize))
             .ToListAsync();
 
         return (returns, totalCount);
@@ -114,6 +117,7 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
             .Include(r => r.User)
             .Include(r => r.Photo)
             .Include(r => r.ReturnSales)
+                .ThenInclude(rs => rs.Sale)
             .Where(r => posIds.Contains(r.PointOfSaleId));
 
         query = ApplyFilters(query, startDate, endDate, productId);
@@ -124,7 +128,7 @@ public class ReturnRepository : Repository<Return>, IReturnRepository
             .OrderByDescending(r => r.ReturnDate)
             .ThenByDescending(r => r.CreatedAt)
             .Skip(skip)
-            .Take(Math.Min(take, 50))
+            .Take(Math.Min(take, PaginationConstants.MaxPageSize))
             .ToListAsync();
 
         return (returns, totalCount);

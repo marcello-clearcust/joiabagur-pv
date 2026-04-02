@@ -47,6 +47,7 @@ export interface Sale {
   originalProductPrice?: number;
   notes?: string;
   hasPhoto: boolean;
+  hasReturn: boolean;
   saleDate: string;
   createdAt: string;
 }

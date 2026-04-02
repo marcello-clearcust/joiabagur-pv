@@ -14,9 +14,15 @@ public class DashboardService : IDashboardService
     private readonly IUserPointOfSaleRepository _userPointOfSaleRepository;
     private readonly IMemoryCache _cache;
 
-    private const string PaymentDistributionCacheKey = "dashboard:payment-distribution";
-    private const string ReturnCategoryCacheKey = "dashboard:return-category-distribution";
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(24);
+    private const string PaymentDistributionCacheKeyPrefix = "dashboard:payment-distribution";
+    private const string ReturnCategoryCacheKeyPrefix = "dashboard:return-category-distribution";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
+
+    private static string PaymentDistributionCacheKey(DateTime monthStart) =>
+        $"{PaymentDistributionCacheKeyPrefix}:{monthStart:yyyy-MM}";
+
+    private static string ReturnCategoryCacheKey(DateTime monthStart) =>
+        $"{ReturnCategoryCacheKeyPrefix}:{monthStart:yyyy-MM}";
 
     public DashboardService(
         ISaleRepository saleRepository,
@@ -49,13 +55,13 @@ public class DashboardService : IDashboardService
         var returnsQuery = _returnRepository.GetAll();
 
         var todaySales = await salesQuery
-            .Where(s => s.SaleDate >= todayStart)
+            .Where(s => s.SaleDate >= todayStart && !s.ReturnSales.Any())
             .GroupBy(_ => 1)
             .Select(g => new { Count = g.Count(), Total = g.Sum(s => s.Price * s.Quantity) })
             .FirstOrDefaultAsync();
 
-        var monthlyRevenue = await salesQuery
-            .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd)
+        var monthlySalesRevenue = await salesQuery
+            .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd && !s.ReturnSales.Any())
             .SumAsync(s => s.Price * s.Quantity);
 
         decimal? previousYearRevenue = null;
@@ -79,6 +85,8 @@ public class DashboardService : IDashboardService
             })
             .FirstOrDefaultAsync();
 
+        var monthlyReturnsTotal = monthlyReturns?.Total ?? 0m;
+
         var paymentDistribution = await GetPaymentMethodDistributionAsync(monthStart, monthEnd);
         var returnCategoryDistribution = await GetReturnCategoryDistributionAsync(monthStart, monthEnd);
 
@@ -86,10 +94,10 @@ public class DashboardService : IDashboardService
         {
             SalesTodayCount = todaySales?.Count ?? 0,
             SalesTodayTotal = todaySales?.Total ?? 0m,
-            MonthlyRevenue = monthlyRevenue,
+            MonthlyRevenue = monthlySalesRevenue,
             PreviousYearMonthlyRevenue = previousYearRevenue,
             MonthlyReturnsCount = monthlyReturns?.Count ?? 0,
-            MonthlyReturnsTotal = monthlyReturns?.Total ?? 0m,
+            MonthlyReturnsTotal = monthlyReturnsTotal,
             PaymentMethodDistribution = paymentDistribution,
             ReturnCategoryDistribution = returnCategoryDistribution
         };
@@ -116,13 +124,13 @@ public class DashboardService : IDashboardService
         var returnsQuery = _returnRepository.GetAll().Where(r => r.PointOfSaleId == posId);
 
         var todaySales = await salesQuery
-            .Where(s => s.SaleDate >= todayStart)
+            .Where(s => s.SaleDate >= todayStart && !s.ReturnSales.Any())
             .GroupBy(_ => 1)
             .Select(g => new { Count = g.Count(), Total = g.Sum(s => s.Price * s.Quantity) })
             .FirstOrDefaultAsync();
 
         var weeklyRevenue = await salesQuery
-            .Where(s => s.SaleDate >= weekStart)
+            .Where(s => s.SaleDate >= weekStart && !s.ReturnSales.Any())
             .SumAsync(s => s.Price * s.Quantity);
 
         var returnsTodayCount = await returnsQuery
@@ -137,13 +145,23 @@ public class DashboardService : IDashboardService
         };
     }
 
+    public void InvalidateDashboardCache()
+    {
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        _cache.Remove(PaymentDistributionCacheKey(monthStart));
+        _cache.Remove(ReturnCategoryCacheKey(monthStart));
+    }
+
     private async Task<List<PaymentMethodDistributionDto>> GetPaymentMethodDistributionAsync(DateTime monthStart, DateTime monthEnd)
     {
-        if (_cache.TryGetValue(PaymentDistributionCacheKey, out List<PaymentMethodDistributionDto>? cached) && cached != null)
+        var cacheKey = PaymentDistributionCacheKey(monthStart);
+        if (_cache.TryGetValue(cacheKey, out List<PaymentMethodDistributionDto>? cached) && cached != null)
             return cached;
 
         var result = await _saleRepository.GetAll()
-            .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd)
+            .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd
+                && !s.ReturnSales.Any())
             .GroupBy(s => new { s.PaymentMethodId, s.PaymentMethod.Name })
             .Select(g => new PaymentMethodDistributionDto
             {
@@ -154,7 +172,7 @@ public class DashboardService : IDashboardService
             .OrderByDescending(d => d.Amount)
             .ToListAsync();
 
-        _cache.Set(PaymentDistributionCacheKey, result, new MemoryCacheEntryOptions
+        _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = CacheDuration
         });
@@ -164,7 +182,8 @@ public class DashboardService : IDashboardService
 
     private async Task<List<ReturnCategoryDistributionDto>> GetReturnCategoryDistributionAsync(DateTime monthStart, DateTime monthEnd)
     {
-        if (_cache.TryGetValue(ReturnCategoryCacheKey, out List<ReturnCategoryDistributionDto>? cached) && cached != null)
+        var cacheKey = ReturnCategoryCacheKey(monthStart);
+        if (_cache.TryGetValue(cacheKey, out List<ReturnCategoryDistributionDto>? cached) && cached != null)
             return cached;
 
         var result = await _returnRepository.GetAll()
@@ -178,7 +197,7 @@ public class DashboardService : IDashboardService
             .OrderByDescending(d => d.Count)
             .ToListAsync();
 
-        _cache.Set(ReturnCategoryCacheKey, result, new MemoryCacheEntryOptions
+        _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = CacheDuration
         });

@@ -91,6 +91,11 @@ public class SaleDto
     public bool HasPhoto { get; set; }
 
     /// <summary>
+    /// Whether this sale has an associated return.
+    /// </summary>
+    public bool HasReturn { get; set; }
+
+    /// <summary>
     /// Sale date.
     /// </summary>
     public DateTime SaleDate { get; set; }

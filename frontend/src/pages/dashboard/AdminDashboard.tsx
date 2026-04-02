@@ -96,14 +96,16 @@ export function AdminDashboard() {
         setStats(dashStats);
         setLowStockResult(lowStock);
 
-        // Recent 8 sales
-        setRecentSales(salesHistory.sales.slice(0, 8));
+        const salesWithoutReturns = salesHistory.sales.filter((s) => !s.hasReturn);
+
+        // Recent 8 sales (exclude returned)
+        setRecentSales(salesWithoutReturns.slice(0, 8));
 
         // Build 30-day trend data grouped by day and POS
         const salesByDayPos = new Map<string, Map<string, number>>();
         const allPosNames = new Set<string>();
 
-        for (const sale of salesHistory.sales) {
+        for (const sale of salesWithoutReturns) {
           const day = sale.saleDate.split('T')[0];
           const pos = sale.pointOfSaleName;
           allPosNames.add(pos);
@@ -133,13 +135,13 @@ export function AdminDashboard() {
         });
         setTrendData(trend);
 
-        // Revenue by POS (current month from all sales)
+        // Revenue by POS (current month, exclude returned)
         const revenueMap = new Map<string, number>();
         const monthStart = new Date();
         monthStart.setDate(1);
         monthStart.setHours(0, 0, 0, 0);
 
-        for (const sale of salesHistory.sales) {
+        for (const sale of salesWithoutReturns) {
           if (new Date(sale.saleDate) >= monthStart) {
             revenueMap.set(
               sale.pointOfSaleName,

@@ -79,11 +79,13 @@ export function OperatorDashboard() {
         ]);
 
         setStats(dashStats);
-        setRecentSales(salesHistory.sales.slice(0, 8));
 
-        // Build weekly trend (Mon-Sun)
+        const salesWithoutReturns = salesHistory.sales.filter((s) => !s.hasReturn);
+        setRecentSales(salesWithoutReturns.slice(0, 8));
+
+        // Build weekly trend (Mon-Sun, exclude returned)
         const revenueByDay = new Map<number, number>();
-        for (const sale of salesHistory.sales) {
+        for (const sale of salesWithoutReturns) {
           const saleDate = new Date(sale.saleDate);
           const saleDow = saleDate.getDay();
           const dayIndex = saleDow === 0 ? 6 : saleDow - 1;

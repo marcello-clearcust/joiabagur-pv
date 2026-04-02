@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Administrator Dashboard KPIs
 
@@ -22,6 +22,18 @@ The system SHALL provide an Administrator dashboard displaying today's sales cou
 
 - **WHEN** authenticated administrator views the dashboard
 - **THEN** system displays "Devoluciones del mes" card showing return count and total refunded amount for the current month
+
+### Requirement: Administrator Recent Sales Table
+
+The system SHALL display a table of the 8 most recent sales **that have no associated return** across all POS on the administrator dashboard, with navigation to sales history.
+
+#### Scenario: Display recent sales table excluding returned sales
+
+- **WHEN** authenticated administrator views the dashboard
+- **THEN** system displays up to 8 of the most recent sales where hasReturn = false
+- **AND** sales where hasReturn = true are NOT shown in this table
+- **AND** columns include: date, product name, POS name, operator name, amount (EUR format), payment method
+- **AND** table provides a navigation link to /sales/history
 
 ### Requirement: Administrator Sales Trend Chart
 
@@ -53,35 +65,6 @@ The system SHALL display a horizontal bar chart showing net revenue (excluding r
 - **AND** bars are sorted by revenue descending
 - **AND** chart height scales with the number of POS
 
-### Requirement: Administrator Critical Stock Alerts
-
-The system SHALL display a table of products with critically low stock (quantity <= 2) across all POS, with direct navigation to inventory adjustment.
-
-#### Scenario: Display critical stock table
-
-- **WHEN** authenticated administrator views the dashboard
-- **THEN** system displays a table of products with stock <= 2 at any POS
-- **AND** columns include: product name, SKU, POS name, current stock
-- **AND** table provides a navigation link to /inventory/adjust
-
-#### Scenario: Fetch stock data from centralized inventory endpoint
-
-- **WHEN** dashboard loads the critical stock table
-- **THEN** frontend fetches GET /api/inventory/centralized
-- **AND** filters results client-side for items with stock <= 2
-
-### Requirement: Administrator Recent Sales Table
-
-The system SHALL display a table of the 8 most recent sales **that have no associated return** across all POS on the administrator dashboard, with navigation to sales history.
-
-#### Scenario: Display recent sales table excluding returned sales
-
-- **WHEN** authenticated administrator views the dashboard
-- **THEN** system displays up to 8 of the most recent sales where hasReturn = false
-- **AND** sales where hasReturn = true are NOT shown in this table
-- **AND** columns include: date, product name, POS name, operator name, amount (EUR format), payment method
-- **AND** table provides a navigation link to /sales/history
-
 ### Requirement: Administrator Donut Charts with Server Cache
 
 The system SHALL display two donut charts on the administrator dashboard — payment method distribution (excluding returned sales) and return category distribution for the current month — with data cached server-side for 24 hours.
@@ -107,43 +90,6 @@ The system SHALL display two donut charts on the administrator dashboard — pay
 - **THEN** next request to GET /api/dashboard/stats triggers fresh aggregation
 - **AND** new results are cached for another 24 hours
 
-### Requirement: Operator Dashboard KPIs
-
-The system SHALL provide an Operator dashboard displaying KPIs scoped to the operator's assigned POS: today's sales, weekly sales, today's returns, and stock summary.
-
-#### Scenario: Display operator today's sales KPI
-
-- **WHEN** authenticated operator views the dashboard
-- **THEN** system displays "Mis ventas hoy" card showing sales count and total revenue for today at the assigned POS
-- **AND** data is fetched from GET /api/dashboard/stats?posId={assignedPosId}
-
-#### Scenario: Display operator weekly sales KPI
-
-- **WHEN** authenticated operator views the dashboard
-- **THEN** system displays "Mis ventas esta semana" card showing accumulated revenue for the current natural week (Mon-Sun) at the assigned POS
-
-#### Scenario: Display operator today's returns KPI
-
-- **WHEN** authenticated operator views the dashboard
-- **THEN** system displays "Devoluciones hoy" card showing return count for today at the assigned POS
-
-#### Scenario: Display operator stock summary KPI
-
-- **WHEN** authenticated operator views the dashboard
-- **THEN** system displays "Artículos en stock" card showing count of SKUs with stock > 0 and total units at the assigned POS
-- **AND** data is fetched from GET /api/inventory?posId={assignedPosId}
-
-### Requirement: Operator Weekly Sales Trend Chart
-
-The system SHALL display a simple line chart showing daily sales revenue for the current natural week (Mon-Sun) at the operator's assigned POS, **excluding sales with associated returns**.
-
-#### Scenario: Display weekly sales trend excluding returned sales
-
-- **WHEN** authenticated operator views the dashboard
-- **THEN** system displays a line chart with 7 data points (Mon through Sun)
-- **AND** revenue aggregation excludes sales where hasReturn = true
-- **AND** future days within the week show no data point
-
 ### Requirement: Operator Recent Sales Table
 
 The system SHALL display a table of the 8 most recent sales **that have no associated return** at the operator's assigned POS with basic transaction details.
@@ -156,47 +102,16 @@ The system SHALL display a table of the 8 most recent sales **that have no assoc
 - **AND** columns include: time, product name, quantity, amount (EUR format), payment method
 - **AND** table provides a navigation link to /sales/history
 
-### Requirement: Operator Low Stock Table
+### Requirement: Operator Weekly Sales Trend Chart
 
-The system SHALL display a table of products with stock <= 2 at the operator's assigned POS for informational awareness.
+The system SHALL display a simple line chart showing daily sales revenue for the current natural week (Mon-Sun) at the operator's assigned POS, **excluding sales with associated returns**.
 
-#### Scenario: Display operator low stock items
-
-- **WHEN** authenticated operator views the dashboard
-- **THEN** system displays products with stock <= 2 at the assigned POS
-- **AND** columns include: product name, SKU, current stock
-- **AND** table provides a navigation link to /inventory
-- **AND** operator cannot adjust stock from this view
-
-### Requirement: Operator Quick Action Bar
-
-The system SHALL display a sticky bottom bar with 3 quick-action buttons on the operator dashboard, always visible regardless of scroll position, providing instant access to core sales operations.
-
-#### Scenario: Display sticky action bar
+#### Scenario: Display weekly sales trend excluding returned sales
 
 - **WHEN** authenticated operator views the dashboard
-- **THEN** system displays a fixed bottom bar with 3 buttons
-- **AND** buttons are: "Nueva venta manual" (links to /sales/new), "Venta por imagen" (links to /sales/new/image), "Registrar devolución" (links to /returns/new)
-- **AND** bar remains visible at all scroll positions
-
-#### Scenario: Action bar hidden for administrators
-
-- **WHEN** authenticated administrator views the dashboard
-- **THEN** the sticky bottom action bar is NOT displayed
-
-### Requirement: Dashboard Role Routing
-
-The system SHALL render the appropriate dashboard based on the authenticated user's role when navigating to /dashboard.
-
-#### Scenario: Administrator sees admin dashboard
-
-- **WHEN** authenticated administrator navigates to /dashboard
-- **THEN** system renders AdminDashboard component with global KPIs, charts, alerts, and donut charts
-
-#### Scenario: Operator sees operator dashboard
-
-- **WHEN** authenticated operator navigates to /dashboard
-- **THEN** system renders OperatorDashboard component with POS-scoped KPIs, weekly trend, tables, and action bar
+- **THEN** system displays a line chart with 7 data points (Mon through Sun)
+- **AND** revenue aggregation excludes sales where hasReturn = true
+- **AND** future days within the week show no data point
 
 ### Requirement: Dashboard Stats API Endpoint
 

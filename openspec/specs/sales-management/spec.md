@@ -191,7 +191,7 @@ The system SHALL compress sale photos to reduce storage costs and improve mobile
 
 ### Requirement: Sales History and Queries
 
-The system SHALL provide sales history with filtering capabilities, applying role-based access control (administrators see all sales, operators see only sales from assigned points of sale).
+The system SHALL provide sales history with filtering capabilities, applying role-based access control (administrators see all sales, operators see only sales from assigned points of sale). Each sale in the response MUST include a `hasReturn` boolean indicating whether the sale has at least one associated return record.
 
 #### Scenario: Administrator views full sales history
 
@@ -199,6 +199,8 @@ The system SHALL provide sales history with filtering capabilities, applying rol
 - **AND** applies optional filters (date range, product, POS, user, payment method)
 - **THEN** system returns paginated sales (max 50 per page)
 - **AND** includes sale details (date, product, quantity, price, total, payment method, operator, photo indicator)
+- **AND** includes `hasReturn: true` for sales that have at least one associated ReturnSale record
+- **AND** includes `hasReturn: false` for sales with no associated returns
 - **AND** includes pagination metadata (totalCount, totalPages, currentPage)
 - **AND** sales from all points of sale are visible
 
@@ -207,6 +209,7 @@ The system SHALL provide sales history with filtering capabilities, applying rol
 - **WHEN** authenticated operator requests GET /api/sales
 - **AND** applies optional filters
 - **THEN** system returns sales ONLY from points of sale assigned to operator
+- **AND** each sale includes `hasReturn` boolean
 - **AND** filters by UserPointOfSale assignments (via access-control integration)
 - **AND** applies same pagination and filtering as admin
 - **AND** sales from unassigned POS are invisible

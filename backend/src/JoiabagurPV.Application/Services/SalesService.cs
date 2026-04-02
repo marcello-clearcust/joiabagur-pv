@@ -1,5 +1,6 @@
 using JoiabagurPV.Application.DTOs.Sales;
 using JoiabagurPV.Application.Interfaces;
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using JoiabagurPV.Domain.Interfaces.Services;
@@ -22,6 +23,7 @@ public class SalesService : ISalesService
     private readonly IInventoryService _inventoryService;
     private readonly IFileStorageService _fileStorageService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDashboardService _dashboardService;
 
     public SalesService(
         ISaleRepository saleRepository,
@@ -33,7 +35,8 @@ public class SalesService : ISalesService
         IPaymentMethodValidationService paymentMethodValidationService,
         IInventoryService inventoryService,
         IFileStorageService fileStorageService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IDashboardService dashboardService)
     {
         _saleRepository = saleRepository ?? throw new ArgumentNullException(nameof(saleRepository));
         _salePhotoRepository = salePhotoRepository ?? throw new ArgumentNullException(nameof(salePhotoRepository));
@@ -45,6 +48,7 @@ public class SalesService : ISalesService
         _inventoryService = inventoryService ?? throw new ArgumentNullException(nameof(inventoryService));
         _fileStorageService = fileStorageService ?? throw new ArgumentNullException(nameof(fileStorageService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _dashboardService = dashboardService ?? throw new ArgumentNullException(nameof(dashboardService));
     }
 
     /// <inheritdoc/>
@@ -285,6 +289,8 @@ public class SalesService : ISalesService
                 // Commit transaction
                 await _unitOfWork.CommitTransactionAsync();
 
+                _dashboardService.InvalidateDashboardCache();
+
                 // Load sale with details for response
                 var saleWithDetails = await _saleRepository.GetByIdWithDetailsAsync(sale.Id);
 
@@ -351,7 +357,7 @@ public class SalesService : ISalesService
         int totalCount;
 
         var skip = (request.Page - 1) * request.PageSize;
-        var take = Math.Min(request.PageSize, 50);
+        var take = Math.Min(request.PageSize, PaginationConstants.MaxPageSize);
 
         if (isAdmin)
         {
@@ -609,6 +615,8 @@ public class SalesService : ISalesService
                 }
 
                 await _unitOfWork.CommitTransactionAsync();
+
+                _dashboardService.InvalidateDashboardCache();
 
                 return new CreateBulkSalesResult
                 {
@@ -876,6 +884,7 @@ public class SalesService : ISalesService
             OriginalProductPrice = sale.OriginalProductPrice,
             Notes = sale.Notes,
             HasPhoto = sale.Photo != null,
+            HasReturn = sale.ReturnSales.Count > 0,
             SaleDate = sale.SaleDate,
             CreatedAt = sale.CreatedAt
         };

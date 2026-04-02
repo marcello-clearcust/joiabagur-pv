@@ -1,3 +1,4 @@
+using JoiabagurPV.Domain.Common;
 using JoiabagurPV.Domain.Entities;
 using JoiabagurPV.Domain.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,7 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
             .Include(s => s.User)
             .Include(s => s.PaymentMethod)
             .Include(s => s.Photo)
+            .Include(s => s.ReturnSales)
             .Where(s => s.PointOfSaleId == pointOfSaleId);
 
         query = ApplyFilters(query, startDate, endDate, productId, userId, paymentMethodId);
@@ -55,7 +57,7 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
             .OrderByDescending(s => s.SaleDate)
             .ThenByDescending(s => s.CreatedAt)
             .Skip(skip)
-            .Take(Math.Min(take, 50))
+            .Take(Math.Min(take, PaginationConstants.MaxPageSize))
             .ToListAsync();
 
         return (sales, totalCount);
@@ -78,6 +80,7 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
             .Include(s => s.User)
             .Include(s => s.PaymentMethod)
             .Include(s => s.Photo)
+            .Include(s => s.ReturnSales)
             .AsQueryable();
 
         if (pointOfSaleId.HasValue)
@@ -93,7 +96,7 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
             .OrderByDescending(s => s.SaleDate)
             .ThenByDescending(s => s.CreatedAt)
             .Skip(skip)
-            .Take(Math.Min(take, 50))
+            .Take(Math.Min(take, PaginationConstants.MaxPageSize))
             .ToListAsync();
 
         return (sales, totalCount);
@@ -118,6 +121,7 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
             .Include(s => s.User)
             .Include(s => s.PaymentMethod)
             .Include(s => s.Photo)
+            .Include(s => s.ReturnSales)
             .Where(s => posIds.Contains(s.PointOfSaleId));
 
         query = ApplyFilters(query, startDate, endDate, productId, userId, paymentMethodId);
@@ -128,7 +132,7 @@ public class SaleRepository : Repository<Sale>, ISaleRepository
             .OrderByDescending(s => s.SaleDate)
             .ThenByDescending(s => s.CreatedAt)
             .Skip(skip)
-            .Take(Math.Min(take, 50))
+            .Take(Math.Min(take, PaginationConstants.MaxPageSize))
             .ToListAsync();
 
         return (sales, totalCount);

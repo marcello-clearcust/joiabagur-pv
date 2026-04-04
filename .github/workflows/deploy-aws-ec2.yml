@@ -1,10 +1,10 @@
 name: Deploy to AWS EC2 (nueva arquitectura)
 
-# Runs on every push to main (automatic deploy). workflow_dispatch remains
-# available for manual runs with an optional image tag.
+# Runs on push to the default production branch(es). Old App Runner workflows
+# use `master`; align here so the bundled EC2 deploy runs on the same pushes.
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       image_tag:

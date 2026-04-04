@@ -56,6 +56,26 @@ variable "db_instance_class" {
   default     = "db.t3.micro"
 }
 
+variable "rds_publicly_accessible" {
+  description = <<-EOT
+    If true, RDS gets a public DNS name and can be reached from the Internet when combined with
+    rds_migration_ingress_cidrs on the security group. Use only briefly for migration (pgAdmin/psql),
+    then set back to false. Requires DB subnets that route to an Internet Gateway (default VPC subnets usually do).
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "rds_migration_ingress_cidrs" {
+  description = <<-EOT
+    IPv4 CIDRs allowed to connect to PostgreSQL (5432) on RDS — e.g. ["203.0.113.50/32"] for your home IP.
+    Leave empty for no extra rules (only EC2 security group access). Remove or empty after migration.
+    Never use 0.0.0.0/0 for production databases.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 variable "ami_id" {
   description = <<-EOT
     Amazon Linux 2023 AMI for eu-west-3. Update before applying.

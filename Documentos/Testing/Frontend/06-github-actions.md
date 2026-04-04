@@ -488,7 +488,9 @@ En GitHub: Settings → Secrets and variables → Actions → Secrets
 
 ## Workflow para Deploy
 
-### .github/workflows/frontend-deploy.yml
+**JoiabagurPV (producción):** el build del frontend va en **`Dockerfile.bundled`** y el despliegue activo es **`deploy-aws-ec2.yml`** (OIDC). El YAML siguiente es un **ejemplo genérico** S3+CloudFront, no el pipeline actual del repo.
+
+### .github/workflows/frontend-deploy.yml (ejemplo genérico)
 
 ```yaml
 name: Frontend Deploy

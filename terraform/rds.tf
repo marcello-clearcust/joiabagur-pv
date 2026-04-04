@@ -23,6 +23,20 @@ resource "aws_security_group" "rds" {
   tags = { Name = "jpv-rds-sg" }
 }
 
+# Temporary Internet access for migration (pgAdmin / psql without SSM tunnel).
+# One rule per CIDR; destroy by clearing rds_migration_ingress_cidrs and apply.
+resource "aws_vpc_security_group_ingress_rule" "rds_migration_postgres" {
+  for_each = toset(var.rds_migration_ingress_cidrs)
+
+  security_group_id = aws_security_group.rds.id
+  description       = "Temporary PostgreSQL migration (remove after import)"
+
+  cidr_ipv4   = each.value
+  from_port   = 5432
+  ip_protocol = "tcp"
+  to_port     = 5432
+}
+
 # ─── Subnet Group (uses default VPC subnets) ─────────────────────────────────
 
 data "aws_subnets" "default" {
@@ -57,10 +71,10 @@ resource "aws_db_instance" "postgres" {
   db_subnet_group_name   = aws_db_subnet_group.default.name
   vpc_security_group_ids = [aws_security_group.rds.id]
 
-  publicly_accessible    = false
-  multi_az               = false
-  deletion_protection    = true
-  skip_final_snapshot    = false
+  publicly_accessible       = var.rds_publicly_accessible
+  multi_az                  = false
+  deletion_protection       = true
+  skip_final_snapshot       = false
   final_snapshot_identifier = "jpv-db-final-snapshot"
 
   backup_retention_period = 7

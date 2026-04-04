@@ -1,5 +1,7 @@
 # Comparación AWS vs Azure para Deploy de JoiabagurPV
 
+> **Nota (2026):** La implementación **activa** en AWS es **EC2 + Terraform + Docker bundlado + RDS + S3 + SSM + OIDC** ([deploy-aws-production.md](../Guias/deploy-aws-production.md)). Las tablas y diagramas de este documento pueden citar **App Runner / CloudFront** como patrón de referencia o legado; la comparativa de servicios sigue siendo válida a nivel conceptual.
+
 ## Resumen Ejecutivo
 
 | Criterio | AWS | Azure | Ganador |

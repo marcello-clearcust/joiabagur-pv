@@ -451,7 +451,12 @@ SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/..."
 
 # Para deployment (si aplica)
 AZURE_CREDENTIALS: "{ ... }"
-AWS_ACCESS_KEY_ID: "..."
-AWS_SECRET_ACCESS_KEY: "..."
+
+# Producción JoiabagurPV (EC2): OIDC — ver deploy-aws-production.md
+# DEPLOY_ROLE_ARN, EC2_INSTANCE_ID, PRODUCTION_DOMAIN
+# (No usar access keys para deploy-aws-ec2.yml)
+
+# Legado App Runner / S3+CloudFront (solo si aún ejecutáis workflows deprecated a mano):
+# AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
 ```
 

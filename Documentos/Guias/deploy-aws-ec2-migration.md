@@ -269,13 +269,20 @@ Ir a **Settings → Secrets and variables → Actions** y crear/actualizar:
 | `EC2_INSTANCE_ID` | `terraform output -raw ec2_instance_id` |
 | `PRODUCTION_DOMAIN` | `pv.joiabagur.com` |
 
-> Los secrets `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` **no se necesitan** para el nuevo workflow gracias a OIDC (Mejora 1). Los secrets actuales pueden dejarse para los workflows existentes hasta que se desactiven.
+> Los secrets `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` **no se necesitan** para el workflow EC2 (OIDC). Los workflows **App Runner** y **S3/CloudFront** están **deprecated** y ya **no se ejecutan en push** (solo ejecución manual si hiciera falta en la cuenta legada).
+
+### 7.2 Workflows en el repositorio
+
+| Workflow | Uso |
+|----------|-----|
+| **Deploy to AWS EC2 (nueva arquitectura)** (`deploy-aws-ec2.yml`) | **Producción** — push a `main`/`master` o manual |
+| `deploy-backend-aws.yml` / `deploy-frontend-aws.yml` | **Deprecated** — solo `workflow_dispatch` |
 
 ---
 
 ## 8. Paso 6 — Primer despliegue
 
-Lanzar el workflow manualmente desde GitHub:
+Tras configurar secrets, el despliegue puede ejecutarse **automáticamente** en cada push a `main`/`master`. También puedes lanzarlo a mano:
 
 ```
 GitHub → Actions → "Deploy to AWS EC2 (nueva arquitectura)" → Run workflow

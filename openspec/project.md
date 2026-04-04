@@ -56,7 +56,7 @@
 - **Containers**: Docker, Docker Compose (development)
 - **CI/CD**: GitHub Actions
 - **Repository**: GitHub
-- **Cloud**: AWS (App Runner, RDS PostgreSQL, S3, CloudFront, Secrets Manager)
+- **Cloud**: AWS (EC2 + Docker bundlado + nginx, RDS PostgreSQL, S3, ECR, SSM Parameter Store; GitHub OIDC para deploy)
 - **Target**: Free-tier optimized deployment
 - **Locale**: es-ES, currency EUR (€)
 
@@ -253,10 +253,10 @@ After completing an OpenSpec change implementation (e.g., via `openspec-apply`),
 
 ### Cloud Services (Production — AWS)
 - **PostgreSQL**: RDS (db.t3.micro, 20GB)
-- **Object Storage**: S3 (5GB)
-- **CDN**: CloudFront
-- **Container Hosting**: App Runner (0.25 vCPU, 0.5GB RAM)
-- **Secrets**: AWS Secrets Manager
+- **Object Storage**: S3 bucket de ficheros (`prod-jpv-files` en pila Terraform)
+- **Edge / TLS**: nginx en EC2 (Let’s Encrypt)
+- **Container hosting**: EC2 + Docker (imagen ECR con API + SPA)
+- **Config / secrets**: SSM Parameter Store (`/jpv/prod/*`)
 - **Logging**: CloudWatch Logs
 
 ### Third-party Libraries

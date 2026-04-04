@@ -51,9 +51,9 @@ flowchart TB
         SPA --> PWA
     end
     
-    CDN["CDN / CloudFront<br/>- Distribución estática del frontend<br/>- Cache de assets"]
+    NginxTLS["nginx en EC2<br/>- TLS (Let’s Encrypt)<br/>- Reverse proxy"]
     
-    Gateway["API Gateway / Load Balancer<br/>- Enrutamiento de requests<br/>- Terminación SSL/TLS<br/>- Rate limiting básico"]
+    Gateway["Proxy a contenedor Docker<br/>- SPA estática + API /api<br/>- Cabeceras X-Forwarded-*"]
     
     subgraph Backend["BACKEND API (.NET 10)"]
         subgraph Container["Contenedor Docker"]
@@ -66,9 +66,9 @@ flowchart TB
     
     Storage["Object Storage<br/>- Fotos de productos<br/>- Fotos de ventas<br/>- Archivos Excel importados"]
     
-    Cliente -->|HTTPS| CDN
-    CDN -->|HTTPS| Gateway
-    Gateway -->|HTTPS| Backend
+    Cliente -->|HTTPS| NginxTLS
+    NginxTLS --> Gateway
+    Gateway -->|HTTP local| Backend
     Backend -->|PostgreSQL Protocol| DB
     Backend -->|S3 API / Blob Storage API| Storage
 ```
@@ -204,26 +204,26 @@ VITE_ENABLE_DEV_TOOLS=true
 
 ```mermaid
 flowchart TB
-    subgraph AWS["AWS Cloud"]
-        CloudFront["CloudFront CDN<br/>- Distribución del frontend<br/>- Cache de assets estáticos<br/>- SSL/TLS automático"]
+    subgraph AWS["AWS Cloud (producción actual)"]
+        EC2["EC2 + nginx<br/>- TLS en :443<br/>- Proxy a :8080"]
         
-        ALB["Application Load Balancer (ALB)<br/>- Terminación SSL/TLS<br/>- Health checks<br/>- Routing a ECS"]
-        
-        subgraph ECS["ECS Fargate / App Runner"]
-            BackendContainer["Backend Container (.NET 10)<br/>- 0.25 vCPU, 0.5 GB RAM (free-tier)<br/>- Auto-scaling (1-2 instancias)"]
+        subgraph Docker["Contenedor Docker"]
+            BackendContainer["API .NET 10 + SPA React<br/>(imagen bundlada ECR)"]
         end
         
         RDS["RDS PostgreSQL<br/>db.t3.micro<br/>20GB"]
         
-        S3["S3 Storage<br/>(Fotos)<br/>5GB"]
+        S3["S3 prod-jpv-files<br/>Fotos / modelos ML"]
+        
+        SSM["SSM Parameter Store<br/>/jpv/prod/*"]
         
         CloudWatch["CloudWatch Logs"]
         
-        CloudFront -->|HTTPS| ALB
-        ALB -->|HTTPS| ECS
-        ECS --> RDS
-        ECS --> S3
-        ECS --> CloudWatch
+        EC2 -->|local| Docker
+        Docker --> RDS
+        Docker --> S3
+        Docker -.->|lectura| SSM
+        Docker --> CloudWatch
     end
 ```
 
@@ -675,7 +675,8 @@ La arquitectura puede evolucionar fácilmente a microservicios o serverless si e
 
 Para instrucciones detalladas sobre el deploy en AWS, consultar:
 
-- **[Guía de Deploy AWS](Guias/deploy-aws-production.md)**: Instrucciones paso a paso para configurar y desplegar la aplicación en AWS (App Runner, RDS, S3, CloudFront).
+- **[Guía de Deploy AWS](Guias/deploy-aws-production.md)**: Producción en EC2, Terraform, RDS, S3, ECR, OIDC y GitHub Actions.
+- **[Migración EC2](Guias/deploy-aws-ec2-migration.md)** y **[Legado App Runner](Guias/deploy-aws-app-runner-legacy.md)**.
 
 - **[Comparación AWS vs Azure](Propuestas/comparacion-aws-azure-deploy.md)**: Análisis detallado de pros y contras de ambas plataformas, costos estimados, y justificación de la elección de AWS.
 
@@ -686,11 +687,11 @@ Para instrucciones detalladas sobre el deploy en AWS, consultar:
 | Decisión | Opción Elegida | Justificación |
 |----------|----------------|---------------|
 | **Cloud Provider** | AWS | Experiencia del equipo, free-tier generoso |
-| **Backend Hosting** | App Runner | Simplicidad, auto-scaling, sin gestión de infra |
-| **Database** | RDS PostgreSQL | Managed service, backups automáticos 7 días |
-| **File Storage** | S3 | Madurez, SDK .NET excelente, pre-signed URLs |
-| **Frontend Hosting** | CloudFront + S3 | CDN global, cache eficiente, bajo costo |
-| **Secrets** | Secrets Manager | Seguridad, integración nativa con .NET |
+| **Backend + frontend** | EC2 + Docker (imagen bundlada) + nginx | Un solo dominio, TLS en instancia, Terraform |
+| **Database** | RDS PostgreSQL | Managed service, backups automáticos (p. ej. 7 días) |
+| **File Storage** | S3 `prod-jpv-files` | Fotos y modelos ML; bucket distinto del legado `jpv-files-prod` |
+| **Frontend estático** | Incluido en imagen (`wwwroot`) | Sin CloudFront dedicado en la pila nueva |
+| **Secrets / config** | SSM Parameter Store | Parámetros leídos por la API en producción |
 | **CI/CD** | GitHub Actions | Ya en uso, free-tier generoso, actions oficiales AWS |
 | **Moneda** | Euro (EUR, €) | Mercado objetivo español/europeo |
 | **Locale** | es-ES | Formato español para números y fechas |

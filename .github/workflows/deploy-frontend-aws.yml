@@ -1,14 +1,9 @@
-name: Deploy Frontend to AWS
-# Trigger rebuild
+# DEPRECATED — S3 + CloudFront (cuenta AWS legada). No se ejecuta en push.
+# Producción actual: React bundlado en la imagen Docker → `.github/workflows/deploy-aws-ec2.yml`
+name: Deploy Frontend to AWS (deprecated — S3/CloudFront)
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/deploy-frontend-aws.yml'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 env:
   AWS_REGION: eu-west-3

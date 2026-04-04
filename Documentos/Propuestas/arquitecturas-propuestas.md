@@ -1,5 +1,7 @@
 # Propuesta de Arquitecturas - Sistema de Gestión de Puntos de Venta
 
+> **Implementación AWS vigente (2026):** EC2 + nginx + Docker (API + SPA bundlada), RDS, S3 `prod-jpv-files`, SSM, Terraform, GitHub OIDC — ver [../Guias/deploy-aws-production.md](../Guias/deploy-aws-production.md). Los diagramas siguientes incluyen variantes S3+CloudFront/App Runner como alternativas de diseño.
+
 ## Contexto del Proyecto
 
 - **Backend**: .NET 10

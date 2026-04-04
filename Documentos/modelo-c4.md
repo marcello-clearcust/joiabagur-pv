@@ -66,7 +66,7 @@ El sistema está compuesto por cuatro contenedores principales: una aplicación 
   - Reconocimiento de imágenes con IA en cliente (TensorFlow.js/ONNX.js)
   - Gestión de sesión y autenticación
   - Comunicación con API backend mediante HTTP/REST
-- **Despliegue**: CDN (CloudFront/Azure CDN) en producción, servidor de desarrollo local en desarrollo
+- **Despliegue**: En AWS producción actual, assets del SPA van **embebidos** en la imagen Docker servida tras nginx en EC2; en desarrollo, servidor local (Vite). CDN sigue siendo patrón válido en Azure u otras cuentas.
 
 #### Backend API
 - **Tecnología**: ASP.NET Core Web API (.NET 10), C#
@@ -76,7 +76,7 @@ El sistema está compuesto por cuatro contenedores principales: una aplicación 
   - Procesamiento de importaciones Excel
   - Validaciones de stock y métodos de pago
   - Gestión de archivos y almacenamiento
-- **Despliegue**: Contenedor Docker en ECS Fargate/App Runner (AWS) o Azure App Service
+- **Despliegue**: Contenedor Docker en **EC2** (pila actual, imagen bundlada) u otros hosts (App Service en Azure, ECS/App Runner en variantes legado)
 
 #### PostgreSQL Database
 - **Tecnología**: PostgreSQL 15+
@@ -420,8 +420,8 @@ C4Component
 
 **Producción:**
 - Build optimizado y minificado
-- Distribución mediante CDN (CloudFront/Azure CDN)
-- Cache agresivo de assets estáticos
+- En AWS actual: mismo origen que la API (nginx + Docker); en otras variantes, CDN (CloudFront/Azure CDN)
+- Cache de assets: cabeceras HTTP / CDN según despliegue
 - Code splitting y lazy loading activados
 
 ### Seguridad

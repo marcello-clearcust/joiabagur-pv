@@ -1,5 +1,7 @@
 # Prompts del Usuario
 
+<!-- Nota 2026: conversaciones históricas pueden citar App Runner / CloudFront. Producción actual: EC2 + Docker bundlado — Documentos/Guias/deploy-aws-production.md -->
+
 ## Prompt Inicial - Descripción del Proyecto
 
 Eres un experto en aplicaciones de gestion de puntos de venta.

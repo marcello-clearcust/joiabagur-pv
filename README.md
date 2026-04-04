@@ -90,7 +90,7 @@ El usuario aterriza en la pantalla de login; tras autenticarse, accede al dashbo
    - Backend: `cd backend/src/JoiabagurPV.Tests` y `dotnet test`.
    - Frontend: `cd frontend` y `npm run test`.
 
-Para despliegue en AWS (App Runner, RDS, S3, CloudFront) y CI/CD con GitHub Actions, ver [Documentos/Guias/deploy-aws-production.md](Documentos/Guias/deploy-aws-production.md).
+Para despliegue en AWS (EC2, nginx, Docker API+SPA, RDS, S3, ECR, OIDC) y CI/CD, ver [Documentos/Guias/deploy-aws-production.md](Documentos/Guias/deploy-aws-production.md). Migración desde App Runner/CloudFront: [Documentos/Guias/deploy-aws-ec2-migration.md](Documentos/Guias/deploy-aws-ec2-migration.md).
 
 ---
 
@@ -109,8 +109,8 @@ flowchart TB
         Browser --> SPA
         SPA --> ML
     end
-    CDN["CDN / CloudFront"]
-    Gateway["API Gateway / Load Balancer"]
+    Nginx["nginx (TLS) + EC2"]
+    Gateway["Reverse proxy → contenedor Docker"]
     subgraph Backend["BACKEND API .NET 10"]
         API["ASP.NET Core Web API"]
         EF["Entity Framework Core"]
@@ -118,9 +118,9 @@ flowchart TB
     end
     DB["PostgreSQL"]
     Storage["Object Storage S3/Blob"]
-    Cliente -->|HTTPS| CDN
-    CDN -->|HTTPS| Gateway
-    Gateway -->|HTTPS| Backend
+    Cliente -->|HTTPS| Nginx
+    Nginx --> Gateway
+    Gateway -->|HTTP interno| Backend
     Backend --> DB
     Backend --> Storage
 ```
@@ -141,7 +141,7 @@ flowchart TB
 
 ### 2.4. Infraestructura y despliegue
 
-En producción (AWS): CloudFront para el frontend, Application Load Balancer, ECS Fargate o App Runner para el backend, RDS PostgreSQL, S3 para almacenamiento de archivos, GitHub Actions para CI/CD. Secretos gestionados con AWS Secrets Manager. Backups automáticos de base de datos (retención 7 días). Detalle en [Documentos/Guias/deploy-aws-production.md](Documentos/Guias/deploy-aws-production.md).
+En producción (AWS): EC2 con nginx (TLS) y un contenedor Docker con API .NET + SPA React; RDS PostgreSQL; S3 (`prod-jpv-files`) para ficheros; ECR; parámetros en SSM; despliegue con GitHub Actions y OIDC. Backups RDS según Terraform (p. ej. 7 días). Detalle en [Documentos/Guias/deploy-aws-production.md](Documentos/Guias/deploy-aws-production.md).
 
 ### 2.5. Seguridad
 
@@ -149,7 +149,7 @@ En producción (AWS): CloudFront para el frontend, Application Load Balancer, EC
 - Contraseñas con BCrypt y salt.
 - Control de acceso por roles (Administrator / Operator) y por punto de venta (operadores solo acceden a sus POS asignados).
 - CORS configurado por origen permitido; en producción solo dominios de la aplicación.
-- HTTPS en producción; secretos en servicios gestionados (AWS Secrets Manager).
+- HTTPS en producción; secretos de aplicación en AWS SSM Parameter Store en la pila actual.
 - Uso de EF Core para evitar inyección SQL; sanitización de entradas frente a XSS.
 
 ### 2.6. Tests

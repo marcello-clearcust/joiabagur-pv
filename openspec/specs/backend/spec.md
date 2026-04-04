@@ -230,13 +230,13 @@ The backend SHALL support production deployment via Docker container with enviro
 - **AND** image contains only .NET runtime (no Python or ML dependencies)
 
 #### Scenario: Health Check Endpoint
-- **WHEN** App Runner performs health check
-- **THEN** `/health` endpoint responds within timeout
-- **AND** includes database and storage connectivity status
+- **WHEN** the load balancer or process supervisor performs a health check (e.g. nginx/Docker/App Runner)
+- **THEN** `/api/health` (or configured health path) responds within timeout
+- **AND** includes database and storage connectivity status where applicable
 
 #### Scenario: CORS Production Configuration
 - **WHEN** running in production environment
-- **THEN** CORS is restricted to CloudFront domain and custom domains
+- **THEN** CORS is restricted to the production web origin (e.g. `https://pv.joiabagur.com`) and any configured custom domains
 - **AND** credentials are properly handled
 
 ### Requirement: Automated Backup Verification

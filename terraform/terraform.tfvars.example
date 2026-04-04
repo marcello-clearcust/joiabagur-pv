@@ -23,3 +23,7 @@ jwt_secret_key = "CHANGE_ME_at_least_32_characters_long_random_string"
 # jwt_audience                        = "JoiabagurPV"
 # s3_presigned_url_expiration_minutes = 60
 # key_pair_name                       = ""
+
+# Optional — brief public RDS access for DB migration only (then revert and terraform apply)
+# rds_publicly_accessible     = true
+# rds_migration_ingress_cidrs = ["YOUR.PUBLIC.IP.ADDRESS/32"]

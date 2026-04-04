@@ -1,13 +1,9 @@
-name: Deploy Backend to AWS
+# DEPRECATED — App Runner (cuenta AWS legada). No se ejecuta en push.
+# Producción actual: EC2 + Docker imagen bundlada → `.github/workflows/deploy-aws-ec2.yml`
+name: Deploy Backend to AWS (deprecated — App Runner)
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-backend-aws.yml'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 env:
   AWS_REGION: eu-west-3

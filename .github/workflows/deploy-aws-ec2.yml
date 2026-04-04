@@ -1,9 +1,10 @@
 name: Deploy to AWS EC2 (nueva arquitectura)
 
-# Only triggered manually. The current deploy-backend-aws.yml and
-# deploy-frontend-aws.yml workflows remain active for the existing App Runner
-# deployment until the migration is complete.
+# Runs on every push to main (automatic deploy). workflow_dispatch remains
+# available for manual runs with an optional image tag.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       image_tag:

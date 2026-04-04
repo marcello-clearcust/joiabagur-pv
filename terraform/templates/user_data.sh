@@ -9,6 +9,10 @@ yum install -y docker nginx python3-pip
 systemctl enable docker
 systemctl start docker
 usermod -aG docker ec2-user
+# SSM Start Session logs in as ssm-user, not ec2-user — same Docker socket access.
+if id ssm-user &>/dev/null; then
+  usermod -aG docker ssm-user
+fi
 
 # ─── SSM Agent (pre-installed on AL2023, ensure it's running) ────────────────
 systemctl enable amazon-ssm-agent

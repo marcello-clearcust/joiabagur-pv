@@ -320,21 +320,110 @@ dig pv.joiabagur.com +short
 # Debe mostrar el Elastic IP nuevo
 ```
 
-### 9.3 Obtener certificado SSL con Let's Encrypt
+### 9.3 Certificado Let's Encrypt y renovación automática
 
-Una vez el DNS apunte al EC2:
+Los certificados obtenidos con `certbot certonly --manual` **no se renuevan solos**: hace falta repetir el TXT a mano o usar otra autenticación. Para que `certbot renew` funcione sin intervención, usa **una** de estas dos vías.
+
+#### Opción A (recomendada tras el corte DNS): HTTP-01 con nginx
+
+Cuando el registro **A** de `pv.joiabagur.com` apunte ya al **Elastic IP del EC2** (puerto 80 accesible como ahora):
 
 ```bash
-# Via SSM
-aws ssm start-session --target $EC2_ID
+# SSM en la instancia
+sudo certbot certonly --nginx -d pv.joiabagur.com --force-renewal
+```
 
-# Dentro de la sesión SSM:
-sudo certbot --nginx -d pv.joiabagur.com
-# Seguir las instrucciones. Certbot modifica nginx automáticamente.
+Eso **sustituye** el certificado “manual” por uno renovable. Luego certbot guarda en `/etc/letsencrypt/renewal/` la configuración adecuada.
 
-# Verificar renovación automática
+Comprueba la renovación simulada:
+
+```bash
 sudo certbot renew --dry-run
 ```
+
+Si instalaste certbot con **pip** (user_data actual), puede que **no** exista el timer de systemd. Programa la renovación con **cron** (dos veces al día es habitual):
+
+```bash
+echo '0 3,15 * * * root certbot renew -q --deploy-hook "systemctl reload nginx"' | sudo tee /etc/cron.d/certbot-jpv
+sudo chmod 644 /etc/cron.d/certbot-jpv
+```
+
+#### Opción B (renovación automática sin esperar al corte DNS): plugin DNS OVH
+
+Si el **A** sigue apuntando al sistema antiguo pero quieres certificado en el EC2 nuevo **renovable por API** (sin TXT manual cada 90 días):
+
+1. En OVH, crea credenciales de **API** con permisos sobre la zona DNS del dominio ([documentación API OVH](https://help.ovhcloud.com/csm/es-es-api-getting-started-ovhcloud-api?id=kb_article_view&sysparm_article=KB0042789)).
+2. En el EC2 (SSM):
+
+```bash
+sudo pip3 install certbot-dns-ovh
+sudo mkdir -p /root/.secrets
+sudo nano /root/.secrets/certbot-ovh.ini   # o vi
+```
+
+Contenido del fichero (valores reales de OVH):
+
+```ini
+dns_ovh_endpoint = ovh-eu
+dns_ovh_application_key = TU_APPLICATION_KEY
+dns_ovh_application_secret = TU_APPLICATION_SECRET
+dns_ovh_consumer_key = TU_CONSUMER_KEY
+```
+
+```bash
+sudo chmod 600 /root/.secrets/certbot-ovh.ini
+sudo certbot certonly \
+  --authenticator dns-ovh \
+  --dns-ovh-credentials /root/.secrets/certbot-ovh.ini \
+  -d pv.joiabagur.com \
+  --cert-name pv.joiabagur.com \
+  --force-renewal
+```
+
+3. Mismo **cron** de renovación que en la opción A (`certbot renew` usará el plugin según `/etc/letsencrypt/renewal/pv.joiabagur.com.conf`).
+
+> **Seguridad:** el `.ini` con claves OVH es sensible; no lo copies al repositorio. Opcional: mover secretos a SSM y generar el `.ini` en un hook (más trabajo).
+
+#### Antes del corte: certificado solo con TXT manual
+
+Si aún usas `certbot certonly --manual --preferred-challenges dns`, ejecuta certbot con **`sudo`**. Tras obtener el cert, configura nginx (siguiente apartado) y **migra a la opción A o B antes del 2026-07-03** para no depender de renovación manual.
+
+### 9.4 nginx con HTTPS (certificados ya en `/etc/letsencrypt/live/`)
+
+Si certbot **no** modificó nginx (p. ej. solo `certonly`), añade un `server` en **443** que reutilice el mismo `proxy_pass` que en el bloque `:80`, y opcionalmente redirige HTTP → HTTPS. Ejemplo mínimo (ajusta `server_name` si difiere):
+
+```nginx
+# /etc/nginx/conf.d/jpv.conf — ejemplo: mantener el server :80 y añadir uno :443 + redirect
+server {
+    listen 80;
+    server_name pv.joiabagur.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name pv.joiabagur.com;
+
+    ssl_certificate     /etc/letsencrypt/live/pv.joiabagur.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/pv.joiabagur.com/privkey.pem;
+
+    location / {
+        proxy_pass         http://localhost:8080;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        client_max_body_size 50M;
+        proxy_read_timeout   120s;
+    }
+}
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Hasta que no quieras forzar HTTPS para todos, puedes dejar **solo** el `server` en 443 y mantener el :80 actual sin redirección (útil mientras pruebas por IP).
 
 ---
 

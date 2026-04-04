@@ -3,6 +3,7 @@ using JoiabagurPV.API.Middleware;
 using JoiabagurPV.Application.Extensions;
 using JoiabagurPV.Infrastructure.Data;
 using JoiabagurPV.Infrastructure.Extensions;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
@@ -21,6 +22,14 @@ builder.Services.AddApplication();
 
 // Add API services
 builder.Services.AddApiServices(builder.Configuration);
+
+// Behind nginx on the same host: trust forwarded proto/host so Request.Scheme is https and UseHttpsRedirection does not break the SPA.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 var app = builder.Build();
 
@@ -54,6 +63,9 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(); // Available at: /scalar/v1
 }
 
+// Must be first: reverse proxy headers (nginx → Kestrel).
+app.UseForwardedHeaders();
+
 // Add CORS BEFORE static files and HTTPS redirection to handle preflight requests correctly,
 // and to ensure CORS headers are present on static file responses for cross-origin requests.
 app.UseCors(app.Environment.IsDevelopment() ? "Development" : "Production");
@@ -85,8 +97,31 @@ app.UseAuthorization();
 // Map controllers
 app.MapControllers();
 
-// SPA fallback: serve index.html for any non-API path not matched by a controller.
-// The regex explicitly excludes /api/ routes so unmatched API calls keep returning 404.
-app.MapFallbackToFile("/{**path:regex(^(?!api/).*$)}", "index.html");
+// SPA fallback: serve index.html for / and client routes; unknown /api/* stays 404 (no HTML).
+app.MapFallback(async context =>
+{
+    if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    var webRoot = app.Environment.WebRootPath;
+    if (string.IsNullOrEmpty(webRoot))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    var indexPath = Path.Combine(webRoot, "index.html");
+    if (!File.Exists(indexPath))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    context.Response.ContentType = "text/html; charset=utf-8";
+    await context.Response.SendFileAsync(indexPath);
+});
 
 app.Run();
